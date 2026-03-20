@@ -8,7 +8,6 @@ import { getAuthErrorMessage, getGenericSupabaseErrorMessage } from '@/lib/auth-
 import { fetchProfileViewData } from '@/lib/profile-data';
 import { ProfileViewData } from '@/components/profile/types';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
-import { AvatarPicker } from '@/components/profile/AvatarPicker';
 import { ProfileStatsGrid } from '@/components/profile/ProfileStatsGrid';
 import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
 import { ProfileTeamsSection } from '@/components/profile/ProfileTeamsSection';
@@ -19,7 +18,6 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<ProfileViewData | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
@@ -61,7 +59,7 @@ export default function ProfileScreen() {
     return () => {
       mounted = false;
     };
-  }, [profile, refreshKey]);
+  }, [profile]);
 
   const handleSignOut = async () => {
     try {
@@ -72,11 +70,6 @@ export default function ProfileScreen() {
     } finally {
       setIsSigningOut(false);
     }
-  };
-
-  const handleAvatarUploadSuccess = () => {
-    // Recargar datos del perfil
-    setRefreshKey((prev) => prev + 1);
   };
 
   if (loading) {
@@ -104,10 +97,6 @@ export default function ProfileScreen() {
       <GlobalHeader />
       <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: 110 }}>
         <ProfileHeader profile={viewData.profile} />
-        <AvatarPicker 
-          profileId={viewData.profile.id} 
-          onUploadSuccess={handleAvatarUploadSuccess}
-        />
         <ProfileStatsGrid stats={viewData.stats} />
         <ProfileBadgesSection badges={viewData.badges} />
         <ProfileTeamsSection teams={viewData.teams} />
