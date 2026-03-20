@@ -1,19 +1,27 @@
-import { Feather } from '@expo/vector-icons';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { AppIcon } from '@/components/ui/AppIcon';
 
 type ProfileSettingsSectionProps = {
   isSigningOut: boolean;
   onSignOut: () => void;
 };
 
-function Row({ icon, title }: { icon: keyof typeof Feather.glyphMap; title: string }) {
+function Row({
+  icon,
+  title,
+  family = 'material-community',
+}: {
+  icon: string;
+  title: string;
+  family?: 'ionicons' | 'material-community' | 'material-icons';
+}) {
   return (
-    <TouchableOpacity activeOpacity={0.85} className="w-full flex-row items-center justify-between border-b border-neutral-outline-variant/10 px-5 py-4">
+    <TouchableOpacity activeOpacity={0.85} className="w-full flex-row items-center justify-between rounded-xl bg-surface-high px-5 py-4">
       <View className="flex-row items-center gap-4">
-        <Feather name={icon} size={18} color="#BCCBB9" />
-        <Text className="text-sm font-medium text-neutral-on-surface">{title}</Text>
+        <AppIcon family={family} name={icon} size={18} color="#BCCBB9" />
+        <Text className="font-ui text-sm text-neutral-on-surface">{title}</Text>
       </View>
-      <Feather name="chevron-right" size={15} color="#BCCBB9" />
+      <AppIcon family="material-icons" name="chevron-right" size={18} color="#BCCBB9" />
     </TouchableOpacity>
   );
 }
@@ -21,21 +29,21 @@ function Row({ icon, title }: { icon: keyof typeof Feather.glyphMap; title: stri
 export function ProfileSettingsSection({ isSigningOut, onSignOut }: ProfileSettingsSectionProps) {
   return (
     <View className="mt-8 pb-16">
-      <Text className="mb-4 px-1 text-sm font-bold uppercase tracking-wider text-neutral-on-surface-variant">Ajustes de Perfil</Text>
-      <View className="overflow-hidden rounded-2xl border border-neutral-outline-variant/10 bg-surface-low">
-        <Row icon="edit-2" title="Editar Perfil" />
-        <Row icon="lock" title="Seguridad y Privacidad" />
-        <Row icon="settings" title="Preferencias" />
+      <Text className="font-display mb-4 px-1 text-sm uppercase tracking-wider text-neutral-on-surface-variant">Ajustes de Perfil</Text>
+      <View className="gap-2 rounded-2xl bg-surface-low p-2">
+        <Row family="material-community" icon="account-edit-outline" title="Editar Perfil" />
+        <Row family="material-community" icon="shield-lock-outline" title="Seguridad y Privacidad" />
+        <Row family="material-community" icon="cog-outline" title="Preferencias" />
 
         <TouchableOpacity
           disabled={isSigningOut}
           onPress={onSignOut}
           activeOpacity={0.9}
-          className="w-full flex-row items-center justify-between px-5 py-4"
+          className="w-full flex-row items-center justify-between rounded-xl bg-surface-high px-5 py-4"
         >
           <View className="flex-row items-center gap-4">
-            <Feather name="log-out" size={18} color="#FFB4AB" />
-            <Text className="text-sm font-bold text-danger-error">Cerrar Sesion</Text>
+            <AppIcon family="material-community" name="logout" size={18} color="#FFB4AB" />
+            <Text className="font-uiBold text-sm text-danger-error">Cerrar Sesion</Text>
           </View>
           {isSigningOut && <ActivityIndicator color="#FFB4AB" size="small" />}
         </TouchableOpacity>

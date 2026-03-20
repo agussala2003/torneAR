@@ -90,15 +90,15 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         <View className="mb-12 items-center">
-          <Text className="mb-2 text-4xl font-black italic tracking-tighter text-brand-primary">TorneAR</Text>
-          <Text className="text-base text-center text-neutral-on-surface-variant">
+          <Text className="font-displayBlack mb-2 text-4xl italic tracking-tighter text-brand-primary">TorneAR</Text>
+          <Text className="font-ui text-base text-center text-neutral-on-surface-variant">
             {isLogin ? 'Bienvenido de vuelta a la cancha' : 'Comienza tu viaje hoy'}
           </Text>
         </View>
 
         <View className="space-y-4 mb-8 gap-4">
           <View>
-            <Text className="mb-2 font-medium text-neutral-on-surface">Correo Electrónico</Text>
+            <Text className="font-uiBold mb-2 text-neutral-on-surface">Correo Electronico</Text>
             {/* 4. Usamos Controller para el input */}
             <Controller
               control={control}
@@ -120,7 +120,7 @@ export default function LoginScreen() {
           </View>
 
           <View>
-            <Text className="mb-2 font-medium text-neutral-on-surface">Contraseña</Text>
+            <Text className="font-uiBold mb-2 text-neutral-on-surface">Contrasena</Text>
             <Controller
               control={control}
               name="password"
@@ -149,16 +149,16 @@ export default function LoginScreen() {
           {loading ? (
             <ActivityIndicator color="#003914" />
           ) : (
-            <Text className="text-lg font-bold uppercase tracking-widest text-[#003914]">
+            <Text className="font-display text-lg uppercase tracking-widest text-[#003914]">
               {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
             </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setIsLogin(!isLogin)} className="items-center py-4">
-          <Text className="text-sm text-neutral-on-surface-variant">
+          <Text className="font-ui text-sm text-neutral-on-surface-variant">
             {isLogin ? "¿No tienes una cuenta? " : "¿Ya tienes una cuenta? "}
-            <Text className="font-bold text-brand-primary">{isLogin ? 'Regístrate' : 'Inicia Sesión'}</Text>
+            <Text className="font-uiBold text-brand-primary">{isLogin ? 'Regístrate' : 'Inicia Sesión'}</Text>
           </Text>
         </TouchableOpacity>
       </ScrollView>

@@ -1,5 +1,9 @@
 import '../global.css';
 import { useEffect, useState } from 'react';
+import { useFonts } from 'expo-font';
+import { Inter_500Medium, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
+import { BarlowCondensed_700Bold, BarlowCondensed_800ExtraBold } from '@expo-google-fonts/barlow-condensed';
+import { Epilogue_700Bold } from '@expo-google-fonts/epilogue';
 import { DarkTheme, DefaultTheme, ThemeProvider, Theme } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -78,6 +82,18 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [fontsLoaded] = useFonts({
+    Inter_500Medium,
+    Inter_700Bold,
+    Inter_900Black,
+    BarlowCondensed_700Bold,
+    BarlowCondensed_800ExtraBold,
+    Epilogue_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return <GlobalLoader label="Cargando tipografias" />;
+  }
 
   const navigationTheme: Theme = colorScheme === 'dark'
     ? {

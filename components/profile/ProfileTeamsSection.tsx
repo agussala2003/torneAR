@@ -1,7 +1,7 @@
-import { Feather } from '@expo/vector-icons';
 import { Image, Text, View } from 'react-native';
 import { TeamItem } from './types';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { AppIcon } from '@/components/ui/AppIcon';
 
 type ProfileTeamsSectionProps = {
   teams: TeamItem[];
@@ -37,11 +37,11 @@ export function ProfileTeamsSection({ teams }: ProfileTeamsSectionProps) {
 
   return (
     <View className="mt-8">
-      <Text className="mb-4 px-1 text-sm font-bold uppercase tracking-wider text-neutral-on-surface-variant">Mis Equipos</Text>
+      <Text className="font-display mb-4 px-1 text-sm uppercase tracking-wider text-neutral-on-surface-variant">Mis Equipos</Text>
       <View className="gap-3">
         {teams.length === 0 ? (
-          <View className="rounded-xl border border-neutral-outline-variant/10 bg-surface-low p-4">
-            <Text className="text-sm text-neutral-on-surface-variant">Todavia no estas en equipos.</Text>
+          <View className="rounded-xl bg-surface-low p-4">
+            <Text className="font-ui text-sm text-neutral-on-surface-variant">Todavia no estas en equipos.</Text>
           </View>
         ) : (
           teams.map((team) => (
@@ -51,22 +51,22 @@ export function ProfileTeamsSection({ teams }: ProfileTeamsSectionProps) {
                   {getShieldImageUrl(team) ? (
                     <Image source={{ uri: getShieldImageUrl(team) }} className="h-8 w-8" resizeMode="contain" />
                   ) : (
-                    <Feather name="shield" size={18} color="#BCCBB9" />
+                    <AppIcon family="material-community" name="shield-outline" size={18} color="#BCCBB9" />
                   )}
                 </View>
 
                 <View>
-                  <Text className="text-xl font-bold text-neutral-on-surface">{team.name}</Text>
+                  <Text className="font-display text-xl text-neutral-on-surface">{team.name}</Text>
                   <View className="mt-1 flex-row items-center gap-2">
-                    <Text className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase ${roleClass(team.role)}`}>
+                    <Text className={`font-uiBold rounded px-2 py-0.5 text-[9px] uppercase ${roleClass(team.role)}`}>
                       {roleLabel(team.role)}
                     </Text>
-                    <Text className="text-xs text-neutral-on-surface-variant">ELO {team.eloRating}</Text>
+                    <Text className="font-ui text-xs text-neutral-on-surface-variant" style={{ fontVariant: ['tabular-nums'] }}>ELO {team.eloRating}</Text>
                   </View>
                 </View>
               </View>
 
-              <Feather name="chevron-right" size={18} color="#BCCBB9" />
+              <AppIcon family="material-icons" name="chevron-right" size={20} color="#BCCBB9" />
             </View>
           ))
         )}

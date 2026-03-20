@@ -4,6 +4,14 @@ module.exports = {
   presets: [require("nativewind/preset")],
   theme: {
     extend: {
+      fontFamily: {
+        ui: ['Inter_500Medium'],
+        uiBold: ['Inter_700Bold'],
+        uiBlack: ['Inter_900Black'],
+        display: ['BarlowCondensed_700Bold'],
+        displayBlack: ['BarlowCondensed_800ExtraBold'],
+        epic: ['Epilogue_700Bold'],
+      },
       colors: {
         brand: {
           primary: "#53E076",

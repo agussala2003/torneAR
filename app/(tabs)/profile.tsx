@@ -79,8 +79,8 @@ export default function ProfileScreen() {
   if (!profile || !viewData) {
     return (
       <View className="flex-1 items-center justify-center bg-surface-base px-6">
-        <Text className="text-xl font-bold text-neutral-on-surface">Perfil no disponible</Text>
-        <Text className="mt-2 text-center text-neutral-on-surface-variant">No se pudo obtener la informacion de perfil en este momento.</Text>
+        <Text className="font-display text-xl text-neutral-on-surface">Perfil no disponible</Text>
+        <Text className="font-ui mt-2 text-center text-neutral-on-surface-variant">No se pudo obtener la informacion de perfil en este momento.</Text>
 
         <CustomAlert
           visible={alertVisible}

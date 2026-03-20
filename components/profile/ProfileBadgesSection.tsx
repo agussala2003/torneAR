@@ -1,7 +1,7 @@
-import { Feather } from '@expo/vector-icons';
 import { Image, ScrollView, Text, View } from 'react-native';
 import { BadgeItem } from './types';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { AppIcon } from '@/components/ui/AppIcon';
 
 type ProfileBadgesSectionProps = {
   badges: BadgeItem[];
@@ -23,10 +23,10 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
   return (
     <View className="mt-8">
       <View className="mb-4 flex-row items-center justify-between px-1">
-        <Text className="text-sm font-bold uppercase tracking-wider text-neutral-on-surface-variant">
+        <Text className="font-display text-sm uppercase tracking-wider text-neutral-on-surface-variant">
           Insignias Ganadas
         </Text>
-        <Text className="text-[10px] font-bold uppercase text-neutral-on-surface-variant">
+        <Text className="font-uiBold text-[10px] uppercase text-neutral-on-surface-variant" style={{ fontVariant: ['tabular-nums'] }}>
           {earnedBadges.length} de {badges.length}
         </Text>
       </View>
@@ -48,11 +48,11 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
                 {getBadgeImageUrl(badge) ? (
                   <Image source={{ uri: getBadgeImageUrl(badge) }} className="h-11 w-11" resizeMode="contain" />
                 ) : (
-                  <Feather name="award" size={28} color="#53E076" />
+                  <AppIcon family="material-community" name="medal-outline" size={28} color="#53E076" />
                 )}
               </View>
               <Text
-                className="max-w-[72px] text-center text-[10px] font-bold text-neutral-on-surface"
+                className="font-uiBold max-w-[72px] text-center text-[10px] text-neutral-on-surface"
                 numberOfLines={2}
               >
                 {badge.name}
@@ -72,20 +72,20 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
                       resizeMode="contain"
                     />
                     <View className="absolute h-6 w-6 items-center justify-center rounded-full bg-neutral-outline-variant">
-                      <Feather name="lock" size={12} color="#8CCDFF" />
+                      <AppIcon family="material-community" name="lock-outline" size={12} color="#8CCDFF" />
                     </View>
                   </>
                 ) : (
                   <>
-                    <Feather name="award" size={28} color="#595959" />
+                    <AppIcon family="material-community" name="medal-outline" size={28} color="#595959" />
                     <View className="absolute h-6 w-6 items-center justify-center rounded-full bg-neutral-outline-variant">
-                      <Feather name="lock" size={12} color="#8CCDFF" />
+                      <AppIcon family="material-community" name="lock-outline" size={12} color="#8CCDFF" />
                     </View>
                   </>
                 )}
               </View>
               <Text
-                className="max-w-[72px] text-center text-[10px] font-bold text-neutral-on-surface-variant"
+                className="font-uiBold max-w-[72px] text-center text-[10px] text-neutral-on-surface-variant"
                 numberOfLines={2}
               >
                 {badge.name}

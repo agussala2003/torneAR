@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, ScrollView,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Feather } from '@expo/vector-icons';
+import { AppIcon } from '@/components/ui/AppIcon';
 import CustomAlert from '../components/ui/CustomAlert';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -78,8 +78,8 @@ const PitchSelector = ({
 
             {/* Pill de Texto */}
             <View className={`flex-row items-center justify-center px-6 py-2.5 rounded-full border ${isSelected ? 'bg-brand-primary border-[#003914]' : 'bg-surface-base/90 border-neutral-outline-variant'}`}>
-              {isSelected && <Feather name="check" size={18} color="#003914" style={{ marginRight: 6 }} />}
-              <Text className={`font-black text-sm uppercase tracking-widest ${isSelected ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
+              {isSelected && <AppIcon family="material-community" name="check" size={18} color="#003914" />}
+              <Text className={`font-displayBlack text-sm uppercase tracking-widest ${isSelected ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
                 {pos.label}
               </Text>
             </View>
@@ -187,8 +187,8 @@ export default function OnboardingScreen() {
       {step === 2 && (
         <View className="px-6 pt-4 pb-2">
           <TouchableOpacity className="flex-row items-center gap-1 active:opacity-70" onPress={() => setStep(1)}>
-            <Feather name="chevron-left" size={24} color="#BCCBB9" />
-            <Text className="font-bold text-sm text-neutral-on-surface-variant">Atrás</Text>
+            <AppIcon family="material-icons" name="arrow-back-ios-new" size={20} color="#BCCBB9" />
+            <Text className="font-uiBold text-sm text-neutral-on-surface-variant">Atras</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -196,8 +196,8 @@ export default function OnboardingScreen() {
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60, paddingTop: step === 1 ? 24 : 8 }}>
         <View className="mb-8">
           <View className="flex-row justify-between items-end mb-3">
-            <Text className="font-bold text-xl uppercase tracking-widest text-brand-primary">Paso {step} de 2</Text>
-            <Text className="font-medium text-sm text-neutral-on-surface-variant">{step === 1 ? 'Datos Base' : 'Finalizando Perfil'}</Text>
+            <Text className="font-display text-xl uppercase tracking-widest text-brand-primary">Paso {step} de 2</Text>
+            <Text className="font-ui text-sm text-neutral-on-surface-variant">{step === 1 ? 'Datos Base' : 'Finalizando Perfil'}</Text>
           </View>
           <View className="h-1.5 w-full rounded-full overflow-hidden flex-row bg-surface-high">
             <View className={`h-full bg-brand-primary ${step === 1 ? 'w-1/2' : 'w-full'}`} style={{ shadowColor: '#53E076', shadowOpacity: 0.4, shadowRadius: 12 }} />
@@ -207,13 +207,13 @@ export default function OnboardingScreen() {
         {step === 1 ? (
           <View>
             <View className="mb-6">
-              <Text className="text-3xl font-bold text-neutral-on-surface mb-2">Datos Personales</Text>
-              <Text className="text-neutral-on-surface-variant">Cuéntanos cómo te llamas y por dónde prefieres jugar.</Text>
+              <Text className="font-displayBlack text-3xl text-neutral-on-surface mb-2">Datos Personales</Text>
+              <Text className="font-ui text-neutral-on-surface-variant">Cuentanos como te llamas y por donde prefieres jugar.</Text>
             </View>
 
             <View className="space-y-4 mb-8 gap-4">
               <View>
-                <Text className="text-xs uppercase tracking-wider mb-2 font-bold text-neutral-on-surface-variant">Nombre Completo</Text>
+                <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">Nombre Completo</Text>
                 <Controller
                   control={control}
                   name="fullName"
@@ -232,7 +232,7 @@ export default function OnboardingScreen() {
               </View>
 
               <View>
-                <Text className="text-xs uppercase tracking-wider mb-2 font-bold text-neutral-on-surface-variant">Nombre de Usuario</Text>
+                <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">Nombre de Usuario</Text>
                 <Controller
                   control={control}
                   name="username"
@@ -252,7 +252,7 @@ export default function OnboardingScreen() {
               </View>
 
               <View>
-                <Text className="text-xs uppercase tracking-wider mb-2 font-bold text-neutral-on-surface-variant">Zona de Juego Principal</Text>
+                <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">Zona de Juego Principal</Text>
                 <TouchableOpacity
                   onPress={() => setShowZonePicker(true)}
                   activeOpacity={0.8}
@@ -261,7 +261,7 @@ export default function OnboardingScreen() {
                   <Text className={selectedZone ? 'text-neutral-on-surface' : 'text-surface-bright'}>
                     {selectedZone || "Selecciona una zona"}
                   </Text>
-                  {loadingZones ? <ActivityIndicator size="small" color="#53E076" /> : <Feather name="chevron-down" size={20} color="#BCCBB9" />}
+                  {loadingZones ? <ActivityIndicator size="small" color="#53E076" /> : <AppIcon family="material-icons" name="keyboard-arrow-down" size={22} color="#BCCBB9" />}
                 </TouchableOpacity>
                 {errors.zone && <Text className="text-red-500 text-xs mt-1">{errors.zone.message}</Text>}
               </View>
@@ -272,14 +272,14 @@ export default function OnboardingScreen() {
               activeOpacity={0.9}
               className="w-full py-4 rounded-xl items-center bg-brand-primary"
             >
-              <Text className="font-bold text-xl uppercase tracking-widest text-[#003914]">Siguiente</Text>
+              <Text className="font-displayBlack text-xl uppercase tracking-widest text-[#003914]">Siguiente</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View>
             <View className="mb-6">
-              <Text className="text-3xl font-bold text-neutral-on-surface mb-2">Perfil Técnico</Text>
-              <Text className="text-neutral-on-surface-variant">Toca el sector de la cancha donde te destacas.</Text>
+              <Text className="font-displayBlack text-3xl text-neutral-on-surface mb-2">Perfil Tecnico</Text>
+              <Text className="font-ui text-neutral-on-surface-variant">Toca el sector de la cancha donde te destacas.</Text>
             </View>
 
             {/* Selector de Cancha Nativo */}
@@ -295,8 +295,8 @@ export default function OnboardingScreen() {
                 onPress={() => setValue('position', 'CUALQUIERA')}
                 className={`px-8 py-3.5 rounded-full border ${selectedPosition === 'CUALQUIERA' ? 'bg-brand-primary border-[#003914]' : 'bg-surface-low border-neutral-outline-variant'}`}
               >
-                <Text className={`font-bold uppercase tracking-widest text-sm ${selectedPosition === 'CUALQUIERA' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
-                  {selectedPosition === 'CUALQUIERA' && <Feather name="check" size={14} color="#003914" />} Soy Flexible
+                <Text className={`font-display uppercase tracking-widest text-sm ${selectedPosition === 'CUALQUIERA' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
+                  {selectedPosition === 'CUALQUIERA' && <AppIcon family="material-community" name="check-circle" size={14} color="#003914" />} Soy Flexible
                 </Text>
               </TouchableOpacity>
             </View>
@@ -307,7 +307,7 @@ export default function OnboardingScreen() {
               activeOpacity={0.9}
               className={`w-full py-4 rounded-xl items-center ${loading ? 'bg-brand-primary/50' : 'bg-brand-primary'}`}
             >
-              {loading ? <ActivityIndicator color="#003914" /> : <Text className="font-bold text-xl uppercase tracking-widest text-[#003914]">Comenzar</Text>}
+              {loading ? <ActivityIndicator color="#003914" /> : <Text className="font-displayBlack text-xl uppercase tracking-widest text-[#003914]">Comenzar</Text>}
             </TouchableOpacity>
           </View>
         )}
@@ -321,7 +321,7 @@ export default function OnboardingScreen() {
               <View className="rounded-t-3xl overflow-hidden max-h-[50%] border-t border-neutral-outline-variant bg-surface-base">
                 <View className="p-4 border-b border-neutral-outline-variant flex-row justify-between items-center">
                   <Text className="text-lg font-bold text-neutral-on-surface">Selecciona tu Zona</Text>
-                  <TouchableOpacity onPress={() => setShowZonePicker(false)}><Feather name="x" size={24} color="#BCCBB9" /></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setShowZonePicker(false)}><AppIcon family="material-icons" name="close" size={24} color="#BCCBB9" /></TouchableOpacity>
                 </View>
                 <FlatList
                   data={zones}
@@ -336,7 +336,7 @@ export default function OnboardingScreen() {
                       }}
                     >
                       <Text className="text-base text-neutral-on-surface">{item}</Text>
-                      {selectedZone === item && <Feather name="check" size={20} color="#53E076" />}
+                      {selectedZone === item && <AppIcon family="material-community" name="check-circle" size={20} color="#53E076" />}
                     </TouchableOpacity>
                   )}
                 />

@@ -74,25 +74,30 @@ export const Colors = {
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+    sans: 'Inter_500Medium',
+    sansBold: 'Inter_700Bold',
+    sansBlack: 'Inter_900Black',
+    display: 'BarlowCondensed_700Bold',
+    displayBlack: 'BarlowCondensed_800ExtraBold',
+    epic: 'Epilogue_700Bold',
+    mono: 'Inter_500Medium',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+    sans: 'Inter_500Medium',
+    sansBold: 'Inter_700Bold',
+    sansBlack: 'Inter_900Black',
+    display: 'BarlowCondensed_700Bold',
+    displayBlack: 'BarlowCondensed_800ExtraBold',
+    epic: 'Epilogue_700Bold',
+    mono: 'Inter_500Medium',
   },
   web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    sans: 'Inter_500Medium',
+    sansBold: 'Inter_700Bold',
+    sansBlack: 'Inter_900Black',
+    display: 'BarlowCondensed_700Bold',
+    displayBlack: 'BarlowCondensed_800ExtraBold',
+    epic: 'Epilogue_700Bold',
+    mono: 'Inter_500Medium',
   },
 });

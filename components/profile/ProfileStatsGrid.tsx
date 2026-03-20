@@ -9,9 +9,9 @@ type StatCardProps = {
 
 function StatCard({ label, value, colorClass = 'text-neutral-on-surface' }: StatCardProps) {
   return (
-    <View className="items-center justify-center rounded-xl border border-neutral-outline-variant/10 bg-surface-low p-5">
-      <Text className={`text-5xl font-black tracking-tighter ${colorClass}`}>{value}</Text>
-      <Text className="mt-1 text-[10px] font-bold uppercase tracking-widest text-neutral-on-surface-variant">{label}</Text>
+    <View className="items-center justify-center rounded-xl bg-surface-low p-5">
+      <Text className={`font-displayBlack text-5xl tracking-tighter ${colorClass}`} style={{ fontVariant: ['tabular-nums'] }}>{value}</Text>
+      <Text className="font-uiBold mt-1 text-[10px] uppercase tracking-widest text-neutral-on-surface-variant">{label}</Text>
     </View>
   );
 }

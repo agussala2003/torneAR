@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Feather } from '@expo/vector-icons';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { Image, Text, View, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 import { ProfileRow } from './types';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { supabase } from '@/lib/supabase';
@@ -17,10 +19,11 @@ function positionLabel(position: string): string {
 
 export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
   const [uploading, setUploading] = useState(false);
+  const [avatarPath, setAvatarPath] = useState(profile.avatar_url);
 
   // Construir URL de avatar desde storage de Supabase
-  const avatarUrl = profile.avatar_url 
-    ? getSupabaseStorageUrl('avatars', profile.avatar_url)
+  const avatarUrl = avatarPath
+    ? getSupabaseStorageUrl('avatars', avatarPath)
     : null;
 
   const pickAndUploadImage = async () => {
@@ -35,7 +38,7 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
 
       // Abrir selector de imagen
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1], // Cuadrado
         quality: 0.8,
@@ -43,7 +46,7 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
-        await uploadAvatar(asset.uri);
+        await uploadAvatar(asset.uri, asset.mimeType ?? 'image/jpeg');
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -51,25 +54,43 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
     }
   };
 
-  const uploadAvatar = async (imageUri: string) => {
+  const uploadAvatar = async (imageUri: string, mimeType: string) => {
     try {
       setUploading(true);
 
-      // Leer archivo
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error('No hay sesion activa para subir avatar.');
+      }
+
+      const folderOwnerId = profile.auth_user_id || user.id;
+
+      if (folderOwnerId !== user.id) {
+        throw new Error('El perfil no corresponde al usuario autenticado.');
+      }
+
+      // React Native + Supabase: usar base64/ArrayBuffer (Blob falla en algunos dispositivos)
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const fileData = decode(base64);
 
       // Generar nombre único
-      const fileExt = 'jpg';
-      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${profile.id}/${fileName}`;
+      const fileExt = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+      const fileName = `avatar-${Date.now()}.${fileExt}`;
+      // Debe empezar con auth.uid() para cumplir la policy de storage
+      const filePath = `${folderOwnerId}/${fileName}`;
 
       // Subir a Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, blob, {
+        .upload(filePath, fileData, {
           cacheControl: '3600',
           upsert: true,
+          contentType: mimeType,
         });
 
       if (uploadError) {
@@ -86,11 +107,12 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
         throw updateError;
       }
 
+      setAvatarPath(filePath);
       onAvatarUpdate?.(filePath);
       Alert.alert('Éxito', 'Foto de perfil actualizada correctamente.');
     } catch (error) {
       console.error('Upload error:', error);
-      Alert.alert('Error al subir', 'No se pudo subir la imagen. Intenta de nuevo.');
+      Alert.alert('Error al subir', 'No se pudo subir la imagen. Revisa conexión y políticas del bucket avatars.');
     } finally {
       setUploading(false);
     }
@@ -106,7 +128,7 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
       >
         <View 
           className="border-4 border-brand-primary-container bg-surface-lowest p-1"
-          style={{ height: 128, width: 128, borderRadius: 8 }}
+          style={{ height: 128, width: 128, borderRadius: 6 }}
         >
           {uploading ? (
             <View 
@@ -126,32 +148,33 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
               className="items-center justify-center bg-surface-high"
               style={{ height: '100%', width: '100%', borderRadius: 6 }}
             >
-              <Feather name="user" size={42} color="#BCCBB9" />
+              <AppIcon family="material-community" name="account" size={42} color="#BCCBB9" />
             </View>
           )}
         </View>
         {/* Badge: + si no hay foto, ✓ si hay foto */}
-        <View className="absolute bottom-1 right-1 rounded-full border-2 border-surface-base bg-brand-primary p-2">
-          <Feather 
-            name={avatarUrl ? "check" : "plus"} 
-            size={12} 
+        <View className="absolute bottom-3 right-3 rounded-lg border-2 border-surface-base bg-brand-primary p-1">
+          <AppIcon 
+            family="material-icons" 
+            name={avatarUrl ? "verified" : "add"} 
+            size={14} 
             color="#003914" 
           />
         </View>
       </TouchableOpacity>
 
-      <Text className="mt-4 text-3xl font-black tracking-tight text-neutral-on-surface">{profile.full_name}</Text>
-      <Text className="mt-1 text-base font-medium text-neutral-on-surface-variant">@{profile.username}</Text>
+      <Text className="font-displayBlack mt-4 text-3xl tracking-tight text-neutral-on-surface">{profile.full_name}</Text>
+      <Text className="font-ui mt-1 text-base text-neutral-on-surface-variant">@{profile.username}</Text>
 
       <View className="mt-3 flex-row items-center gap-3">
         <View className="flex-row items-center gap-1 rounded-full bg-surface-high px-3 py-1">
-          <Feather name="map-pin" size={12} color="#8CCDFF" />
-          <Text className="text-xs font-semibold text-neutral-on-surface">{profile.zone ?? 'Sin zona'}</Text>
+          <AppIcon family="material-community" name="map-marker-outline" size={12} color="#8CCDFF" />
+          <Text className="font-uiBold text-xs text-neutral-on-surface">{profile.zone ?? 'Sin zona'}</Text>
         </View>
 
         <View className="flex-row items-center gap-1 rounded-full border border-brand-primary/25 bg-brand-primary-container/20 px-3 py-1">
-          <Feather name="crosshair" size={12} color="#53E076" />
-          <Text className="text-xs font-bold uppercase text-brand-primary">{positionLabel(profile.preferred_position)}</Text>
+          <AppIcon family="material-community" name="soccer" size={12} color="#53E076" />
+          <Text className="font-display text-xs uppercase text-brand-primary">{positionLabel(profile.preferred_position)}</Text>
         </View>
       </View>
     </View>

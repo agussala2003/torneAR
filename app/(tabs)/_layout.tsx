@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { AppIcon } from '@/components/ui/AppIcon';
 
 export default function TabLayout() {
   return (
@@ -10,8 +10,8 @@ export default function TabLayout() {
         // Solo estilos visuales, sin tocar alturas ni paddings nativos
         tabBarStyle: {
           backgroundColor: Colors.dark.surfaceContainer,
-          borderTopColor: Colors.dark.border,
-          borderTopWidth: 1,
+          borderTopColor: 'transparent',
+          borderTopWidth: 0,
           elevation: 10,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
@@ -22,7 +22,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: Colors.dark.tabIconDefault,
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: '900',
+          fontFamily: 'BarlowCondensed_700Bold',
           textTransform: 'uppercase',
           letterSpacing: 0.5,
         },
@@ -34,7 +34,7 @@ export default function TabLayout() {
         options={{
           title: 'INICIO',
           tabBarIcon: ({ color, focused }) => (
-            <Feather name="home" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="material-community" name="home-variant-outline" size={focused ? 24 : 22} color={color} />
           ),
         }}
       />
@@ -43,7 +43,7 @@ export default function TabLayout() {
         options={{
           title: 'RANKING',
           tabBarIcon: ({ color, focused }) => (
-            <Feather name="bar-chart-2" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="material-community" name="trophy-outline" size={focused ? 24 : 22} color={color} />
           ),
         }}
       />
@@ -52,7 +52,7 @@ export default function TabLayout() {
         options={{
           title: 'PARTIDOS',
           tabBarIcon: ({ color, focused }) => (
-            <Feather name="crosshair" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="material-community" name="soccer" size={focused ? 24 : 22} color={color} />
           ),
         }}
       />
@@ -61,7 +61,7 @@ export default function TabLayout() {
         options={{
           title: 'MERCADO',
           tabBarIcon: ({ color, focused }) => (
-            <Feather name="users" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="ionicons" name="storefront-outline" size={focused ? 24 : 22} color={color} />
           ),
         }}
       />
@@ -70,7 +70,7 @@ export default function TabLayout() {
         options={{
           title: 'PERFIL',
           tabBarIcon: ({ color, focused }) => (
-            <Feather name="user" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="material-community" name="account-outline" size={focused ? 24 : 22} color={color} />
           ),
         }}
       />

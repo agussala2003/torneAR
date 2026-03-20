@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons';
+import { AppIcon } from './ui/AppIcon';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 type GlobalHeaderProps = {
@@ -11,10 +11,10 @@ export function GlobalHeader({ onNotificationPress, notificationCount = 0 }: Glo
     <View className="relative z-50 flex-row items-center justify-between bg-surface-base/80 px-5 pb-4 pt-12 backdrop-blur-md">
       {/* Logo TorneAR */}
       <View className="flex-row items-center gap-2">
-        <View className="h-8 w-8 items-center justify-center rounded-full bg-brand-primary">
-          <Feather name="activity" size={18} color="#003914" />
+        <View className="h-8 w-8 items-center justify-center rounded-full">
+          <AppIcon family="material-community" name="soccer" size={20} color='#53E076'/>
         </View>
-        <Text className="text-lg font-bold tracking-wider text-brand-primary">TORNEAR</Text>
+        <Text className="font-displayBlack text-lg tracking-wider text-brand-primary">TORNEAR</Text>
       </View>
 
       {/* Notification Bell */}
@@ -23,10 +23,10 @@ export function GlobalHeader({ onNotificationPress, notificationCount = 0 }: Glo
         activeOpacity={0.7}
         className="relative"
       >
-        <Feather name="bell" size={20} color="#8CCDFF" />
+        <AppIcon family="material-community" name="bell" size={20}  />
         {notificationCount > 0 && (
           <View className="absolute -top-1 -right-1 h-4 w-4 items-center justify-center rounded-full bg-warning-secondary">
-            <Text className="text-[10px] font-bold text-surface-base">
+            <Text className="font-uiBold text-[10px] text-surface-base" style={{ fontVariant: ['tabular-nums'] }}>
               {notificationCount > 9 ? '9+' : notificationCount}
             </Text>
           </View>
