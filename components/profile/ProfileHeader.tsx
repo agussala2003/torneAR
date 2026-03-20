@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Image, Text, View } from 'react-native';
 import { ProfileRow } from './types';
+import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
 type ProfileHeaderProps = {
   profile: ProfileRow;
@@ -11,14 +12,29 @@ function positionLabel(position: string): string {
 }
 
 export function ProfileHeader({ profile }: ProfileHeaderProps) {
+  // Construir URL de avatar desde storage de Supabase
+  const avatarUrl = profile.avatar_url 
+    ? getSupabaseStorageUrl('avatars', profile.avatar_url)
+    : null;
+
   return (
     <View className="items-center pt-3">
       <View className="relative">
-        <View className="h-32 w-32 rounded-full border-4 border-brand-primary-container bg-surface-lowest p-1">
-          {profile.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} className="h-full w-full rounded-full" resizeMode="cover" />
+        <View 
+          className="border-4 border-brand-primary-container bg-surface-lowest p-1"
+          style={{ height: 128, width: 128, borderRadius: 64 }}
+        >
+          {avatarUrl ? (
+            <Image 
+              source={{ uri: avatarUrl }} 
+              style={{ height: '100%', width: '100%', borderRadius: 60 }}
+              resizeMode="cover" 
+            />
           ) : (
-            <View className="h-full w-full rounded-full items-center justify-center bg-surface-high">
+            <View 
+              className="items-center justify-center bg-surface-high"
+              style={{ height: '100%', width: '100%', borderRadius: 60 }}
+            >
               <Feather name="user" size={42} color="#BCCBB9" />
             </View>
           )}

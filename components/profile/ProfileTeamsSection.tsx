@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Image, Text, View } from 'react-native';
 import { TeamItem } from './types';
+import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
 type ProfileTeamsSectionProps = {
   teams: TeamItem[];
@@ -27,6 +28,13 @@ function roleClass(role: TeamItem['role']): string {
 }
 
 export function ProfileTeamsSection({ teams }: ProfileTeamsSectionProps) {
+  // Helper para obtener URL de shield
+  const getShieldImageUrl = (team: TeamItem): string => {
+    if (!team.shieldUrl) return '';
+    if (team.shieldUrl.startsWith('http')) return team.shieldUrl;
+    return getSupabaseStorageUrl('shields', team.shieldUrl);
+  };
+
   return (
     <View className="mt-8">
       <Text className="mb-4 px-1 text-sm font-bold uppercase tracking-wider text-neutral-on-surface-variant">Mis Equipos</Text>
@@ -40,8 +48,8 @@ export function ProfileTeamsSection({ teams }: ProfileTeamsSectionProps) {
             <View key={team.id} className="flex-row items-center justify-between rounded-xl bg-surface-low p-3">
               <View className="flex-row items-center gap-4">
                 <View className="h-12 w-12 items-center justify-center rounded-lg bg-surface-variant">
-                  {team.shieldUrl ? (
-                    <Image source={{ uri: team.shieldUrl }} className="h-8 w-8" resizeMode="contain" />
+                  {getShieldImageUrl(team) ? (
+                    <Image source={{ uri: getShieldImageUrl(team) }} className="h-8 w-8" resizeMode="contain" />
                   ) : (
                     <Feather name="shield" size={18} color="#BCCBB9" />
                   )}

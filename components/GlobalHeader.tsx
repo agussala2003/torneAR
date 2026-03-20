@@ -8,7 +8,7 @@ type GlobalHeaderProps = {
 
 export function GlobalHeader({ onNotificationPress, notificationCount = 0 }: GlobalHeaderProps) {
   return (
-    <View className="relative z-50 flex-row items-center justify-between bg-surface-base/80 px-5 py-4 backdrop-blur-md">
+    <View className="relative z-50 flex-row items-center justify-between bg-surface-base/80 px-5 pb-4 pt-12 backdrop-blur-md">
       {/* Logo TorneAR */}
       <View className="flex-row items-center gap-2">
         <View className="h-8 w-8 items-center justify-center rounded-full bg-brand-primary">

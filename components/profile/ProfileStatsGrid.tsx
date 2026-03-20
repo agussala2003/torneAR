@@ -22,11 +22,19 @@ type ProfileStatsGridProps = {
 
 export function ProfileStatsGrid({ stats }: ProfileStatsGridProps) {
   return (
-    <View className="mt-7 grid grid-cols-2 gap-3">
-      <StatCard label="Partidos" value={stats.matchesPlayed} />
-      <StatCard label="Goles" value={stats.goals} colorClass="text-brand-primary" />
-      <StatCard label="MVPs" value={stats.mvps} colorClass="text-warning-tertiary" />
-      <StatCard label="Victorias" value={stats.wins} colorClass="text-info-secondary" />
+    <View style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 28 }}>
+      <View style={{ width: '48%' }}>
+        <StatCard label="Partidos" value={stats.matchesPlayed} />
+      </View>
+      <View style={{ width: '48%' }}>
+        <StatCard label="Goles" value={stats.goals} colorClass="text-brand-primary" />
+      </View>
+      <View style={{ width: '48%' }}>
+        <StatCard label="MVPs" value={stats.mvps} colorClass="text-warning-tertiary" />
+      </View>
+      <View style={{ width: '48%' }}>
+        <StatCard label="Victorias" value={stats.wins} colorClass="text-info-secondary" />
+      </View>
     </View>
   );
 }

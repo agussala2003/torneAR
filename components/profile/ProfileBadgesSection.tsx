@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { Image, ScrollView, Text, View } from 'react-native';
 import { BadgeItem } from './types';
+import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
 type ProfileBadgesSectionProps = {
   badges: BadgeItem[];
@@ -9,6 +10,15 @@ type ProfileBadgesSectionProps = {
 export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
   const earnedBadges = badges.filter((b) => b.isEarned);
   const lockedBadges = badges.filter((b) => !b.isEarned);
+
+  // Helper para obtener URL de insignia
+  const getBadgeImageUrl = (badge: BadgeItem): string => {
+    if (!badge.iconUrl) return '';
+    // Si ya es una URL completa, devolver como está
+    if (badge.iconUrl.startsWith('http')) return badge.iconUrl;
+    // Si no, tratarla como path en el bucket de badges
+    return getSupabaseStorageUrl('badges', badge.iconUrl);
+  };
 
   return (
     <View className="mt-8">
@@ -35,8 +45,8 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
           {earnedBadges.map((badge) => (
             <View key={`earned-${badge.id}`} className="items-center gap-2">
               <View className="h-20 w-20 items-center justify-center rounded-full border-2 border-brand-primary bg-surface-high">
-                {badge.iconUrl ? (
-                  <Image source={{ uri: badge.iconUrl }} className="h-11 w-11" resizeMode="contain" />
+                {getBadgeImageUrl(badge) ? (
+                  <Image source={{ uri: getBadgeImageUrl(badge) }} className="h-11 w-11" resizeMode="contain" />
                 ) : (
                   <Feather name="award" size={28} color="#53E076" />
                 )}
@@ -54,10 +64,10 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
           {lockedBadges.map((badge) => (
             <View key={`locked-${badge.id}`} className="items-center gap-2">
               <View className="relative h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-neutral-outline-variant bg-surface-high">
-                {badge.iconUrl ? (
+                {getBadgeImageUrl(badge) ? (
                   <>
                     <Image
-                      source={{ uri: badge.iconUrl }}
+                      source={{ uri: getBadgeImageUrl(badge) }}
                       className="h-11 w-11 opacity-30"
                       resizeMode="contain"
                     />
