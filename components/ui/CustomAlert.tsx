@@ -19,15 +19,15 @@ export default function CustomAlert({ visible, title, message, onClose }: Custom
       <TouchableWithoutFeedback onPress={onClose}>
         <View className="flex-1 justify-center items-center bg-black/80 p-6">
           <TouchableWithoutFeedback>
-            <View className="w-full max-w-sm bg-zinc-900 border border-[#3d4a3d] rounded-2xl p-6 shadow-2xl">
-              <Text className="text-xl font-bold text-[#e5e2e1] mb-2">{title}</Text>
-              <Text className="text-base text-[#bccbb9] mb-6 leading-6">{message}</Text>
+            <View className="w-full max-w-sm rounded-2xl border border-neutral-outline-variant bg-surface-high p-6 shadow-2xl">
+              <Text className="mb-2 text-xl font-bold text-neutral-on-surface">{title}</Text>
+              <Text className="mb-6 text-base leading-6 text-neutral-on-surface-variant">{message}</Text>
               
               <TouchableOpacity
                 onPress={onClose}
-                className="w-full bg-[#53e076] py-3 rounded-xl items-center active:scale-95"
+                className="w-full rounded-xl bg-brand-primary py-3 items-center active:scale-95"
               >
-                <Text className="text-[#003914] font-bold text-base uppercase tracking-wider">
+                <Text className="font-bold text-base uppercase tracking-wider text-[#003914]">
                   Aceptar
                 </Text>
               </TouchableOpacity>

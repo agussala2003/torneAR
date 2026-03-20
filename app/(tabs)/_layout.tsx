@@ -1,77 +1,77 @@
-import { Redirect, Tabs } from 'expo-router';
-import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
-
-import { HapticTab } from '@/components/haptic-tab';
+import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '../../context/AuthContext';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const { session, profile, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-[#131313]">
-        <ActivityIndicator color="#53e076" size="large" />
-      </View>
-    );
-  }
-
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
-  if (!profile?.username || !profile?.full_name || !profile?.preferred_position) {
-    return <Redirect href="/onboarding" />;
-  }
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#53e076', // TorneAR Primary Green
         headerShown: false,
-        tabBarButton: HapticTab,
+        // Solo estilos visuales, sin tocar alturas ni paddings nativos
         tabBarStyle: {
-          backgroundColor: '#131313',
-          borderTopColor: '#3d4a3d',
-        }
-      }}>
+          backgroundColor: Colors.dark.surfaceContainer,
+          borderTopColor: Colors.dark.border,
+          borderTopWidth: 1,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+        },
+        tabBarActiveTintColor: Colors.dark.tint,
+        tabBarInactiveTintColor: Colors.dark.tabIconDefault,
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '900',
+          textTransform: 'uppercase',
+          letterSpacing: 0.5,
+        },
+        tabBarHideOnKeyboard: true,
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Inicio',
-          tabBarIcon: ({ color }) => <Feather size={28} name="home" color={color} />,
+          title: 'INICIO',
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="home" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="ranking"
         options={{
-          title: 'Ranking',
-          tabBarIcon: ({ color }) => <Feather size={28} name="list" color={color} />,
+          title: 'RANKING',
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="bar-chart-2" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="matches"
         options={{
-          title: 'Partidos',
-          tabBarIcon: ({ color }) => <Feather size={28} name="calendar" color={color} />,
+          title: 'PARTIDOS',
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="crosshair" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="market"
         options={{
-          title: 'Mercado',
-          tabBarIcon: ({ color }) => <Feather size={28} name="shopping-cart" color={color} />,
+          title: 'MERCADO',
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="users" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Perfil',
-          tabBarIcon: ({ color }) => <Feather size={28} name="user" color={color} />,
+          title: 'PERFIL',
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="user" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
     </Tabs>

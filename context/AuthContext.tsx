@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/supabase';
@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const syncVersionRef = useRef(0);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -38,43 +39,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select('*')
         .eq('auth_user_id', userId)
         .single();
-      
+
       if (!error && data) {
-        setProfile(data);
-      } else {
-        setProfile(null);
+        return data;
       }
+
+      return null;
     } catch (e) {
       console.error('Error fetching profile', e);
+      return null;
     }
   };
 
   const refreshProfile = async () => {
     if (user?.id) {
-      await fetchProfile(user.id);
+      const nextProfile = await fetchProfile(user.id);
+      setProfile(nextProfile);
+    }
+  };
+
+  const syncAuthState = async (nextSession: Session | null) => {
+    const syncVersion = ++syncVersionRef.current;
+
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+
+    if (!nextSession?.user) {
+      if (syncVersion === syncVersionRef.current) {
+        setProfile(null);
+        setLoading(false);
+      }
+      return;
+    }
+
+    setLoading(true);
+    const nextProfile = await fetchProfile(nextSession.user.id);
+
+    if (syncVersion === syncVersionRef.current) {
+      setProfile(nextProfile);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
+      void syncAuthState(session);
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      void syncAuthState(nextSession);
     });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
