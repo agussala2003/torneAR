@@ -22,18 +22,18 @@ export function ProfileHeader({ profile }: ProfileHeaderProps) {
       <View className="relative">
         <View 
           className="border-4 border-brand-primary-container bg-surface-lowest p-1"
-          style={{ height: 128, width: 128, borderRadius: 64 }}
+          style={{ height: 128, width: 128, borderRadius: 8 }}
         >
           {avatarUrl ? (
             <Image 
               source={{ uri: avatarUrl }} 
-              style={{ height: '100%', width: '100%', borderRadius: 60 }}
+              style={{ height: '100%', width: '100%', borderRadius: 6 }}
               resizeMode="cover" 
             />
           ) : (
             <View 
               className="items-center justify-center bg-surface-high"
-              style={{ height: '100%', width: '100%', borderRadius: 60 }}
+              style={{ height: '100%', width: '100%', borderRadius: 6 }}
             >
               <Feather name="user" size={42} color="#BCCBB9" />
             </View>
