@@ -15,6 +15,7 @@ export type BadgeItem = {
   name: string;
   slug: string;
   iconUrl: string | null;
+  description?: string | null;
   earnedAt?: string | null;
   isEarned: boolean;
 };
@@ -22,7 +23,7 @@ export type BadgeItem = {
 export type TeamItem = {
   id: string;
   name: string;
-  eloRating: number;
+  prRating: number;
   shieldUrl: string | null;
   role: TeamRole;
 };

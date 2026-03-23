@@ -45,7 +45,7 @@ function toTeams(rows: TeamMemberJoinedRow[] | null): TeamItem[] {
     .map((row) => ({
       id: row.teams!.id,
       name: row.teams!.name,
-      eloRating: row.teams!.elo_rating,
+      prRating: row.teams!.elo_rating,
       shieldUrl: row.teams!.shield_url,
       role: row.role,
     }));
@@ -70,6 +70,7 @@ function toBadges(earnedRows: ProfileBadgeJoinedRow[] | null, allBadges: AllBadg
       name: badge.name,
       slug: badge.slug,
       iconUrl: badge.icon_url,
+      description: badge.description,
       earnedAt: earnedRow?.earned_at ?? null,
       isEarned: !!earnedRow,
     };

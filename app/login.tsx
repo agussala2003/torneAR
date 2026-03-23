@@ -8,6 +8,7 @@ import * as z from 'zod';
 import CustomAlert from '../components/ui/CustomAlert';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
+import { HeroButton } from '@/components/ui/HeroButton';
 
 // 1. Definimos el Schema con Zod
 const authSchema = z.object({
@@ -105,7 +106,7 @@ export default function LoginScreen() {
               name="email"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.email ? 'border-red-500' : 'border-neutral-outline-variant'} bg-surface-low`}
+                  className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.email ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                   placeholder="jugador@tornear.com"
                   placeholderTextColor="#BCCBB9"
                   onBlur={onBlur}
@@ -126,7 +127,7 @@ export default function LoginScreen() {
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.password ? 'border-red-500' : 'border-neutral-outline-variant'} bg-surface-low`}
+                  className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.password ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                   placeholder="••••••••"
                   placeholderTextColor="#BCCBB9"
                   onBlur={onBlur}
@@ -140,20 +141,12 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
+        <HeroButton
           onPress={handleSubmit(onSubmit)}
-          disabled={loading}
-          className={`mb-6 w-full rounded-xl py-4 items-center shadow-lg ${loading ? 'bg-brand-primary/50' : 'bg-brand-primary active:scale-[0.98]'}`}
-          style={{ shadowColor: '#53E076', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
-        >
-          {loading ? (
-            <ActivityIndicator color="#003914" />
-          ) : (
-            <Text className="font-display text-lg uppercase tracking-widest text-[#003914]">
-              {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
-            </Text>
-          )}
-        </TouchableOpacity>
+          isLoading={loading}
+          label={isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+          style={{ marginBottom: 24, width: '100%', shadowColor: '#53E076', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
+        />
 
         <TouchableOpacity onPress={() => setIsLogin(!isLogin)} className="items-center py-4">
           <Text className="font-ui text-sm text-neutral-on-surface-variant">

@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { Image, Text, View, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { Image, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { ProfileRow } from './types';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { supabase } from '@/lib/supabase';
+import CustomAlert from '@/components/ui/CustomAlert';
+import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 
 type ProfileHeaderProps = {
   profile: ProfileRow;
@@ -20,6 +22,15 @@ function positionLabel(position: string): string {
 export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
   const [uploading, setUploading] = useState(false);
   const [avatarPath, setAvatarPath] = useState(profile.avatar_url);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   // Construir URL de avatar desde storage de Supabase
   const avatarUrl = avatarPath
@@ -32,7 +43,7 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (!permissionResult.granted) {
-        Alert.alert('Permiso denegado', 'Se necesita acceso a la galería para seleccionar una imagen.');
+        showAlert('Permiso denegado', 'Se necesita acceso a la galeria para seleccionar una imagen.');
         return;
       }
 
@@ -50,7 +61,7 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'No se pudo seleccionar la imagen.');
+      showAlert('Error', 'No se pudo seleccionar la imagen.');
     }
   };
 
@@ -109,10 +120,10 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
 
       setAvatarPath(filePath);
       onAvatarUpdate?.(filePath);
-      Alert.alert('Éxito', 'Foto de perfil actualizada correctamente.');
+      showAlert('Exito', 'Foto de perfil actualizada correctamente.');
     } catch (error) {
       console.error('Upload error:', error);
-      Alert.alert('Error al subir', 'No se pudo subir la imagen. Revisa conexión y políticas del bucket avatars.');
+      showAlert('Error al subir', getGenericSupabaseErrorMessage(error, 'No se pudo subir la imagen. Revisa conexion y politicas del bucket avatars.'));
     } finally {
       setUploading(false);
     }
@@ -177,6 +188,13 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
           <Text className="font-display text-xs uppercase text-brand-primary">{positionLabel(profile.preferred_position)}</Text>
         </View>
       </View>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }

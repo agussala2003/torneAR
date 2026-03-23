@@ -1,6 +1,6 @@
-import { Image, ScrollView, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Modal, ScrollView, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { BadgeItem } from './types';
-import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { AppIcon } from '@/components/ui/AppIcon';
 
 type ProfileBadgesSectionProps = {
@@ -10,14 +10,27 @@ type ProfileBadgesSectionProps = {
 export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
   const earnedBadges = badges.filter((b) => b.isEarned);
   const lockedBadges = badges.filter((b) => !b.isEarned);
+  const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
 
-  // Helper para obtener URL de insignia
-  const getBadgeImageUrl = (badge: BadgeItem): string => {
-    if (!badge.iconUrl) return '';
-    // Si ya es una URL completa, devolver como está
-    if (badge.iconUrl.startsWith('http')) return badge.iconUrl;
-    // Si no, tratarla como path en el bucket de badges
-    return getSupabaseStorageUrl('badges', badge.iconUrl);
+  const unlockHints = useMemo(
+    () => ({
+      goleador: 'Anota varios goles en partidos oficiales para desbloquearla.',
+      mvp: 'Consigue votos MVP repetidamente y destaca en tu equipo.',
+      capitan: 'Lidera tu equipo y participa activamente en desafios/partidos.',
+      invicto: 'Mantene una racha de victorias sin derrotas.',
+      debut: 'Juga tu primer partido oficial en TorneAR.',
+      'fair-play': 'Recibi buenas valoraciones y evita tarjetas/sanciones.',
+    }),
+    []
+  );
+
+  const getHowToUnlock = (badge: BadgeItem): string => {
+    if (badge.description && badge.description.trim().length > 0) {
+      return badge.description;
+    }
+
+    const key = badge.slug.toLowerCase();
+    return unlockHints[key as keyof typeof unlockHints] ?? 'Participa en mas partidos y completa desafios para desbloquear esta insignia.';
   };
 
   return (
@@ -32,7 +45,7 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
       </View>
 
       {badges.length === 0 ? (
-        <View className="rounded-xl border border-dashed border-neutral-outline-variant bg-surface-high px-4 py-3">
+        <View className="rounded-xl border border-dashed border-neutral-outline-variant/15 bg-surface-high px-4 py-3">
           <Text className="text-xs text-neutral-on-surface-variant">Aun no hay insignias disponibles.</Text>
         </View>
       ) : (
@@ -43,13 +56,14 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
         >
           {/* Insignias ganadas */}
           {earnedBadges.map((badge) => (
-            <View key={`earned-${badge.id}`} className="items-center gap-2">
+            <TouchableOpacity
+              key={`earned-${badge.id}`}
+              activeOpacity={0.85}
+              className="items-center gap-2"
+              onPress={() => setSelectedBadge(badge)}
+            >
               <View className="h-20 w-20 items-center justify-center rounded-full border-2 border-brand-primary bg-surface-high">
-                {getBadgeImageUrl(badge) ? (
-                  <Image source={{ uri: getBadgeImageUrl(badge) }} className="h-11 w-11" resizeMode="contain" />
-                ) : (
-                  <AppIcon family="material-community" name="medal-outline" size={28} color="#53E076" />
-                )}
+                <AppIcon family="material-community" name={badge.iconUrl || 'medal-outline'} size={28} color="#53E076" />
               </View>
               <Text
                 className="font-uiBold max-w-[72px] text-center text-[10px] text-neutral-on-surface"
@@ -57,32 +71,22 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
               >
                 {badge.name}
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
 
           {/* Insignias bloqueadas */}
           {lockedBadges.map((badge) => (
-            <View key={`locked-${badge.id}`} className="items-center gap-2">
-              <View className="relative h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-neutral-outline-variant bg-surface-high">
-                {getBadgeImageUrl(badge) ? (
-                  <>
-                    <Image
-                      source={{ uri: getBadgeImageUrl(badge) }}
-                      className="h-11 w-11 opacity-30"
-                      resizeMode="contain"
-                    />
-                    <View className="absolute h-6 w-6 items-center justify-center rounded-full bg-neutral-outline-variant">
-                      <AppIcon family="material-community" name="lock-outline" size={12} color="#8CCDFF" />
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <AppIcon family="material-community" name="medal-outline" size={28} color="#595959" />
-                    <View className="absolute h-6 w-6 items-center justify-center rounded-full bg-neutral-outline-variant">
-                      <AppIcon family="material-community" name="lock-outline" size={12} color="#8CCDFF" />
-                    </View>
-                  </>
-                )}
+            <TouchableOpacity
+              key={`locked-${badge.id}`}
+              activeOpacity={0.85}
+              className="items-center gap-2"
+              onPress={() => setSelectedBadge(badge)}
+            >
+              <View className="relative h-20 w-20 items-center justify-center rounded-full border-2 border-dashed border-neutral-outline-variant/15 bg-surface-high">
+                <AppIcon family="material-community" name={badge.iconUrl || 'medal-outline'} size={28} color="#595959" />
+                <View className="absolute h-6 w-6 items-center justify-center rounded-full bg-neutral-outline-variant">
+                  <AppIcon family="material-community" name="lock-outline" size={12} color="#8CCDFF" />
+                </View>
               </View>
               <Text
                 className="font-uiBold max-w-[72px] text-center text-[10px] text-neutral-on-surface-variant"
@@ -90,10 +94,59 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
               >
                 {badge.name}
               </Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       )}
+
+      <Modal
+        visible={!!selectedBadge}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedBadge(null)}
+      >
+        <TouchableWithoutFeedback onPress={() => setSelectedBadge(null)}>
+          <View className="flex-1 items-center justify-center bg-black/80 px-5">
+            <TouchableWithoutFeedback>
+              <View className="w-full max-w-sm rounded-2xl bg-surface-high p-5">
+                {selectedBadge && (
+                  <>
+                    <View className="mb-3 flex-row items-center justify-between">
+                      <Text className="font-display text-lg text-neutral-on-surface">{selectedBadge.name}</Text>
+                      <View className={`rounded-full px-3 py-1 ${selectedBadge.isEarned ? 'bg-brand-primary/25' : 'bg-neutral-outline-variant/20'}`}>
+                        <Text className={`font-uiBold text-[10px] uppercase ${selectedBadge.isEarned ? 'text-brand-primary' : 'text-neutral-on-surface-variant'}`}>
+                          {selectedBadge.isEarned ? 'Ganada' : 'Bloqueada'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text className="font-ui text-sm leading-5 text-neutral-on-surface-variant">
+                      {getHowToUnlock(selectedBadge)}
+                    </Text>
+
+                    {!selectedBadge.isEarned && (
+                      <View className="mt-4 rounded-xl bg-surface-low px-3 py-2">
+                        <Text className="font-uiBold text-xs uppercase tracking-wide text-brand-primary">Como conseguirla</Text>
+                        <Text className="font-ui mt-1 text-xs text-neutral-on-surface-variant">
+                          Completa su objetivo en partidos oficiales para desbloquear esta insignia.
+                        </Text>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPress={() => setSelectedBadge(null)}
+                      className="mt-5 items-center rounded-xl bg-brand-primary py-3"
+                    >
+                      <Text className="font-display text-sm uppercase tracking-wide text-[#003914]">Entendido</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }

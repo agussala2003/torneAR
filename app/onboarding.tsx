@@ -5,11 +5,12 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { AppIcon } from '@/components/ui/AppIcon';
 import CustomAlert from '../components/ui/CustomAlert';
+import { HeroButton } from '@/components/ui/HeroButton';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
-
+import { PitchSelector } from '@/components/ui/PitchSelector';
 // Zod Schema
 const onboardingSchema = z.object({
   fullName: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
@@ -22,73 +23,7 @@ const onboardingSchema = z.object({
 
 type OnboardingFormData = z.infer<typeof onboardingSchema>;
 
-// === COMPONENTE: Selector de Cancha Nativo ===
-const PitchSelector = ({
-  value,
-  onChange
-}: {
-  value: string;
-  onChange: (val: 'ARQUERO' | 'DEFENSOR' | 'MEDIOCAMPISTA' | 'DELANTERO') => void;
-}) => {
-  const positions: { id: 'DELANTERO' | 'MEDIOCAMPISTA' | 'DEFENSOR' | 'ARQUERO', label: string }[] = [
-    { id: 'DELANTERO', label: 'DELANTERO' },
-    { id: 'MEDIOCAMPISTA', label: 'MEDIOCAMPISTA' },
-    { id: 'DEFENSOR', label: 'DEFENSOR' },
-    { id: 'ARQUERO', label: 'ARQUERO' },
-  ];
 
-  return (
-    <View className="w-full aspect-[2/3.2] max-w-[340px] mx-auto bg-surface-lowest border-2 border-neutral-outline-variant rounded-2xl relative overflow-hidden flex-col mb-6 shadow-xl">
-      {/* Líneas de la cancha (Fondo) */}
-      <View className="absolute inset-0 z-0 pointer-events-none">
-        {/* Línea central */}
-        <View className="absolute top-1/2 left-0 right-0 h-[2px] bg-neutral-outline-variant -translate-y-1/2" />
-        {/* Círculo central */}
-        <View className="absolute top-1/2 left-1/2 w-24 h-24 rounded-full border-[2px] border-neutral-outline-variant -translate-x-1/2 -translate-y-1/2" />
-        {/* Punto central */}
-        <View className="absolute top-1/2 left-1/2 w-1.5 h-1.5 rounded-full bg-neutral-outline-variant -translate-x-1/2 -translate-y-1/2" />
-
-        {/* Área superior */}
-        <View className="absolute top-0 left-1/2 w-40 h-16 border-b-[2px] border-x-[2px] border-neutral-outline-variant -translate-x-1/2" />
-        <View className="absolute top-0 left-1/2 w-16 h-6 border-b-[2px] border-x-[2px] border-neutral-outline-variant -translate-x-1/2" />
-        {/* Luna superior */}
-        <View className="absolute top-16 left-1/2 w-16 h-6 border-b-[2px] border-x-[2px] border-t-0 border-neutral-outline-variant rounded-bl-full rounded-br-full -translate-x-1/2" />
-
-        {/* Área inferior */}
-        <View className="absolute bottom-0 left-1/2 w-40 h-16 border-t-[2px] border-x-[2px] border-neutral-outline-variant -translate-x-1/2" />
-        <View className="absolute bottom-0 left-1/2 w-16 h-6 border-t-[2px] border-x-[2px] border-neutral-outline-variant -translate-x-1/2" />
-        {/* Luna inferior */}
-        <View className="absolute bottom-16 left-1/2 w-16 h-6 border-t-[2px] border-x-[2px] border-b-0 border-neutral-outline-variant rounded-tl-full rounded-tr-full -translate-x-1/2" />
-      </View>
-
-      {/* Zonas Clickables */}
-      {positions.map((pos) => {
-        const isSelected = value === pos.id;
-        return (
-          <TouchableOpacity
-            key={pos.id}
-            activeOpacity={0.9}
-            onPress={() => onChange(pos.id)}
-            className="flex-1 justify-center items-center z-10 border-b border-neutral-outline-variant/30 last:border-b-0"
-          >
-            {/* Fondo Verde si está seleccionado */}
-            {isSelected && (
-              <View className="absolute inset-0 bg-brand-primary/95" />
-            )}
-
-            {/* Pill de Texto */}
-            <View className={`flex-row items-center justify-center px-6 py-2.5 rounded-full border ${isSelected ? 'bg-brand-primary border-[#003914]' : 'bg-surface-base/90 border-neutral-outline-variant'}`}>
-              {isSelected && <AppIcon family="material-community" name="check" size={18} color="#003914" />}
-              <Text className={`font-displayBlack text-sm uppercase tracking-widest ${isSelected ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
-                {pos.label}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-};
 
 export default function OnboardingScreen() {
   const { user, refreshProfile } = useAuth();
@@ -219,7 +154,7 @@ export default function OnboardingScreen() {
                   name="fullName"
                   render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
-                      className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.fullName ? 'border-red-500' : 'border-neutral-outline-variant'} bg-surface-low`}
+                      className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.fullName ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                       placeholder="Ej: Lionel Messi"
                       placeholderTextColor="#3A3939"
                       onBlur={onBlur}
@@ -238,7 +173,7 @@ export default function OnboardingScreen() {
                   name="username"
                   render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
-                      className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.username ? 'border-red-500' : 'border-neutral-outline-variant'} bg-surface-low`}
+                      className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.username ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                       placeholder="Ej: leomessi"
                       placeholderTextColor="#3A3939"
                       autoCapitalize="none"
@@ -256,7 +191,7 @@ export default function OnboardingScreen() {
                 <TouchableOpacity
                   onPress={() => setShowZonePicker(true)}
                   activeOpacity={0.8}
-                  className={`w-full rounded-xl px-4 py-4 flex-row justify-between items-center border ${errors.zone ? 'border-red-500' : 'border-neutral-outline-variant'} bg-surface-low`}
+                  className={`w-full rounded-xl px-4 py-4 flex-row justify-between items-center border ${errors.zone ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                 >
                   <Text className={selectedZone ? 'text-neutral-on-surface' : 'text-surface-bright'}>
                     {selectedZone || "Selecciona una zona"}
@@ -267,13 +202,11 @@ export default function OnboardingScreen() {
               </View>
             </View>
 
-            <TouchableOpacity
+            <HeroButton
               onPress={handleNextStep}
-              activeOpacity={0.9}
-              className="w-full py-4 rounded-xl items-center bg-brand-primary"
-            >
-              <Text className="font-displayBlack text-xl uppercase tracking-widest text-[#003914]">Siguiente</Text>
-            </TouchableOpacity>
+              label="Siguiente"
+              style={{ width: '100%' }}
+            />
           </View>
         ) : (
           <View>
@@ -293,7 +226,7 @@ export default function OnboardingScreen() {
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={() => setValue('position', 'CUALQUIERA')}
-                className={`px-8 py-3.5 rounded-full border ${selectedPosition === 'CUALQUIERA' ? 'bg-brand-primary border-[#003914]' : 'bg-surface-low border-neutral-outline-variant'}`}
+                className={`px-8 py-3.5 rounded-full border ${selectedPosition === 'CUALQUIERA' ? 'bg-brand-primary border-[#003914]' : 'bg-surface-low border-neutral-outline-variant/15'}`}
               >
                 <Text className={`font-display uppercase tracking-widest text-sm ${selectedPosition === 'CUALQUIERA' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
                   {selectedPosition === 'CUALQUIERA' && <AppIcon family="material-community" name="check-circle" size={14} color="#003914" />} Soy Flexible
@@ -301,14 +234,12 @@ export default function OnboardingScreen() {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
+            <HeroButton
               onPress={handleSubmit(onSubmit)}
-              disabled={loading}
-              activeOpacity={0.9}
-              className={`w-full py-4 rounded-xl items-center ${loading ? 'bg-brand-primary/50' : 'bg-brand-primary'}`}
-            >
-              {loading ? <ActivityIndicator color="#003914" /> : <Text className="font-displayBlack text-xl uppercase tracking-widest text-[#003914]">Comenzar</Text>}
-            </TouchableOpacity>
+              isLoading={loading}
+              label="Comenzar"
+              style={{ width: '100%' }}
+            />
           </View>
         )}
       </ScrollView>
@@ -316,30 +247,46 @@ export default function OnboardingScreen() {
       {/* Modal Zonas */}
       <Modal visible={showZonePicker} transparent animationType="fade" onRequestClose={() => setShowZonePicker(false)}>
         <TouchableWithoutFeedback onPress={() => setShowZonePicker(false)}>
-          <View className="flex-1 justify-end bg-black/80">
+          <View className="flex-1 items-center justify-center bg-black/80 px-6">
             <TouchableWithoutFeedback>
-              <View className="rounded-t-3xl overflow-hidden max-h-[50%] border-t border-neutral-outline-variant bg-surface-base">
-                <View className="p-4 border-b border-neutral-outline-variant flex-row justify-between items-center">
-                  <Text className="text-lg font-bold text-neutral-on-surface">Selecciona tu Zona</Text>
-                  <TouchableOpacity onPress={() => setShowZonePicker(false)}><AppIcon family="material-icons" name="close" size={24} color="#BCCBB9" /></TouchableOpacity>
-                </View>
-                <FlatList
-                  data={zones}
-                  keyExtractor={(item, index) => `${item}-${index}`}
-                  contentContainerStyle={{ padding: 16 }}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      className="py-4 border-b border-surface-high flex-row items-center justify-between"
-                      onPress={() => {
-                        setValue('zone', item, { shouldValidate: true });
-                        setShowZonePicker(false);
-                      }}
-                    >
-                      <Text className="text-base text-neutral-on-surface">{item}</Text>
-                      {selectedZone === item && <AppIcon family="material-community" name="check-circle" size={20} color="#53E076" />}
-                    </TouchableOpacity>
-                  )}
-                />
+              <View className="w-full max-w-sm rounded-2xl border border-neutral-outline-variant/15 bg-surface-high p-4">
+                <Text className="font-display mb-3 text-lg text-neutral-on-surface">Selecciona una zona</Text>
+
+                {loadingZones ? (
+                  <View className="py-6">
+                    <ActivityIndicator size="small" color="#53E076" />
+                  </View>
+                ) : (
+                  <FlatList
+                    data={zones}
+                    keyExtractor={(item) => item}
+                    style={{ maxHeight: 320 }}
+                    ItemSeparatorComponent={() => <View className="h-2" />}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                          activeOpacity={0.9}
+                          onPress={() => {
+                            setValue('zone', item, { shouldValidate: true });
+                            setShowZonePicker(false);
+                          }}
+                          className={`rounded-lg border px-3 py-3 ${selectedZone === item ? 'border-brand-primary bg-brand-primary/15' : 'border-neutral-outline-variant/15 bg-surface-low'}`}
+                        >
+                          <Text className={`font-ui ${selectedZone === item ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>{item}</Text>
+                      </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={() => (
+                      <Text className="py-2 text-sm text-neutral-on-surface-variant">No hay zonas activas disponibles.</Text>
+                    )}
+                  />
+                )}
+
+                <TouchableOpacity
+                  onPress={() => setShowZonePicker(false)}
+                  activeOpacity={0.9}
+                  className="mt-4 items-center rounded-lg bg-surface-low py-3"
+                >
+                  <Text className="font-display text-xs uppercase tracking-wider text-neutral-on-surface-variant">Cerrar</Text>
+                </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
           </View>
