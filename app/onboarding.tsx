@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { PitchSelector } from '@/components/ui/PitchSelector';
+import { registerForPushNotificationsAsync } from '@/lib/push-notifications';
 // Zod Schema
 const onboardingSchema = z.object({
   fullName: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
@@ -97,6 +98,8 @@ export default function OnboardingScreen() {
       return;
     }
 
+    const pushToken = await registerForPushNotificationsAsync();
+
     const { error } = await supabase
       .from('profiles')
       .upsert({
@@ -105,6 +108,7 @@ export default function OnboardingScreen() {
         username: data.username,
         zone: data.zone,
         preferred_position: data.position,
+        expo_push_token: pushToken,
         updated_at: new Date().toISOString()
       });
 

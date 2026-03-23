@@ -4,6 +4,8 @@ import { AppIcon } from './ui/AppIcon';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useTeamStore } from '@/stores/teamStore';
+import { ActiveTeamSelector } from './ui/ActiveTeamSelector';
 
 type GlobalHeaderProps = {
   onNotificationPress?: () => void;
@@ -62,6 +64,17 @@ export function GlobalHeader({ onNotificationPress, notificationCount }: GlobalH
     };
   }, [loadUnreadNotificationsCount, profile?.id]);
 
+  const { fetchMyTeams, activeTeamId } = useTeamStore();
+
+  useEffect(() => {
+    // Fetch user's teams for the global Zustand store when they log in
+    if (profile?.id) {
+      if (!activeTeamId) { // Basic check to avoid re-fetching excessively if already set, though fetchMyTeams handles caching logic internally if wanted
+        void fetchMyTeams(profile.id);
+      }
+    }
+  }, [profile?.id, activeTeamId, fetchMyTeams]);
+
   const resolvedNotificationCount = notificationCount ?? internalNotificationCount;
   const handleNotificationPress = onNotificationPress ?? (() => router.push('/notifications'));
 
@@ -73,6 +86,10 @@ export function GlobalHeader({ onNotificationPress, notificationCount }: GlobalH
           <AppIcon family="material-community" name="soccer" size={20} color='#53E076'/>
         </View>
         <Text className="font-displayBlack text-lg tracking-wider text-brand-primary">TORNEAR</Text>
+      </View>
+
+      <View className="flex-1 flex-row items-center justify-end pr-4">
+        <ActiveTeamSelector />
       </View>
 
       {/* Notification Bell */}

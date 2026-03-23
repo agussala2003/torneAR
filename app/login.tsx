@@ -9,6 +9,7 @@ import CustomAlert from '../components/ui/CustomAlert';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
 import { HeroButton } from '@/components/ui/HeroButton';
+import { useRouter } from 'expo-router';
 
 // 1. Definimos el Schema con Zod
 const authSchema = z.object({
@@ -19,6 +20,7 @@ const authSchema = z.object({
 type AuthFormData = z.infer<typeof authSchema>;
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
 
@@ -121,7 +123,7 @@ export default function LoginScreen() {
           </View>
 
           <View>
-            <Text className="font-uiBold mb-2 text-neutral-on-surface">Contrasena</Text>
+            <Text className="font-uiBold mb-2 text-neutral-on-surface">Contraseña</Text>
             <Controller
               control={control}
               name="password"
@@ -138,6 +140,12 @@ export default function LoginScreen() {
               )}
             />
             {errors.password && <Text className="text-red-500 text-xs mt-1">{errors.password.message}</Text>}
+
+            {isLogin && (
+              <TouchableOpacity onPress={() => router.push('/forgot-password')} className="mt-2 items-end">
+                <Text className="font-uiBold text-xs text-brand-primary">¿Olvidaste tu contraseña?</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 

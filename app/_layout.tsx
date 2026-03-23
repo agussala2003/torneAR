@@ -41,7 +41,7 @@ function RootLayoutNav() {
     // Si AuthContext todavía está cargando desde AsyncStorage/Supabase, no hacemos nada
     if (loading) return;
 
-    const inAuthGroup = segments[0] === 'login';
+    const inAuthGroup = segments[0] === 'login' || segments[0] === 'forgot-password';
     const inOnboarding = segments[0] === 'onboarding';
 
     if (!session) {
@@ -74,6 +74,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="forgot-password" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="profile-stats" />
       <Stack.Screen name="team-create" />
