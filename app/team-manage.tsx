@@ -16,6 +16,7 @@ import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { getTeamCategoryLabel, getTeamFormatLabel, getTeamRoleLabel, TEAM_CATEGORY_OPTIONS, TEAM_FORMAT_OPTIONS, TeamCategory, TeamFormat, TeamRole } from '@/lib/team-options';
 import { positionLabel, firstLetterUpper, requestStatusChip, roleAppearance, canManageMember, allowedRolesToAssign } from '@/lib/team-helpers';
 import { TeamMembersList } from '@/components/team-manage/TeamMembersList';
+import { sendPushNotification } from '@/lib/push-notifications';
 
 type TeamDetail = {
   id: string;
@@ -40,6 +41,7 @@ type TeamMemberRow = {
     username: string | null;
     avatar_url: string | null;
     preferred_position: string | null;
+    expo_push_token?: string | null;
   } | null;
 };
 
@@ -54,6 +56,7 @@ type TeamJoinRequestRow = {
     username: string | null;
     avatar_url: string | null;
     preferred_position: string;
+    expo_push_token?: string | null;
   } | null;
 };
 
@@ -167,18 +170,18 @@ export default function TeamManageScreen() {
         .maybeSingle(),
       supabase
         .from('team_members')
-        .select('profile_id, role, joined_at, profiles(id, full_name, username, avatar_url, preferred_position)')
+        .select('profile_id, role, joined_at, profiles(id, full_name, username, avatar_url, preferred_position, expo_push_token)')
         .eq('team_id', teamId)
         .order('joined_at', { ascending: true }),
       supabase
         .from('team_join_requests')
-        .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position)')
+        .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position, expo_push_token)')
         .eq('team_id', teamId)
         .eq('status', 'PENDIENTE')
         .order('created_at', { ascending: true }),
       supabase
         .from('team_join_requests')
-        .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position)')
+        .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position, expo_push_token)')
         .eq('team_id', teamId)
         .in('status', ['ACEPTADA', 'RECHAZADA'])
         .order('created_at', { ascending: false })
@@ -396,6 +399,22 @@ export default function TeamManageScreen() {
       if (updateRequestError) {
         throw updateRequestError;
       }
+      
+      if (request.profiles?.expo_push_token) {
+        void sendPushNotification(
+          request.profiles.expo_push_token,
+          "¡Solicitud aceptada!",
+          `Fuiste aceptado en el equipo ${team?.name}.`
+        );
+      }
+
+      await supabase.from('notifications').insert({
+        profile_id: request.profile_id,
+        type: 'SOLICITUD_UNION_ACEPTADA',
+        title: '¡Solicitud aceptada!',
+        body: `Fuiste aceptado en el equipo ${team?.name}.`,
+        data: { team_id: teamId },
+      });
 
       await refreshTeamData();
       showAlert('Solicitud aprobada', 'El jugador fue agregado al plantel.');
@@ -460,6 +479,22 @@ export default function TeamManageScreen() {
       if (error) {
         throw error;
       }
+      
+      if (memberForRoleUpdate.profiles?.expo_push_token) {
+        void sendPushNotification(
+          memberForRoleUpdate.profiles.expo_push_token,
+          "Rol de equipo actualizado",
+          `Tu rol en el equipo ${team?.name} ahora es ${getTeamRoleLabel(selectedRoleToAssign)}.`
+        );
+      }
+
+      await supabase.from('notifications').insert({
+        profile_id: memberForRoleUpdate.profile_id,
+        type: 'MENSAJE_NUEVO',
+        title: 'Rol de equipo actualizado',
+        body: `Tu rol en el equipo ${team?.name} ahora es ${getTeamRoleLabel(selectedRoleToAssign)}.`,
+        data: { team_id: teamId },
+      });
 
       await refreshTeamData();
       setShowRoleModal(false);
@@ -499,6 +534,22 @@ export default function TeamManageScreen() {
       if (error) {
         throw error;
       }
+
+      if (memberForRemove.profiles?.expo_push_token) {
+        void sendPushNotification(
+          memberForRemove.profiles.expo_push_token,
+          "Eliminado del equipo",
+          `Fuiste removido del equipo ${team?.name}.`
+        );
+      }
+
+      await supabase.from('notifications').insert({
+        profile_id: memberForRemove.profile_id,
+        type: 'MENSAJE_NUEVO',
+        title: 'Eliminado del equipo',
+        body: `Fuiste removido del equipo ${team?.name}.`,
+        data: { team_id: teamId },
+      });
 
       await refreshTeamData();
       setShowRemoveConfirmModal(false);
@@ -763,8 +814,8 @@ export default function TeamManageScreen() {
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => {
-              if (profile?.id) {
-                router.push({ pathname: '/profile-stats', params: { profileId: profile.id } });
+              if (teamId) {
+                router.push({ pathname: '/team-stats', params: { teamId: teamId } });
               }
             }}
             className="mt-3 flex-row items-center justify-center gap-2 rounded-lg bg-surface-high py-2.5"

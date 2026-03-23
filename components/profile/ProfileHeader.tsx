@@ -3,6 +3,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { Image, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useAuth } from '@/context/AuthContext';
 import { decode } from 'base64-arraybuffer';
 import { ProfileRow } from './types';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
@@ -20,6 +21,7 @@ function positionLabel(position: string): string {
 }
 
 export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
+  const { refreshProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [avatarPath, setAvatarPath] = useState(profile.avatar_url);
   const [alertVisible, setAlertVisible] = useState(false);
@@ -117,6 +119,8 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
       if (updateError) {
         throw updateError;
       }
+
+      await refreshProfile();
 
       setAvatarPath(filePath);
       onAvatarUpdate?.(filePath);

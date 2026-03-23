@@ -55,6 +55,7 @@ export default function ProfileEditScreen() {
   });
 
   const selectedZone = watch('zone');
+  const selectedPosition = watch('position');
 
   useEffect(() => {
     async function fetchZones() {
@@ -115,18 +116,18 @@ export default function ProfileEditScreen() {
         <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">Editar Perfil</Text>
         <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">Modifica tus datos personales y tu posicion preferida en la cancha.</Text>
 
-        <View className="mt-8 gap-5">
+        <View className="mt-8 gap-4">
           {/* FULL NAME */}
           <View>
-            <Text className="font-display text-[10px] uppercase tracking-wide text-neutral-on-surface-variant mb-2">Nombre y Apellido</Text>
+            <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">Nombre y Apellido</Text>
             <Controller
               control={control}
               name="fullName"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  className={`px-4 py-3.5 bg-surface-lowest border rounded-xl font-ui text-base text-neutral-on-surface ${errors.fullName ? 'border-danger-error' : 'border-neutral-outline-variant/15'}`}
+                  className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.fullName ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                   placeholder="Ej. Lionel Messi"
-                  placeholderTextColor="#6F6D6C"
+                  placeholderTextColor="#3A3939"
                   onBlur={onBlur}
                   onChangeText={onChange}
                   value={value}
@@ -134,48 +135,45 @@ export default function ProfileEditScreen() {
                 />
               )}
             />
-            {errors.fullName && <Text className="font-ui mt-1 text-xs text-danger-error">{errors.fullName.message}</Text>}
+            {errors.fullName && <Text className="text-red-500 text-xs mt-1">{errors.fullName.message}</Text>}
           </View>
 
           {/* USERNAME */}
           <View>
-            <Text className="font-display text-[10px] uppercase tracking-wide text-neutral-on-surface-variant mb-2">Nombre de usuario</Text>
+            <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">Nombre de usuario</Text>
             <Controller
               control={control}
               name="username"
               render={({ field: { onChange, onBlur, value } }) => (
-                <View className="relative justify-center">
-                  <Text className="absolute left-4 font-uiBold text-base text-neutral-on-surface-variant z-10">@</Text>
-                  <TextInput
-                    className={`pl-9 pr-4 py-3.5 bg-surface-lowest border rounded-xl font-ui text-base text-neutral-on-surface ${errors.username ? 'border-danger-error' : 'border-neutral-outline-variant/15'}`}
-                    placeholder="usuario_123"
-                    placeholderTextColor="#6F6D6C"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
+                <TextInput
+                  className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.username ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
+                  placeholder="usuario_123"
+                  placeholderTextColor="#3A3939"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onBlur={onBlur}
+                  onChangeText={(text) => onChange(text.toLowerCase())}
+                  value={value}
+                />
               )}
             />
-            {errors.username && <Text className="font-ui mt-1 text-xs text-danger-error">{errors.username.message}</Text>}
+            {errors.username && <Text className="text-red-500 text-xs mt-1">{errors.username.message}</Text>}
           </View>
 
           {/* ZONE */}
           <View>
-            <Text className="font-display text-[10px] uppercase tracking-wide text-neutral-on-surface-variant mb-2">Zona de Juego Principal</Text>
+            <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">Zona de Juego Principal</Text>
             <TouchableOpacity
               onPress={() => setShowZonePicker(true)}
               activeOpacity={0.8}
-              className={`w-full rounded-xl px-4 py-4 flex-row justify-between items-center border ${errors.zone ? 'border-danger-error' : 'border-neutral-outline-variant/15'} bg-surface-low`}
+              className={`w-full rounded-xl px-4 py-4 flex-row justify-between items-center border ${errors.zone ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
             >
               <Text className={selectedZone ? 'text-neutral-on-surface' : 'text-surface-bright'}>
                 {selectedZone || "Selecciona una zona"}
               </Text>
               {loadingZones ? <ActivityIndicator size="small" color="#53E076" /> : <AppIcon family="material-icons" name="keyboard-arrow-down" size={22} color="#BCCBB9" />}
             </TouchableOpacity>
-            {errors.zone && <Text className="font-ui mt-1 text-xs text-danger-error">{errors.zone.message}</Text>}
+            {errors.zone && <Text className="text-red-500 text-xs mt-1">{errors.zone.message}</Text>}
           </View>
 
           {/* POSITION */}
@@ -188,7 +186,21 @@ export default function ProfileEditScreen() {
                 <PitchSelector value={value} onChange={onChange} />
               )}
             />
-            {errors.position && <Text className="font-ui mt-1 text-xs text-danger-error text-center">{errors.position.message}</Text>}
+            
+            {/* Opción Flexible como lo pide el diseño */}
+            <View className="flex-row items-center justify-center mt-6 mb-2">
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setValue('position', 'CUALQUIERA')}
+                className={`px-8 py-3.5 rounded-full border ${selectedPosition === 'CUALQUIERA' ? 'bg-brand-primary border-[#003914]' : 'bg-surface-low border-neutral-outline-variant/15'}`}
+              >
+                <Text className={`font-display uppercase tracking-widest text-sm ${selectedPosition === 'CUALQUIERA' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
+                  {selectedPosition === 'CUALQUIERA' && <AppIcon family="material-community" name="check-circle" size={14} color="#003914" />} Soy Flexible
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {errors.position && <Text className="font-ui mt-1 text-xs text-red-500 text-center">{errors.position.message}</Text>}
           </View>
         </View>
 
