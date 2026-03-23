@@ -3,7 +3,6 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
-import CustomAlert from '../../components/ui/CustomAlert';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -15,6 +14,7 @@ import { ProfileStatsGrid } from '@/components/profile/ProfileStatsGrid';
 import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
 import { ProfileTeamsSection } from '@/components/profile/ProfileTeamsSection';
 import { ProfileSettingsSection } from '@/components/profile/ProfileSettingsSection';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -22,15 +22,8 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<ProfileViewData | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
-
-  const showAlert = (title: string, message: string) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setAlertVisible(true);
-  };
+  
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   const loadProfileData = useCallback(async () => {
     if (!profile) {
@@ -47,7 +40,7 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [profile]);
+  }, [profile, showAlert]);
 
   useFocusEffect(
     useCallback(() => {
@@ -76,12 +69,7 @@ export default function ProfileScreen() {
         <Text className="font-display text-xl text-neutral-on-surface">Perfil no disponible</Text>
         <Text className="font-ui mt-2 text-center text-neutral-on-surface-variant">No se pudo obtener la informacion de perfil en este momento.</Text>
 
-        <CustomAlert
-          visible={alertVisible}
-          title={alertTitle}
-          message={alertMessage}
-          onClose={() => setAlertVisible(false)}
-        />
+        {AlertComponent}
       </View>
     );
   }
@@ -111,12 +99,7 @@ export default function ProfileScreen() {
         <ProfileSettingsSection isSigningOut={isSigningOut} onSignOut={handleSignOut} />
       </ScrollView>
 
-      <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        onClose={() => setAlertVisible(false)}
-      />
+      {AlertComponent}
 
       {isSigningOut && <GlobalLoader label="Cerrando sesion" />}
     </View>

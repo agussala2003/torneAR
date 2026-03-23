@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { AuthError } from '@supabase/supabase-js';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import CustomAlert from '../components/ui/CustomAlert';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { useRouter } from 'expo-router';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 // 1. Definimos el Schema con Zod
 const authSchema = z.object({
@@ -23,10 +23,8 @@ export default function LoginScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
-
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
+  
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   // 2. Inicializamos React Hook Form
   const { control, handleSubmit, formState: { errors } } = useForm<AuthFormData>({
@@ -36,12 +34,6 @@ export default function LoginScreen() {
       password: '',
     },
   });
-
-  const showAlert = (title: string, message: string) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setAlertVisible(true);
-  };
 
   // 3. La función onSubmit recibe directamente los datos validados
   const onSubmit = async (data: AuthFormData) => {
@@ -164,12 +156,7 @@ export default function LoginScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        onClose={() => setAlertVisible(false)}
-      />
+      {AlertComponent}
 
       {loading && <GlobalLoader label={isLogin ? 'Iniciando sesion' : 'Creando cuenta'} />}
     </KeyboardAvoidingView>

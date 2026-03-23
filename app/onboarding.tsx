@@ -1,46 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, ScrollView, Modal, FlatList, TouchableWithoutFeedback } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { AppIcon } from '@/components/ui/AppIcon';
-import CustomAlert from '../components/ui/CustomAlert';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { PitchSelector } from '@/components/ui/PitchSelector';
 import { registerForPushNotificationsAsync } from '@/lib/push-notifications';
-// Zod Schema
-const onboardingSchema = z.object({
-  fullName: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
-  username: z.string()
-    .min(3, 'El usuario debe tener al menos 3 caracteres')
-    .regex(/^[a-z0-9_]+$/, 'Solo minúsculas, números y guiones bajos (_) sin espacios'),
-  zone: z.string().min(1, 'Debes seleccionar una zona'),
-  position: z.enum(['CUALQUIERA', 'ARQUERO', 'DEFENSOR', 'MEDIOCAMPISTA', 'DELANTERO']),
-});
-
-type OnboardingFormData = z.infer<typeof onboardingSchema>;
-
-
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
+import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
 
 export default function OnboardingScreen() {
   const { user, refreshProfile } = useAuth();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [zones, setZones] = useState<string[]>([]);
   const [showZonePicker, setShowZonePicker] = useState(false);
-  const [loadingZones, setLoadingZones] = useState(true);
+  
+  const { showAlert, AlertComponent } = useCustomAlert();
 
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
-
-  const { control, handleSubmit, trigger, watch, setValue, formState: { errors } } = useForm<OnboardingFormData>({
-    resolver: zodResolver(onboardingSchema),
+  const { control, handleSubmit, trigger, watch, setValue, formState: { errors } } = useForm<UserProfileFormData>({
+    resolver: zodResolver(userProfileSchema),
     defaultValues: {
       fullName: '',
       username: '',
@@ -52,27 +36,6 @@ export default function OnboardingScreen() {
   const selectedZone = watch('zone');
   const selectedPosition = watch('position');
 
-  useEffect(() => {
-    fetchZones();
-  }, []);
-
-  async function fetchZones() {
-    setLoadingZones(true);
-    const { data, error } = await supabase.from('zones').select('name').eq('is_active', true);
-    if (!error && data) {
-      setZones(data.map(z => z.name));
-    } else {
-      setZones(['Buenos Aires Centro', 'GBA Norte', 'GBA Sur', 'GBA Oeste']);
-    }
-    setLoadingZones(false);
-  }
-
-  const showAlert = (title: string, message: string) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setAlertVisible(true);
-  };
-
   const handleNextStep = async () => {
     const isStep1Valid = await trigger(['fullName', 'username', 'zone']);
     if (isStep1Valid) {
@@ -80,23 +43,9 @@ export default function OnboardingScreen() {
     }
   };
 
-  const onSubmit = async (data: OnboardingFormData) => {
+  const onSubmit = async (data: UserProfileFormData) => {
     if (!user) return;
     setLoading(true);
-
-    const { data: existingUser } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('username', data.username)
-      .neq('auth_user_id', user.id)
-      .maybeSingle();
-
-    if (existingUser) {
-      setLoading(false);
-      setStep(1);
-      showAlert('Error', 'Ese nombre de usuario ya está en uso. Por favor, elige otro.');
-      return;
-    }
 
     const pushToken = await registerForPushNotificationsAsync();
 
@@ -114,7 +63,12 @@ export default function OnboardingScreen() {
 
     if (error) {
       setLoading(false);
-      showAlert('Error al guardar', getGenericSupabaseErrorMessage(error, 'No se pudo guardar tu perfil. Intentalo nuevamente.'));
+      if (error.code === '23505' && error.message.includes('username')) {
+        setStep(1);
+        showAlert('Error', 'Ese nombre de usuario ya está en uso. Por favor, elige otro.');
+      } else {
+        showAlert('Error al guardar', getGenericSupabaseErrorMessage(error, 'No se pudo guardar tu perfil. Intentalo nuevamente.'));
+      }
     } else {
       await refreshProfile();
       setLoading(false);
@@ -200,7 +154,7 @@ export default function OnboardingScreen() {
                   <Text className={selectedZone ? 'text-neutral-on-surface' : 'text-surface-bright'}>
                     {selectedZone || "Selecciona una zona"}
                   </Text>
-                  {loadingZones ? <ActivityIndicator size="small" color="#53E076" /> : <AppIcon family="material-icons" name="keyboard-arrow-down" size={22} color="#BCCBB9" />}
+                  <AppIcon family="material-icons" name="keyboard-arrow-down" size={22} color="#BCCBB9" />
                 </TouchableOpacity>
                 {errors.zone && <Text className="text-red-500 text-xs mt-1">{errors.zone.message}</Text>}
               </View>
@@ -248,56 +202,14 @@ export default function OnboardingScreen() {
         )}
       </ScrollView>
 
-      {/* Modal Zonas */}
-      <Modal visible={showZonePicker} transparent animationType="fade" onRequestClose={() => setShowZonePicker(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowZonePicker(false)}>
-          <View className="flex-1 items-center justify-center bg-black/80 px-6">
-            <TouchableWithoutFeedback>
-              <View className="w-full max-w-sm rounded-2xl border border-neutral-outline-variant/15 bg-surface-high p-4">
-                <Text className="font-display mb-3 text-lg text-neutral-on-surface">Selecciona una zona</Text>
+      <ZonePickerDialog
+        visible={showZonePicker}
+        onClose={() => setShowZonePicker(false)}
+        selectedZone={selectedZone}
+        onSelect={(val) => setValue('zone', val, { shouldValidate: true })}
+      />
 
-                {loadingZones ? (
-                  <View className="py-6">
-                    <ActivityIndicator size="small" color="#53E076" />
-                  </View>
-                ) : (
-                  <FlatList
-                    data={zones}
-                    keyExtractor={(item) => item}
-                    style={{ maxHeight: 320 }}
-                    ItemSeparatorComponent={() => <View className="h-2" />}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                          activeOpacity={0.9}
-                          onPress={() => {
-                            setValue('zone', item, { shouldValidate: true });
-                            setShowZonePicker(false);
-                          }}
-                          className={`rounded-lg border px-3 py-3 ${selectedZone === item ? 'border-brand-primary bg-brand-primary/15' : 'border-neutral-outline-variant/15 bg-surface-low'}`}
-                        >
-                          <Text className={`font-ui ${selectedZone === item ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>{item}</Text>
-                      </TouchableOpacity>
-                    )}
-                    ListEmptyComponent={() => (
-                      <Text className="py-2 text-sm text-neutral-on-surface-variant">No hay zonas activas disponibles.</Text>
-                    )}
-                  />
-                )}
-
-                <TouchableOpacity
-                  onPress={() => setShowZonePicker(false)}
-                  activeOpacity={0.9}
-                  className="mt-4 items-center rounded-lg bg-surface-low py-3"
-                >
-                  <Text className="font-display text-xs uppercase tracking-wider text-neutral-on-surface-variant">Cerrar</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} onClose={() => setAlertVisible(false)} />
+      {AlertComponent}
     </SafeAreaView>
   );
 }
