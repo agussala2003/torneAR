@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { supabase } from '../lib/supabase';
 import { AuthError } from '@supabase/supabase-js';
+import { signIn, signUp } from '@/lib/auth-data';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -44,16 +44,10 @@ export default function LoginScreen() {
 
     try {
       if (isLogin) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
-        });
+        const { error: signInError } = await signIn(data.email, data.password);
         error = signInError;
       } else {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-        });
+        const { error: signUpError } = await signUp(data.email, data.password);
 
         if (!signUpError) {
           showAlert('Exito', 'Cuenta creada. Revisa tu correo o inicia sesion.');

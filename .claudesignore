@@ -1,0 +1,10 @@
+node_modules/
+.expo/
+ios/
+android/
+assets/
+dist/
+*.png
+*.jpg
+*.json
+package-lock.json

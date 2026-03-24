@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { PitchSelector } from '@/components/ui/PitchSelector';
@@ -22,8 +21,11 @@ import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } 
 
 type CreationType = 'TEAM' | 'PLAYER';
 
-export default function MarketCreateModal() {
-  const router = useRouter();
+// ==========================================
+// CONTENIDO PURO — sin hooks de navegación.
+// Se puede renderizar dentro de un <Modal> de RN sin perder el contexto.
+// ==========================================
+export function MarketCreateContent({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
   const { showAlert, AlertComponent } = useCustomAlert();
 
@@ -43,7 +45,7 @@ export default function MarketCreateModal() {
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <View className="px-6 py-4 flex-row items-center border-b border-surface-container-high bg-surface-base">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={onClose}
           className="mr-4"
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
@@ -89,17 +91,27 @@ export default function MarketCreateModal() {
           <TeamPostForm
             managedTeams={managedTeams}
             isLoadingTeams={isLoadingTeams}
-            onSuccess={() => router.back()}
+            onSuccess={onClose}
             showAlert={showAlert}
           />
         ) : (
-          <PlayerPostForm onSuccess={() => router.back()} showAlert={showAlert} />
+          <PlayerPostForm onSuccess={onClose} showAlert={showAlert} />
         )}
       </ScrollView>
 
       {AlertComponent}
     </SafeAreaView>
   );
+}
+
+// ==========================================
+// PANTALLA RUTA — solo se usa cuando Expo Router
+// navega a /(modals)/market-create. Envuelve el
+// contenido y provee router.back() como onClose.
+// ==========================================
+export default function MarketCreateModal() {
+  const router = useRouter();
+  return <MarketCreateContent onClose={() => router.back()} />;
 }
 
 // ==========================================
@@ -126,7 +138,6 @@ function TeamPostForm({
     defaultValues: { positionWanted: 'CUALQUIERA', description: '', teamId: undefined },
   });
 
-  // Auto-select si solo maneja 1 equipo
   useEffect(() => {
     if (managedTeams.length === 1) {
       setValue('teamId', managedTeams[0].id);
@@ -147,7 +158,6 @@ function TeamPostForm({
     return <ActivityIndicator size="large" color="#00E65B" className="mt-10" />;
   }
 
-  // REGLA: Solo CAPITÁN o SUBCAPITÁN puede publicar en nombre de un equipo
   if (managedTeams.length === 0) {
     return (
       <View className="bg-surface-container-high p-6 rounded-xl mt-4 border border-error/20">

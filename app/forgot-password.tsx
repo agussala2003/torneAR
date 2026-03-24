@@ -2,59 +2,47 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '@/components/ui/AppIcon';
-import CustomAlert from '@/components/ui/CustomAlert';
 import { HeroButton } from '@/components/ui/HeroButton';
-import { supabase } from '@/lib/supabase';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { useRouter } from 'expo-router';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { GlobalLoader } from '@/components/GlobalLoader';
+import { sendPasswordReset } from '@/lib/auth-data';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
-  const [success, setSuccess] = useState(false);
-
-  const showAlert = (title: string, message: string, isSuccess = false) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setSuccess(isSuccess);
-    setAlertVisible(true);
-  };
-
-  const onAlertClose = () => {
-    setAlertVisible(false);
-    if (success) {
-      router.back();
-    }
-  };
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   const handleResetPassword = async () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      showAlert('Error', 'Por favor, ingresa tu correo electrónico.', false);
+      showAlert('Error', 'Por favor, ingresa tu correo electrónico.');
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail);
+      const { error } = await sendPasswordReset(trimmedEmail);
 
       if (error) throw error;
 
       showAlert(
         'Correo enviado',
         'Revisa tu bandeja de entrada o la carpeta de spam para obtener las instrucciones para restablecer tu contraseña.',
-        true
+        () => router.back()
       );
     } catch (error) {
-      showAlert('Error al enviar', getGenericSupabaseErrorMessage(error, 'No pudimos procesar la solicitud. Inténtalo nuevamente.'), false);
+      showAlert('Error al enviar', getGenericSupabaseErrorMessage(error, 'No pudimos procesar la solicitud. Inténtalo nuevamente.'));
     } finally {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return <GlobalLoader label="Enviando correo..." />;
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface-base">
@@ -97,7 +85,7 @@ export default function ForgotPasswordScreen() {
         />
       </View>
 
-      <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} onClose={onAlertClose} />
+      {AlertComponent}
     </SafeAreaView>
   );
 }

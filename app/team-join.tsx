@@ -2,41 +2,22 @@ import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import CustomAlert from '@/components/ui/CustomAlert';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
-import { supabase } from '@/lib/supabase';
-import { getTeamCategoryLabel, getTeamFormatLabel, TeamCategory, TeamFormat, TeamRole } from '@/lib/team-options';
-
-type TeamPreview = {
-  id: string;
-  name: string;
-  zone: string;
-  category: TeamCategory;
-  preferred_format: TeamFormat;
-  elo_rating: number;
-};
+import { getTeamCategoryLabel, getTeamFormatLabel } from '@/lib/team-options';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { findTeamByCode, sendJoinRequest, TeamPreview } from '@/lib/team-join-data';
 
 export default function TeamJoinScreen() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   const [inviteCode, setInviteCode] = useState('');
   const [searching, setSearching] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [team, setTeam] = useState<TeamPreview | null>(null);
-  const [requestSent, setRequestSent] = useState(false);
-
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
-
-  const showAlert = (title: string, message: string) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setAlertVisible(true);
-  };
 
   const normalizedCode = inviteCode.trim().toUpperCase();
 
@@ -48,24 +29,15 @@ export default function TeamJoinScreen() {
 
     try {
       setSearching(true);
+      const foundTeam = await findTeamByCode(normalizedCode);
 
-      const { data, error } = await supabase
-        .from('teams')
-        .select('id, name, zone, category, preferred_format, elo_rating')
-        .eq('invite_code', normalizedCode)
-        .maybeSingle();
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data) {
+      if (!foundTeam) {
         setTeam(null);
         showAlert('No encontrado', 'No existe un equipo con ese codigo.');
         return;
       }
 
-      setTeam(data as TeamPreview);
+      setTeam(foundTeam);
     } catch (error) {
       showAlert('Error al buscar equipo', getGenericSupabaseErrorMessage(error, 'No se pudo validar el codigo de invitacion.'));
     } finally {
@@ -74,124 +46,33 @@ export default function TeamJoinScreen() {
   };
 
   const handleJoinTeam = async () => {
-    if (!profile || !team) {
-      return;
-    }
+    if (!profile || !team) return;
 
     try {
       setSubmittingRequest(true);
+      
+      await sendJoinRequest(team.id, {
+        id: profile.id,
+        full_name: profile.full_name,
+        username: profile.username
+      }, team.name);
 
-      const [{ data: memberData, error: memberError }, { data: existingRequest, error: requestReadError }] = await Promise.all([
-        supabase
-          .from('team_members')
-          .select('id')
-          .eq('team_id', team.id)
-          .eq('profile_id', profile.id)
-          .maybeSingle(),
-        supabase
-          .from('team_join_requests')
-          .select('id, status')
-          .eq('team_id', team.id)
-          .eq('profile_id', profile.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
-
-      if (memberError) {
-        throw memberError;
-      }
-
-      if (requestReadError) {
-        throw requestReadError;
-      }
-
-      if (memberData) {
+      showAlert('Solicitud enviada', `Tu solicitud para ${team.name} fue enviada.`, () => {
+        router.back();
+      });
+    } catch (error: any) {
+      if (error?.message === 'ALREADY_MEMBER') {
         showAlert('Ya sos miembro', 'Ya formas parte de este equipo.');
-        return;
-      }
-
-      if (existingRequest?.status === 'PENDIENTE') {
+      } else if (error?.message === 'REQUEST_PENDING') {
         showAlert('Solicitud pendiente', 'Ya enviaste una solicitud. Espera la respuesta del capitan.');
-        return;
-      }
-
-      const { data: requestRow, error } = await supabase
-        .from('team_join_requests')
-        .upsert(
-        {
-          team_id: team.id,
-          profile_id: profile.id,
-          status: 'PENDIENTE',
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'team_id,profile_id',
-        }
-      )
-        .select('id')
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      try {
-        const managerRoles: TeamRole[] = ['CAPITAN', 'SUBCAPITAN'];
-        const { data: managers, error: managersError } = await supabase
-          .from('team_members')
-          .select('profile_id')
-          .eq('team_id', team.id)
-          .in('role', managerRoles)
-          .neq('profile_id', profile.id);
-
-        if (managersError) {
-          throw managersError;
-        }
-
-        const notificationsPayload = (managers ?? []).map((manager) => ({
-          profile_id: manager.profile_id,
-          type: 'SOLICITUD_UNION_EQUIPO' as const,
-          title: 'Nueva solicitud de union',
-          body: `${profile.full_name} envio una solicitud para unirse a ${team.name}.`,
-          data: {
-            team_id: team.id,
-            team_name: team.name,
-            request_id: requestRow?.id ?? null,
-            requester_profile_id: profile.id,
-          },
-        }));
-
-        if (notificationsPayload.length > 0) {
-          const { error: notificationsError } = await supabase.from('notifications').insert(notificationsPayload);
-          if (notificationsError) {
-            throw notificationsError;
-          }
-        }
-      } catch (notificationError) {
-        console.warn('No se pudieron crear notificaciones para solicitud de equipo', notificationError);
-      }
-
-      setRequestSent(true);
-      showAlert('Solicitud enviada', `Tu solicitud para ${team.name} fue enviada.`);
-    } catch (error: unknown) {
-      const code = (error as { code?: string }).code;
-
-      const fallbackMessage =
-        code === '42501'
-          ? 'No tienes permisos para enviar solicitudes. Revisa las politicas de RLS de team_join_requests.'
+      } else {
+        const fallbackMessage = error?.code === '42501'
+          ? 'No tienes permisos para enviar solicitudes. Revisa las politicas de RLS.'
           : 'No se pudo completar el envio de la solicitud.';
-
-      showAlert('Error al enviar solicitud', getGenericSupabaseErrorMessage(error, fallbackMessage));
+        showAlert('Error al enviar solicitud', getGenericSupabaseErrorMessage(error, fallbackMessage));
+      }
     } finally {
       setSubmittingRequest(false);
-    }
-  };
-
-  const onCloseAlert = () => {
-    setAlertVisible(false);
-    if (requestSent) {
-      router.back();
     }
   };
 
@@ -268,7 +149,7 @@ export default function TeamJoinScreen() {
         ) : null}
       </ScrollView>
 
-      <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} onClose={onCloseAlert} />
+      {AlertComponent}
     </SafeAreaView>
   );
 }

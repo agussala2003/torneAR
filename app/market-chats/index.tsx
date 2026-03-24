@@ -12,6 +12,8 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { GlobalLoader } from '@/components/GlobalLoader';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { useAuth } from '@/context/AuthContext';
 import { fetchInbox, MarketConversation } from '@/lib/chat-api';
 import { fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
@@ -23,6 +25,8 @@ export default function MarketInboxScreen() {
   const [chats, setChats] = useState<MarketConversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   const [managedTeams, setManagedTeams] = useState<ManagedTeam[]>([]);
   const [filterTeamId, setFilterTeamId] = useState<string | null>(null);
@@ -36,12 +40,12 @@ export default function MarketInboxScreen() {
       setChats(inbox);
       setManagedTeams(teams);
     } catch (error) {
-      console.error('Error loading inbox:', error);
+      showAlert('Error', 'No se pudieron cargar los chats.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [user]);
+  }, [user, showAlert]);
 
   useEffect(() => {
     if (user) loadData();
@@ -182,8 +186,8 @@ export default function MarketInboxScreen() {
       )}
 
       {isLoading ? (
-        <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#00E65B" />
+        <View className="flex-1 mt-10">
+          <GlobalLoader label="Cargando chats" />
         </View>
       ) : displayedChats.length === 0 ? (
         <View className="flex-1 justify-center items-center px-6">
@@ -208,6 +212,8 @@ export default function MarketInboxScreen() {
           }
         />
       )}
+
+      {AlertComponent}
     </View>
   );
 }

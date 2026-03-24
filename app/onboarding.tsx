@@ -9,10 +9,10 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { PitchSelector } from '@/components/ui/PitchSelector';
-import { registerForPushNotificationsAsync } from '@/lib/push-notifications';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
+import { saveOnboardingProfile } from '@/lib/onboarding-data';
 
 export default function OnboardingScreen() {
   const { user, refreshProfile } = useAuth();
@@ -46,31 +46,17 @@ export default function OnboardingScreen() {
   const onSubmit = async (data: UserProfileFormData) => {
     if (!user) return;
     setLoading(true);
-
-    const pushToken = await registerForPushNotificationsAsync();
-
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        auth_user_id: user.id,
-        full_name: data.fullName,
-        username: data.username,
-        zone: data.zone,
-        preferred_position: data.position,
-        expo_push_token: pushToken,
-        updated_at: new Date().toISOString()
-      });
-
-    if (error) {
-      setLoading(false);
-      if (error.code === '23505' && error.message.includes('username')) {
+    try {
+      await saveOnboardingProfile(user.id, data);
+      await refreshProfile();
+    } catch (error: any) {
+      if (error?.code === '23505' && error?.message?.includes('username')) {
         setStep(1);
         showAlert('Error', 'Ese nombre de usuario ya está en uso. Por favor, elige otro.');
       } else {
         showAlert('Error al guardar', getGenericSupabaseErrorMessage(error, 'No se pudo guardar tu perfil. Intentalo nuevamente.'));
       }
-    } else {
-      await refreshProfile();
+    } finally {
       setLoading(false);
     }
   };

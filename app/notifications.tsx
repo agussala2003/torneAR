@@ -1,100 +1,55 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import CustomAlert from '@/components/ui/CustomAlert';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { useAuth } from '@/context/AuthContext';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { supabase } from '@/lib/supabase';
-
-type NotificationRow = {
-  id: string;
-  type: string;
-  title: string;
-  body: string | null;
-  is_read: boolean;
-  created_at: string;
-  data: unknown;
-};
-
-function formatDate(dateText: string): string {
-  const date = new Date(dateText);
-  return date.toLocaleString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+import { fetchNotificationsViewData, markAllNotificationsAsRead, markNotificationAsRead } from '@/lib/notifications-data';
+import { NotificationsViewData, NotificationItem } from '@/components/notifications/types';
+import { NotificationsListSection } from '@/components/notifications/NotificationsListSection';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   const [loading, setLoading] = useState(true);
+  const [viewData, setViewData] = useState<NotificationsViewData | null>(null);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [openingNotificationId, setOpeningNotificationId] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
 
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
-
-  const showAlert = (title: string, message: string) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setAlertVisible(true);
-  };
-
+  const notifications = viewData?.notifications ?? [];
   const unreadCount = useMemo(() => notifications.filter((item) => !item.is_read).length, [notifications]);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotificationsData = useCallback(async (showBaseLoader = true) => {
     if (!profile?.id) {
-      setNotifications([]);
+      setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('id, type, title, body, is_read, created_at, data')
-      .eq('profile_id', profile.id)
-      .order('created_at', { ascending: false })
-      .limit(60);
-
-    if (error) {
-      throw error;
+    try {
+      if (showBaseLoader) setLoading(true);
+      const data = await fetchNotificationsViewData(profile.id);
+      setViewData(data);
+    } catch (error) {
+      showAlert(
+        'Error al cargar',
+        getGenericSupabaseErrorMessage(error, 'No se pudieron cargar las notificaciones.')
+      );
+    } finally {
+      setLoading(false);
     }
+  }, [profile?.id, showAlert]);
 
-    setNotifications((data as NotificationRow[] | null) ?? []);
-  }, [profile?.id]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function init() {
-      try {
-        setLoading(true);
-        await loadNotifications();
-      } catch (error) {
-        if (mounted) {
-          showAlert('Error al cargar notificaciones', getGenericSupabaseErrorMessage(error, 'No se pudieron cargar las notificaciones.'));
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void init();
-
-    return () => {
-      mounted = false;
-    };
-  }, [loadNotifications]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadNotificationsData(true);
+    }, [loadNotificationsData])
+  );
 
   useEffect(() => {
     if (!profile?.id) {
@@ -112,7 +67,7 @@ export default function NotificationsScreen() {
           filter: `profile_id=eq.${profile.id}`,
         },
         () => {
-          void loadNotifications();
+          void loadNotificationsData(false);
         }
       )
       .subscribe();
@@ -120,27 +75,21 @@ export default function NotificationsScreen() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadNotifications, profile?.id]);
+  }, [loadNotificationsData, profile?.id]);
 
   const markAllAsRead = async () => {
-    if (!profile?.id || unreadCount === 0) {
+    if (!profile?.id || unreadCount === 0 || !viewData) {
       return;
     }
 
     try {
       setMarkingAllRead(true);
+      await markAllNotificationsAsRead(profile.id);
 
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('profile_id', profile.id)
-        .eq('is_read', false);
-
-      if (error) {
-        throw error;
-      }
-
-      setNotifications((current) => current.map((item) => ({ ...item, is_read: true })));
+      setViewData({
+        ...viewData,
+        notifications: viewData.notifications.map((item) => ({ ...item, is_read: true })),
+      });
     } catch (error) {
       showAlert('No se pudo marcar', getGenericSupabaseErrorMessage(error, 'No se pudieron marcar como leidas.'));
     } finally {
@@ -148,21 +97,19 @@ export default function NotificationsScreen() {
     }
   };
 
-  const openNotification = async (item: NotificationRow) => {
+  const openNotification = async (item: NotificationItem) => {
     try {
       setOpeningNotificationId(item.id);
 
-      if (!item.is_read) {
-        const { error } = await supabase
-          .from('notifications')
-          .update({ is_read: true })
-          .eq('id', item.id);
+      if (!item.is_read && viewData) {
+        await markNotificationAsRead(item.id);
 
-        if (error) {
-          throw error;
-        }
-
-        setNotifications((current) => current.map((row) => (row.id === item.id ? { ...row, is_read: true } : row)));
+        setViewData({
+          ...viewData,
+          notifications: viewData.notifications.map((row) =>
+            row.id === item.id ? { ...row, is_read: true } : row
+          ),
+        });
       }
 
       if (item.type === 'SOLICITUD_UNION_EQUIPO' && item.data && typeof item.data === 'object') {
@@ -177,6 +124,15 @@ export default function NotificationsScreen() {
       setOpeningNotificationId(null);
     }
   };
+
+  if (!profile && !loading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-surface-base px-6">
+        <Text className="font-display text-xl text-neutral-on-surface">No disponible</Text>
+        {AlertComponent}
+      </View>
+    );
+  }
 
   if (loading) {
     return <GlobalLoader label="Cargando notificaciones" />;
@@ -212,44 +168,15 @@ export default function NotificationsScreen() {
         <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">{unreadCount} sin leer</Text>
 
         <View className="mt-5 gap-2">
-          {notifications.length === 0 ? (
-            <View className="rounded-xl bg-surface-low p-4">
-              <Text className="font-ui text-sm text-neutral-on-surface-variant">No tienes notificaciones por ahora.</Text>
-            </View>
-          ) : (
-            notifications.map((item) => {
-              const opening = openingNotificationId === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => openNotification(item)}
-                  activeOpacity={0.9}
-                  className={`rounded-xl border p-3 ${item.is_read ? 'border-neutral-outline-variant/20 bg-surface-low' : 'border-info-secondary/35 bg-info-secondary/10'}`}
-                >
-                  <View className="flex-row items-start gap-3">
-                    <View className={`mt-1 h-2.5 w-2.5 rounded-full ${item.is_read ? 'bg-surface-bright/60' : 'bg-info-secondary'}`} />
-                    <View className="flex-1">
-                      <View className="flex-row items-center justify-between gap-2">
-                        <Text className={`font-uiBold text-sm ${item.is_read ? 'text-neutral-on-surface-variant' : 'text-neutral-on-surface'}`}>{item.title}</Text>
-                        <Text className="font-ui text-[11px] text-neutral-on-surface-variant">{formatDate(item.created_at)}</Text>
-                      </View>
-                      {item.body ? <Text className="font-ui mt-1 text-xs text-neutral-on-surface-variant">{item.body}</Text> : null}
-                      {opening ? (
-                        <View className="mt-2 flex-row items-center gap-2">
-                          <ActivityIndicator size="small" color="#BCCBB9" />
-                          <Text className="font-display text-[10px] uppercase tracking-wide text-neutral-on-surface-variant">Abriendo...</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
+          <NotificationsListSection
+            notifications={notifications}
+            openingNotificationId={openingNotificationId}
+            onOpenNotification={openNotification}
+          />
         </View>
       </ScrollView>
 
-      <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} onClose={() => setAlertVisible(false)} />
+      {AlertComponent}
     </SafeAreaView>
   );
 }

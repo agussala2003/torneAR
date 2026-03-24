@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityIndicator, FlatList, Modal, ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import CustomAlert from '@/components/ui/CustomAlert';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
-import { supabase } from '@/lib/supabase';
 import { TEAM_CATEGORY_OPTIONS, TEAM_FORMAT_OPTIONS, TeamCategory, TeamFormat } from '@/lib/team-options';
+import { fetchZones, createTeam } from '@/lib/team-create-data';
+import { ZonePickerModal } from '@/components/team-create/ZonePickerModal';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 export default function TeamCreateScreen() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   const [name, setName] = useState('');
   const [zone, setZone] = useState(profile?.zone ?? '');
@@ -21,43 +23,20 @@ export default function TeamCreateScreen() {
   const [loadingZones, setLoadingZones] = useState(true);
   const [showZonePicker, setShowZonePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createdTeamId, setCreatedTeamId] = useState<string | null>(null);
-
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
-
-  const showAlert = (title: string, message: string) => {
-    setAlertTitle(title);
-    setAlertMessage(message);
-    setAlertVisible(true);
-  };
 
   useEffect(() => {
-    async function fetchZones() {
+    async function loadZones() {
       try {
         setLoadingZones(true);
-
-        const { data, error } = await supabase
-          .from('zones')
-          .select('name')
-          .eq('is_active', true)
-          .order('name', { ascending: true });
-
-        if (error) {
-          throw error;
-        }
-
-        setZones((data ?? []).map((zoneRow) => zoneRow.name));
+        const data = await fetchZones();
+        setZones(data);
       } catch {
-        // Si falla la consulta, permitimos continuar con zona de perfil o ingreso manual no editable.
         setZones(profile?.zone ? [profile.zone] : []);
       } finally {
         setLoadingZones(false);
       }
     }
-
-    void fetchZones();
+    void loadZones();
   }, [profile?.zone]);
 
   const handleCreateTeam = async () => {
@@ -73,7 +52,6 @@ export default function TeamCreateScreen() {
       showAlert('Nombre invalido', 'El nombre del equipo debe tener al menos 3 caracteres.');
       return;
     }
-
     if (!sanitizedZone) {
       showAlert('Zona requerida', 'Ingresa una zona para el equipo.');
       return;
@@ -81,52 +59,18 @@ export default function TeamCreateScreen() {
 
     try {
       setIsSubmitting(true);
-
-      const { data: teamData, error: teamError } = await supabase
-        .from('teams')
-        .insert({
-          name: sanitizedName,
-          zone: sanitizedZone,
-          category,
-          preferred_format: format,
-        })
-        .select('id, name')
-        .single();
-
-      if (teamError) {
-        throw teamError;
-      }
-
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert({
-          team_id: teamData.id,
-          profile_id: profile.id,
-          role: 'CAPITAN',
-        });
-
-      if (memberError) {
-        throw memberError;
-      }
-
-      setCreatedTeamId(teamData.id);
-      showAlert('Equipo creado', `Tu equipo ${teamData.name} ya esta listo.`);
+      const teamData = await createTeam(profile.id, sanitizedName, sanitizedZone, category, format);
+      
+      showAlert('Equipo creado', `Tu equipo ${teamData.name} ya esta listo.`, () => {
+        router.replace({ pathname: '/team-manage', params: { teamId: teamData.id } });
+      });
     } catch (error: unknown) {
-      const fallbackMessage =
-        (error as { code?: string }).code === '42501'
-          ? 'No tienes permisos para crear equipos. Revisa las politicas de RLS para teams y team_members.'
-          : 'No se pudo crear el equipo. Intentalo nuevamente.';
-
+      const fallbackMessage = (error as { code?: string }).code === '42501'
+        ? 'No tienes permisos para crear equipos. Revisa las politicas de RLS para teams y team_members.'
+        : 'No se pudo crear el equipo. Intentalo nuevamente.';
       showAlert('Error al crear equipo', getGenericSupabaseErrorMessage(error, fallbackMessage));
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const onCloseAlert = () => {
-    setAlertVisible(false);
-    if (createdTeamId) {
-      router.replace({ pathname: '/team-manage', params: { teamId: createdTeamId } });
     }
   };
 
@@ -185,9 +129,7 @@ export default function TeamCreateScreen() {
                     activeOpacity={0.9}
                     className={`rounded-lg border px-4 py-2 ${active ? 'border-brand-primary bg-brand-primary/20' : 'border-neutral-outline-variant/15 bg-surface-low'}`}
                   >
-                    <Text className={`font-display text-xs uppercase tracking-wide ${active ? 'text-brand-primary' : 'text-neutral-on-surface-variant'}`}>
-                      {option.label}
-                    </Text>
+                    <Text className={`font-display text-xs uppercase tracking-wide ${active ? 'text-brand-primary' : 'text-neutral-on-surface-variant'}`}>{option.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -206,9 +148,7 @@ export default function TeamCreateScreen() {
                     activeOpacity={0.9}
                     className={`rounded-lg border px-4 py-2 ${active ? 'border-info-secondary bg-info-secondary/15' : 'border-neutral-outline-variant/15 bg-surface-low'}`}
                   >
-                    <Text className={`font-display text-xs uppercase tracking-wide ${active ? 'text-info-secondary' : 'text-neutral-on-surface-variant'}`}>
-                      {option.label}
-                    </Text>
+                    <Text className={`font-display text-xs uppercase tracking-wide ${active ? 'text-info-secondary' : 'text-neutral-on-surface-variant'}`}>{option.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -233,60 +173,16 @@ export default function TeamCreateScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <Modal
-        transparent
-        animationType="fade"
+      <ZonePickerModal
         visible={showZonePicker}
-        onRequestClose={() => setShowZonePicker(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setShowZonePicker(false)}>
-          <View className="flex-1 items-center justify-center bg-black/80 px-6">
-            <TouchableWithoutFeedback>
-              <View className="w-full max-w-sm rounded-2xl border border-neutral-outline-variant/15 bg-surface-high p-4">
-                <Text className="font-display mb-3 text-lg text-neutral-on-surface">Selecciona una zona</Text>
+        zones={zones}
+        loadingZones={loadingZones}
+        selectedZone={zone}
+        onSelectZone={(selected) => { setZone(selected); setShowZonePicker(false); }}
+        onClose={() => setShowZonePicker(false)}
+      />
 
-                {loadingZones ? (
-                  <View className="py-6">
-                    <ActivityIndicator size="small" color="#53E076" />
-                  </View>
-                ) : (
-                  <FlatList
-                    data={zones}
-                    keyExtractor={(item) => item}
-                    style={{ maxHeight: 320 }}
-                    ItemSeparatorComponent={() => <View className="h-2" />}
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => {
-                          setZone(item);
-                          setShowZonePicker(false);
-                        }}
-                        className={`rounded-lg border px-3 py-3 ${zone === item ? 'border-brand-primary bg-brand-primary/15' : 'border-neutral-outline-variant/15 bg-surface-low'}`}
-                      >
-                        <Text className={`font-ui ${zone === item ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>{item}</Text>
-                      </TouchableOpacity>
-                    )}
-                    ListEmptyComponent={() => (
-                      <Text className="py-2 text-sm text-neutral-on-surface-variant">No hay zonas activas disponibles.</Text>
-                    )}
-                  />
-                )}
-
-                <TouchableOpacity
-                  onPress={() => setShowZonePicker(false)}
-                  activeOpacity={0.9}
-                  className="mt-4 items-center rounded-lg bg-surface-low py-3"
-                >
-                  <Text className="font-display text-xs uppercase tracking-wider text-neutral-on-surface-variant">Cerrar</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} onClose={onCloseAlert} />
+      {AlertComponent}
     </SafeAreaView>
   );
 }

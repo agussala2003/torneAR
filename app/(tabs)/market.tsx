@@ -1,95 +1,76 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  FlatList,
-  ActivityIndicator,
-  TouchableOpacity,
-  RefreshControl,
-  Text,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 
 import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { MarketTabs } from '../../components/market/MarketTabs';
-import { PositionFilterScroll } from '../../components/market/PositionFilterScroll';
-import { MarketTeamCard, MarketPlayerCard } from '../../components/market/MarketCards';
-
-import {
-  fetchTeamPosts,
-  fetchPlayerPosts,
-  fetchUserManagedTeams,
-  MarketTeamPost,
-  MarketPlayerPost,
-  ManagedTeam,
-} from '../../lib/market-api';
-import { getOrCreateMarketChat } from '../../lib/chat-api';
+import { MarketTabs } from '@/components/market/MarketTabs';
+import { PositionFilterScroll } from '@/components/market/PositionFilterScroll';
+import { MarketListSection } from '@/components/market/MarketListSection';
+import { MarketCreateContent } from '@/app/(modals)/market-create';
 import { useAuth } from '@/context/AuthContext';
-
-type TabType = 'TEAMS_LOOKING' | 'PLAYERS_LOOKING';
+import { GlobalLoader } from '@/components/GlobalLoader';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { fetchMarketViewData } from '@/lib/market-data';
+import { MarketViewData, TabType } from '@/components/market/types';
+import { getOrCreateMarketChat } from '@/lib/chat-api';
 
 export default function MarketScreen() {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   const [activeTab, setActiveTab] = useState<TabType>('TEAMS_LOOKING');
   const [selectedPosition, setSelectedPosition] = useState<string>('CUALQUIERA');
 
-  const [teamPosts, setTeamPosts] = useState<MarketTeamPost[]>([]);
-  const [playerPosts, setPlayerPosts] = useState<MarketPlayerPost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isContactLoading, setIsContactLoading] = useState(false);
+  const [viewData, setViewData] = useState<MarketViewData | null>(null);
 
-  // Equipos que el usuario actual gestiona (CAPITÁN / SUBCAPITÁN)
-  const [managedTeams, setManagedTeams] = useState<ManagedTeam[]>([]);
-  // Equipo activo del capitán para contactar jugadores (cuando gestiona varios)
+  const [isContactLoading, setIsContactLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [activeCaptainTeamId, setActiveCaptainTeamId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) return;
-    fetchUserManagedTeams(user.id).then((teams) => {
-      setManagedTeams(teams);
-      if (teams.length > 0) setActiveCaptainTeamId(teams[0].id);
-    });
-  }, [user]);
+  const loadMarketData = useCallback(async (showFullLoader = true) => {
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
 
-  const loadPosts = useCallback(async () => {
     try {
-      if (activeTab === 'TEAMS_LOOKING') {
-        const data = await fetchTeamPosts(selectedPosition);
-        setTeamPosts(data);
-      } else {
-        const data = await fetchPlayerPosts(selectedPosition);
-        setPlayerPosts(data);
+      if (showFullLoader) setLoading(true);
+      const data = await fetchMarketViewData(profile, selectedPosition);
+      setViewData(data);
+
+      if (data.managedTeams.length > 0) {
+        setActiveCaptainTeamId((current) => current ?? data.managedTeams[0].id);
       }
     } catch (error) {
-      console.error('Error al cargar datos del mercado:', error);
+      showAlert(
+        'Error',
+        'No se pudo cargar la informacion del mercado.'
+      );
     } finally {
-      setIsLoading(false);
+      setLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeTab, selectedPosition]);
+  }, [profile, selectedPosition, showAlert]);
 
-  useEffect(() => {
-    setIsLoading(true);
-    loadPosts();
-  }, [loadPosts]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadMarketData(true);
+    }, [loadMarketData])
+  );
 
   const onRefresh = () => {
     setIsRefreshing(true);
-    loadPosts();
+    void loadMarketData(false);
   };
 
   const handleCreatePost = () => {
-    router.push('/(modals)/market-create');
+    setShowCreateModal(true);
   };
 
-  /**
-   * El jugador (o cualquier usuario) ve una publicación de equipo buscando jugador
-   * y quiere contactar a ese equipo. El usuario actúa como JUGADOR.
-   */
   const handleContactTeam = async (teamId: string) => {
     if (!profile) return;
     setIsContactLoading(true);
@@ -97,70 +78,48 @@ export default function MarketScreen() {
       const chat = await getOrCreateMarketChat(profile.id, teamId);
       router.push(`/market-chats/${chat.id}` as any);
     } catch (e) {
-      Alert.alert('Error', 'No se pudo abrir el chat. Intentá de nuevo.');
+      showAlert('Error', 'No se pudo abrir el chat. Intenta de nuevo.');
     } finally {
       setIsContactLoading(false);
     }
   };
 
-  /**
-   * El CAPITÁN / SUBCAPITÁN ve una publicación de jugador buscando equipo
-   * y quiere contactarlo en nombre de su equipo.
-   */
   const handleContactPlayer = async (playerProfileId: string) => {
-    if (!profile) return;
+    if (!profile || !viewData) return;
 
-    if (managedTeams.length === 0) {
-      Alert.alert(
+    if (viewData.managedTeams.length === 0) {
+      showAlert(
         'Sin equipos',
-        'Debés ser Capitán o Subcapitán de un equipo para contactar jugadores.',
+        'Debes ser Capitan o Subcapitan de un equipo para contactar jugadores.'
       );
       return;
     }
 
-    const teamId = activeCaptainTeamId ?? managedTeams[0].id;
+    const teamId = activeCaptainTeamId ?? viewData.managedTeams[0].id;
 
     setIsContactLoading(true);
     try {
       const chat = await getOrCreateMarketChat(playerProfileId, teamId);
       router.push(`/market-chats/${chat.id}` as any);
     } catch (e) {
-      Alert.alert('Error', 'No se pudo abrir el chat. Intentá de nuevo.');
+      showAlert('Error', 'No se pudo abrir el chat. Intenta de nuevo.');
     } finally {
       setIsContactLoading(false);
     }
   };
 
-  const renderItem = ({ item }: { item: MarketTeamPost | MarketPlayerPost }) => {
-    if (activeTab === 'TEAMS_LOOKING') {
-      const post = item as MarketTeamPost;
-      return (
-        <MarketTeamCard
-          teamName={post.teams?.name ?? 'Equipo'}
-          logoUrl={post.teams?.shield_url}
-          positionWanted={post.position_wanted}
-          description={post.description}
-          onPressAction={() => handleContactTeam(post.team_id)}
-        />
-      );
-    } else {
-      const post = item as MarketPlayerPost;
-      return (
-        <MarketPlayerCard
-          playerName={post.profiles?.full_name ?? 'Jugador'}
-          username={post.profiles?.username ?? 'user'}
-          avatarUrl={post.profiles?.avatar_url}
-          position={post.position}
-          postType={post.post_type}
-          description={post.description}
-          onPressAction={() => handleContactPlayer(post.profile_id)}
-        />
-      );
-    }
-  };
+  if (!profile && !loading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-surface-base px-6">
+        <Text className="font-display text-xl text-neutral-on-surface">Mercado no disponible</Text>
+        {AlertComponent}
+      </View>
+    );
+  }
 
-  const posts: (MarketTeamPost | MarketPlayerPost)[] =
-    activeTab === 'TEAMS_LOOKING' ? teamPosts : playerPosts;
+  const posts = viewData 
+    ? (activeTab === 'TEAMS_LOOKING' ? viewData.teamPosts : viewData.playerPosts)
+    : [];
 
   return (
     <View className="flex-1 bg-surface-base">
@@ -173,26 +132,25 @@ export default function MarketScreen() {
           onPositionSelect={setSelectedPosition}
         />
 
-        {/* Selector de equipo activo para capitanes con múltiples equipos */}
-        {activeTab === 'PLAYERS_LOOKING' && managedTeams.length > 1 && (
+        {activeTab === 'PLAYERS_LOOKING' && viewData && viewData.managedTeams.length > 1 && (
           <View className="px-4 pt-3">
-            <Text className="text-neutral-on-surface-variant text-xs font-uiMedium mb-2">
+            <Text className="mb-2 font-uiMedium text-xs text-neutral-on-surface-variant">
               Contactar como:
             </Text>
-            <View className="flex-row gap-2 flex-wrap">
-              {managedTeams.map((team) => (
+            <View className="flex-row flex-wrap gap-2">
+              {viewData.managedTeams.map((team) => (
                 <TouchableOpacity
                   key={team.id}
                   onPress={() => setActiveCaptainTeamId(team.id)}
                   activeOpacity={0.7}
-                  className={`px-3 py-1.5 rounded-full border ${
+                  className={`rounded-full border px-3 py-1.5 ${
                     activeCaptainTeamId === team.id
-                      ? 'bg-brand-primary border-brand-primary'
-                      : 'bg-surface-low border-surface-high'
+                      ? 'border-brand-primary bg-brand-primary'
+                      : 'border-surface-high bg-surface-low'
                   }`}
                 >
                   <Text
-                    className={`text-xs font-uiBold ${
+                    className={`font-uiBold text-xs ${
                       activeCaptainTeamId === team.id ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
                     }`}
                   >
@@ -204,57 +162,34 @@ export default function MarketScreen() {
           </View>
         )}
 
-        {/* Acceso rápido al inbox de chats */}
         <TouchableOpacity
-          className="flex-row items-center px-4 py-3 border-b border-surface-high"
+          className="flex-row items-center border-b border-surface-high px-4 py-3"
           onPress={() => router.push('/market-chats' as any)}
           activeOpacity={0.7}
         >
           <AppIcon family="material-icons" name="chat-bubble-outline" size={18} color="#00E65B" />
-          <Text className="text-brand-primary font-uiMedium text-sm ml-2">Mis Chats de Mercado</Text>
+          <Text className="ml-2 font-uiMedium text-sm text-brand-primary">Mis Chats de Mercado</Text>
           <View className="flex-1" />
           <AppIcon family="material-icons" name="chevron-right" size={18} color="#88998D" />
         </TouchableOpacity>
       </View>
 
       <View className="flex-1 px-4">
-        {isLoading ? (
-          <View className="flex-1 justify-center items-center">
-            <ActivityIndicator size="large" color="#00E65B" />
-          </View>
-        ) : (
-          <FlatList
-            data={posts}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingTop: 12, paddingBottom: 100 }}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={onRefresh}
-                tintColor="#00E65B"
-                colors={['#00E65B']}
-              />
-            }
-            ListEmptyComponent={
-              <View className="flex-1 justify-center items-center py-20">
-                <AppIcon family="material-community" name="soccer-field" size={48} color="#3F4943" />
-                <Text className="text-neutral-on-surface-variant font-uiMedium mt-4 text-center">
-                  No se encontraron publicaciones.
-                </Text>
-              </View>
-            }
-          />
-        )}
+        <MarketListSection
+          isLoading={loading && !isRefreshing}
+          isRefreshing={isRefreshing}
+          posts={posts}
+          activeTab={activeTab}
+          onRefresh={onRefresh}
+          onContactTeam={handleContactTeam}
+          onContactPlayer={handleContactPlayer}
+        />
       </View>
 
-      {/* FAB: Crear publicación */}
       <TouchableOpacity
-        className="absolute bottom-6 right-6 w-14 h-14 bg-primary rounded-full items-center justify-center"
+        className="absolute bottom-6 right-6 h-14 w-14 items-center justify-center rounded-full bg-brand-primary"
         onPress={handleCreatePost}
         activeOpacity={0.9}
-        disabled={isContactLoading}
         style={{
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 4 },
@@ -263,12 +198,21 @@ export default function MarketScreen() {
           elevation: 5,
         }}
       >
-        {isContactLoading ? (
-          <ActivityIndicator size="small" color="#003914" />
-        ) : (
-          <AppIcon family="material-icons" name="add" size={28} color="#003914" />
-        )}
+        <AppIcon family="material-icons" name="add" size={28} color="#003914" />
       </TouchableOpacity>
+
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCreateModal(false)}
+      >
+        <MarketCreateContent onClose={() => setShowCreateModal(false)} />
+      </Modal>
+
+      {isContactLoading && <GlobalLoader label="Abriendo chat..." />}
+
+      {AlertComponent}
     </View>
   );
 }

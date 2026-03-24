@@ -12,6 +12,8 @@ import { HeroButton } from '@/components/ui/HeroButton';
 import { PitchSelector } from '@/components/ui/PitchSelector';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { GlobalLoader } from '@/components/GlobalLoader';
+import { updateProfile } from '@/lib/profile-edit-data';
 import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
 
@@ -44,18 +46,7 @@ export default function ProfileEditScreen() {
     setLoading(true);
 
     try {
-      // Update profile
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          full_name: data.fullName,
-          username: data.username,
-          zone: data.zone,
-          preferred_position: data.position,
-        })
-        .eq('id', profile.id);
-
-      if (updateError) throw updateError;
+      await updateProfile(profile.id, data);
 
       await refreshProfile();
       showAlert('Éxito', 'Tu perfil se ha actualizado correctamente.');
@@ -75,6 +66,10 @@ export default function ProfileEditScreen() {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return <GlobalLoader label="Guardando cambios..." />;
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface-base">
