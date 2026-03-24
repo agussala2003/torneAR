@@ -9,10 +9,10 @@ interface PositionFilterScrollProps {
 
 export function PositionFilterScroll({ selectedPosition, onPositionSelect }: PositionFilterScrollProps) {
   return (
-    <ScrollView 
-      horizontal 
+    <ScrollView
+      horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 12, paddingHorizontal: 24, paddingBottom: 32 }}
+      contentContainerStyle={{ gap: 12, paddingBottom: 32 }}
     >
       {POSITIONS.map((pos) => {
         const isActive = selectedPosition === pos;
@@ -21,16 +21,14 @@ export function PositionFilterScroll({ selectedPosition, onPositionSelect }: Pos
             key={pos}
             onPress={() => onPositionSelect(pos)}
             activeOpacity={0.8}
-            className={`px-5 py-2 rounded-full ${
-              isActive
-                ? 'border border-brand-primary/30 bg-brand-primary/10'
-                : 'bg-surface-high'
-            }`}
+            className={`px-5 py-2 rounded-full ${isActive
+              ? 'border border-brand-primary/30 bg-brand-primary/10'
+              : 'bg-surface-high'
+              }`}
           >
             <Text
-              className={`text-xs font-display uppercase tracking-wider ${
-                isActive ? 'text-brand-primary' : 'text-neutral-on-surface-variant'
-              }`}
+              className={`text-xs font-display uppercase tracking-wider ${isActive ? 'text-brand-primary' : 'text-neutral-on-surface-variant'
+                }`}
             >
               {pos}
             </Text>

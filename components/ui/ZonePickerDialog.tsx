@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Modal, FlatList, TouchableWithoutFeedback, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, TouchableWithoutFeedback, ActivityIndicator, StyleSheet } from 'react-native';
 import { supabase } from '@/lib/supabase';
 
 interface ZonePickerDialogProps {
@@ -33,8 +33,12 @@ export function ZonePickerDialog({ visible, onClose, selectedZone, onSelect }: Z
     }
   }, [visible, zones.length]);
 
+  // Si no está visible, retornamos null y no renderizamos nada en el árbol
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    // SOLUCIÓN: Reemplazamos <Modal> por una View absoluta con z-index altísimo
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 99 }]} className="flex-1">
       <TouchableWithoutFeedback onPress={onClose}>
         <View className="flex-1 items-center justify-center bg-black/80 px-6">
           <TouchableWithoutFeedback>
@@ -80,6 +84,6 @@ export function ZonePickerDialog({ visible, onClose, selectedZone, onSelect }: Z
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
-    </Modal>
+    </View>
   );
 }

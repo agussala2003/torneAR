@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,8 +8,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { PitchSelector } from '@/components/ui/PitchSelector';
-import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
 import { useAuth } from '@/context/AuthContext';
+import { useUI } from '@/context/UIContext';
 
 import {
   createTeamPostSchema,
@@ -21,13 +22,9 @@ import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } 
 
 type CreationType = 'TEAM' | 'PLAYER';
 
-// ==========================================
-// CONTENIDO PURO — sin hooks de navegación.
-// Se puede renderizar dentro de un <Modal> de RN sin perder el contexto.
-// ==========================================
 export function MarketCreateContent({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
-  const { showAlert, AlertComponent } = useCustomAlert();
+  const { showAlert } = useUI();
 
   const [creationType, setCreationType] = useState<CreationType>('TEAM');
   const [managedTeams, setManagedTeams] = useState<ManagedTeam[]>([]);
@@ -42,81 +39,59 @@ export function MarketCreateContent({ onClose }: { onClose: () => void }) {
   }, [user]);
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <View className="px-6 py-4 flex-row items-center border-b border-surface-container-high bg-surface-base">
+    <SafeAreaView className="flex-1 bg-surface-base" edges={['top']}>
+      <View className="px-6 py-4 flex-row items-center border-b border-surface-high bg-surface-base">
         <TouchableOpacity
           onPress={onClose}
           className="mr-4"
+          activeOpacity={0.7} // IMPORTANTE: SIN CLASES ACTIVE: DE TAILWIND
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
         </TouchableOpacity>
-        <Text className="text-on-surface font-displayBlack text-xl tracking-wider">
+        <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
           Nueva Publicación
         </Text>
       </View>
 
-      {/* Segmented Control */}
-      <View className="flex-row mx-6 mt-4 p-1 bg-surface-container-low rounded-xl">
+      <View className="flex-row mx-6 mt-4 p-1 bg-surface-low rounded-xl">
         <TouchableOpacity
-          className={`flex-1 py-3 items-center rounded-lg ${creationType === 'TEAM' ? 'bg-primary shadow-lg' : ''}`}
+          className={`flex-1 py-3 items-center rounded-lg ${creationType === 'TEAM' ? 'bg-brand-primary shadow-lg' : ''}`}
           onPress={() => setCreationType('TEAM')}
-          activeOpacity={0.8}
+          activeOpacity={0.8} // IMPORTANTE
         >
-          <Text
-            className={`font-uiBold text-xs ${creationType === 'TEAM' ? 'text-on-primary' : 'text-on-surface-variant'}`}
-          >
+          <Text className={`font-uiBold text-xs ${creationType === 'TEAM' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
             Busco Jugador
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          className={`flex-1 py-3 items-center rounded-lg ${creationType === 'PLAYER' ? 'bg-primary shadow-lg' : ''}`}
+          className={`flex-1 py-3 items-center rounded-lg ${creationType === 'PLAYER' ? 'bg-brand-primary shadow-lg' : ''}`}
           onPress={() => setCreationType('PLAYER')}
-          activeOpacity={0.8}
+          activeOpacity={0.8} // IMPORTANTE
         >
-          <Text
-            className={`font-uiBold text-xs ${creationType === 'PLAYER' ? 'text-on-primary' : 'text-on-surface-variant'}`}
-          >
+          <Text className={`font-uiBold text-xs ${creationType === 'PLAYER' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
             Busco Equipo / Partido
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        className="flex-1 px-6 pt-6"
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         {creationType === 'TEAM' ? (
-          <TeamPostForm
-            managedTeams={managedTeams}
-            isLoadingTeams={isLoadingTeams}
-            onSuccess={onClose}
-            showAlert={showAlert}
-          />
+          <TeamPostForm managedTeams={managedTeams} isLoadingTeams={isLoadingTeams} onSuccess={onClose} showAlert={showAlert} />
         ) : (
           <PlayerPostForm onSuccess={onClose} showAlert={showAlert} />
         )}
       </ScrollView>
-
-      {AlertComponent}
     </SafeAreaView>
   );
 }
 
-// ==========================================
-// PANTALLA RUTA — solo se usa cuando Expo Router
-// navega a /(modals)/market-create. Envuelve el
-// contenido y provee router.back() como onClose.
-// ==========================================
+// ESTE ES EL COMPONENTE QUE EXPO ROUTER LLAMA AUTOMÁTICAMENTE
 export default function MarketCreateModal() {
-  const router = useRouter();
   return <MarketCreateContent onClose={() => router.back()} />;
 }
 
-// ==========================================
-// FORM PARA EQUIPOS BUSCANDO JUGADOR
-// ==========================================
+// ... EL RESTO DEL CÓDIGO (TeamPostForm y PlayerPostForm) QUEDA IGUAL AL QUE TENÍAMOS ...
 function TeamPostForm({
   managedTeams,
   isLoadingTeams,
@@ -132,11 +107,15 @@ function TeamPostForm({
     control,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CreateTeamPostInput>({
     resolver: zodResolver(createTeamPostSchema),
-    defaultValues: { positionWanted: 'CUALQUIERA', description: '', teamId: undefined },
+    defaultValues: { positionWanted: 'CUALQUIERA', description: '', teamId: undefined, matchDate: '', matchTime: '', zone: '' },
   });
+
+  const [showZonePicker, setShowZonePicker] = useState(false);
+  const currentZone = watch('zone');
 
   useEffect(() => {
     if (managedTeams.length === 1) {
@@ -160,11 +139,11 @@ function TeamPostForm({
 
   if (managedTeams.length === 0) {
     return (
-      <View className="bg-surface-container-high p-6 rounded-xl mt-4 border border-error/20">
+      <View className="bg-surface-high p-6 rounded-xl mt-4 border border-error/20">
         <Text className="text-error font-uiBold text-base mb-2 text-center">
           Acceso Restringido
         </Text>
-        <Text className="text-on-surface-variant text-sm text-center">
+        <Text className="text-neutral-on-surface-variant text-sm text-center">
           Debés ser Capitán o Subcapitán de un equipo para crear esta publicación.
         </Text>
       </View>
@@ -174,10 +153,10 @@ function TeamPostForm({
   return (
     <View>
       <View className="mb-6">
-        <Text className="text-on-surface font-uiBold mb-2">Equipo</Text>
+        <Text className="text-neutral-on-surface font-uiBold mb-2">Equipo</Text>
         {managedTeams.length === 1 ? (
-          <View className="bg-surface-container-low p-4 rounded-xl border border-primary/20">
-            <Text className="text-on-surface font-uiMedium">{managedTeams[0].name}</Text>
+          <View className="bg-surface-low p-4 rounded-xl border border-brand-primary/20">
+            <Text className="text-neutral-on-surface font-uiMedium">{managedTeams[0].name}</Text>
           </View>
         ) : (
           <Controller
@@ -189,11 +168,11 @@ function TeamPostForm({
                   <TouchableOpacity
                     key={team.id}
                     onPress={() => onChange(team.id)}
-                    className={`p-4 rounded-xl border ${value === team.id ? 'bg-primary/10 border-primary' : 'bg-surface-container-low border-transparent'}`}
+                    className={`p-4 rounded-xl border ${value === team.id ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
                     activeOpacity={0.7}
                   >
                     <Text
-                      className={`font-uiMedium ${value === team.id ? 'text-primary' : 'text-on-surface'}`}
+                      className={`font-uiMedium ${value === team.id ? 'text-brand-primary' : 'text-neutral-on-surface'}`}
                     >
                       {team.name}
                     </Text>
@@ -209,21 +188,21 @@ function TeamPostForm({
       </View>
 
       <View className="mb-6">
-        <Text className="text-on-surface font-uiBold mb-2">Posición Buscada</Text>
+        <Text className="text-neutral-on-surface font-uiBold mb-2">Posición Buscada</Text>
         <Controller
           control={control}
           name="positionWanted"
           render={({ field: { onChange, value } }) => (
             <View>
-              {/* @ts-ignore - PitchSelector asume value y onChange */}
+              {/* @ts-ignore */}
               <PitchSelector value={value} onChange={onChange} />
               <TouchableOpacity
-                className="mt-4 p-3 border border-primary/30 rounded-lg items-center bg-surface-container-low"
+                className="mt-4 p-3 border border-brand-primary/30 rounded-lg items-center bg-surface-low"
                 onPress={() => onChange('CUALQUIERA')}
                 activeOpacity={0.7}
               >
-                <Text className="text-primary font-uiMedium text-sm">
-                  Soy Flexible / Cualquier posición
+                <Text className="text-brand-primary font-uiMedium text-sm">
+                  Cualquier posición / Flexible
                 </Text>
               </TouchableOpacity>
             </View>
@@ -234,8 +213,62 @@ function TeamPostForm({
         )}
       </View>
 
+      <View className="mb-6 p-4 bg-surface-low rounded-xl border border-surface-high">
+        <Text className="text-neutral-on-surface font-uiBold mb-1">¿Es para un partido específico?</Text>
+        <Text className="text-neutral-on-surface-variant font-ui text-xs mb-4">Completá estos datos si les falta 1 para jugar pronto. Dejalo en blanco si buscan fijo.</Text>
+
+        <View className="flex-row gap-4 mb-4">
+          <View className="flex-1">
+            <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Día (Ej: Hoy, Jueves)</Text>
+            <Controller
+              control={control}
+              name="matchDate"
+              render={({ field: { onChange, value } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder="Viernes"
+                  placeholderTextColor="#88998D"
+                  className="bg-surface-high p-3 rounded-lg text-neutral-on-surface font-ui"
+                />
+              )}
+            />
+          </View>
+          <View className="flex-1">
+            <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Hora (Ej: 21:00)</Text>
+            <Controller
+              control={control}
+              name="matchTime"
+              render={({ field: { onChange, value } }) => (
+                <TextInput
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder="20:30 hs"
+                  placeholderTextColor="#88998D"
+                  className="bg-surface-high p-3 rounded-lg text-neutral-on-surface font-ui"
+                />
+              )}
+            />
+          </View>
+        </View>
+
+        <View>
+          <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Zona</Text>
+          <TouchableOpacity
+            onPress={() => setShowZonePicker(true)}
+            activeOpacity={0.7}
+            className="flex-row items-center justify-between bg-surface-high p-3 rounded-lg"
+          >
+            <Text className={`font-ui ${currentZone ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
+              {currentZone || 'Seleccionar zona'}
+            </Text>
+            <AppIcon family="material-icons" name="arrow-drop-down" size={20} color="#88998D" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       <View className="mb-8">
-        <Text className="text-on-surface font-uiBold mb-2">Descripción (Opcional)</Text>
+        <Text className="text-neutral-on-surface font-uiBold mb-2">Descripción (Opcional)</Text>
         <Controller
           control={control}
           name="description"
@@ -247,7 +280,7 @@ function TeamPostForm({
               numberOfLines={4}
               placeholder="Ej: Buscamos arquero con experiencia para torneo los sábados..."
               placeholderTextColor="#88998D"
-              className="bg-surface-container-low p-4 rounded-xl text-on-surface font-ui min-h-[100px]"
+              className="bg-surface-low p-4 rounded-xl text-neutral-on-surface font-ui min-h-[100px]"
               textAlignVertical="top"
             />
           )}
@@ -259,13 +292,17 @@ function TeamPostForm({
         onPress={handleSubmit(onSubmit)}
         disabled={isSubmitting}
       />
+
+      <ZonePickerDialog
+        visible={showZonePicker}
+        onClose={() => setShowZonePicker(false)}
+        selectedZone={currentZone || ''}
+        onSelect={(val) => setValue('zone', val)}
+      />
     </View>
   );
 }
 
-// ==========================================
-// FORM PARA JUGADORES BUSCANDO EQUIPO/PARTIDO
-// ==========================================
 function PlayerPostForm({
   onSuccess,
   showAlert,
@@ -295,7 +332,7 @@ function PlayerPostForm({
   return (
     <View>
       <View className="mb-6">
-        <Text className="text-on-surface font-uiBold mb-2">¿Qué estás buscando?</Text>
+        <Text className="text-neutral-on-surface font-uiBold mb-2">¿Qué estás buscando?</Text>
         <Controller
           control={control}
           name="postType"
@@ -304,10 +341,10 @@ function PlayerPostForm({
               <TouchableOpacity
                 onPress={() => onChange('BUSCA_EQUIPO')}
                 activeOpacity={0.8}
-                className={`flex-1 p-4 rounded-xl border items-center ${value === 'BUSCA_EQUIPO' ? 'bg-primary/10 border-primary' : 'bg-surface-container-low border-transparent'}`}
+                className={`flex-1 p-4 rounded-xl border items-center ${value === 'BUSCA_EQUIPO' ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
               >
                 <Text
-                  className={`font-uiMedium ${value === 'BUSCA_EQUIPO' ? 'text-primary' : 'text-on-surface'}`}
+                  className={`font-uiMedium text-center ${value === 'BUSCA_EQUIPO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}
                 >
                   Unirme a Equipo
                 </Text>
@@ -315,10 +352,10 @@ function PlayerPostForm({
               <TouchableOpacity
                 onPress={() => onChange('BUSCA_PARTIDO')}
                 activeOpacity={0.8}
-                className={`flex-1 p-4 rounded-xl border items-center ${value === 'BUSCA_PARTIDO' ? 'bg-primary/10 border-primary' : 'bg-surface-container-low border-transparent'}`}
+                className={`flex-1 p-4 rounded-xl border items-center ${value === 'BUSCA_PARTIDO' ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
               >
                 <Text
-                  className={`font-uiMedium ${value === 'BUSCA_PARTIDO' ? 'text-primary' : 'text-on-surface'}`}
+                  className={`font-uiMedium text-center ${value === 'BUSCA_PARTIDO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}
                 >
                   Jugar un Partido
                 </Text>
@@ -332,7 +369,7 @@ function PlayerPostForm({
       </View>
 
       <View className="mb-6">
-        <Text className="text-on-surface font-uiBold mb-2">Mi Posición</Text>
+        <Text className="text-neutral-on-surface font-uiBold mb-2">Mi Posición</Text>
         <Controller
           control={control}
           name="position"
@@ -341,11 +378,11 @@ function PlayerPostForm({
               {/* @ts-ignore */}
               <PitchSelector value={value} onChange={onChange} />
               <TouchableOpacity
-                className="mt-4 p-3 border border-primary/30 rounded-lg items-center bg-surface-container-low"
+                className="mt-4 p-3 border border-brand-primary/30 rounded-lg items-center bg-surface-low"
                 onPress={() => onChange('CUALQUIERA')}
                 activeOpacity={0.7}
               >
-                <Text className="text-primary font-uiMedium text-sm">
+                <Text className="text-brand-primary font-uiMedium text-sm">
                   Soy Flexible / Cualquier posición
                 </Text>
               </TouchableOpacity>
@@ -358,7 +395,7 @@ function PlayerPostForm({
       </View>
 
       <View className="mb-8">
-        <Text className="text-on-surface font-uiBold mb-2">Descripción (Opcional)</Text>
+        <Text className="text-neutral-on-surface font-uiBold mb-2">Descripción (Opcional)</Text>
         <Controller
           control={control}
           name="description"
@@ -370,7 +407,7 @@ function PlayerPostForm({
               numberOfLines={4}
               placeholder="Ej: Juego de 5, tengo disponibilidad por la noche..."
               placeholderTextColor="#88998D"
-              className="bg-surface-container-low p-4 rounded-xl text-on-surface font-ui min-h-[100px]"
+              className="bg-surface-low p-4 rounded-xl text-neutral-on-surface font-ui min-h-[100px]"
               textAlignVertical="top"
             />
           )}

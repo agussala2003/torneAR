@@ -41,6 +41,9 @@ export function MarketListSection({
           logoUrl={post.teams?.shield_url}
           positionWanted={post.position_wanted}
           description={post.description}
+          matchDate={post.match_date}
+          matchTime={post.match_time}
+          zone={post.zone}
           onPressAction={() => onContactTeam(post.team_id)}
         />
       );
@@ -66,7 +69,7 @@ export function MarketListSection({
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingTop: 12, paddingBottom: 100 }}
+      contentContainerStyle={{ paddingTop: 0, paddingBottom: 100 }}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}

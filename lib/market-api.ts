@@ -11,6 +11,9 @@ export interface MarketTeamPost {
   team_id: string;
   position_wanted: string;
   description: string | null;
+  match_date?: string | null;
+  match_time?: string | null;
+  zone?: string | null;
   is_active: boolean;
   created_at: string;
   teams: {
@@ -122,6 +125,9 @@ export async function createTeamPost(postData: CreateTeamPostInput): Promise<voi
       team_id: postData.teamId,
       position_wanted: postData.positionWanted,
       description: postData.description || null,
+      match_date: postData.matchDate || null,
+      match_time: postData.matchTime || null,
+      zone: postData.zone || null,
       created_by: profileId,
     });
 

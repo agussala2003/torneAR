@@ -7,6 +7,9 @@ export const createTeamPostSchema = z.object({
   teamId: z.string().uuid('ID de equipo inválido'),
   positionWanted: z.enum(POSITIONS),
   description: z.string().optional(),
+  matchDate: z.string().optional(),
+  matchTime: z.string().optional(),
+  zone: z.string().optional(),
 });
 
 export const createPlayerPostSchema = z.object({

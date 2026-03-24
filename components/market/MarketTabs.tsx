@@ -8,23 +8,31 @@ interface MarketTabsProps {
 
 export function MarketTabs({ activeTab, onTabChange }: MarketTabsProps) {
   return (
-    <View className="flex-row gap-2 p-1 bg-surface-low rounded-xl mx-6 mb-6">
+    <View className="flex-row gap-2 p-1 bg-surface-low rounded-xl mb-6">
       <TouchableOpacity
-        className={`flex-1 py-3 items-center rounded-lg ${activeTab === 'TEAMS_LOOKING' ? 'bg-brand-primary shadow-lg' : ''}`}
+        className="flex-1 py-3 items-center rounded-lg"
+        style={activeTab === 'TEAMS_LOOKING' ? { backgroundColor: '#53E076' } : undefined}
         onPress={() => onTabChange('TEAMS_LOOKING')}
         activeOpacity={0.8}
       >
-        <Text className={`font-uiBold text-sm ${activeTab === 'TEAMS_LOOKING' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
+        <Text
+          className="font-uiBold text-sm"
+          style={{ color: activeTab === 'TEAMS_LOOKING' ? '#003914' : '#BCCBB9' }}
+        >
           Buscan Jugador
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        className={`flex-1 py-3 items-center rounded-lg ${activeTab === 'PLAYERS_LOOKING' ? 'bg-brand-primary shadow-lg' : ''}`}
+        className="flex-1 py-3 items-center rounded-lg"
+        style={activeTab === 'PLAYERS_LOOKING' ? { backgroundColor: '#53E076' } : undefined}
         onPress={() => onTabChange('PLAYERS_LOOKING')}
         activeOpacity={0.8}
       >
-        <Text className={`font-uiBold text-sm ${activeTab === 'PLAYERS_LOOKING' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
+        <Text
+          className="font-uiBold text-sm"
+          style={{ color: activeTab === 'PLAYERS_LOOKING' ? '#003914' : '#BCCBB9' }}
+        >
           Buscan Equipo
         </Text>
       </TouchableOpacity>

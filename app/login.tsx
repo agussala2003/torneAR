@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
 import { HeroButton } from '@/components/ui/HeroButton';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 // 1. Definimos el Schema con Zod
@@ -20,7 +20,6 @@ const authSchema = z.object({
 type AuthFormData = z.infer<typeof authSchema>;
 
 export default function LoginScreen() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   

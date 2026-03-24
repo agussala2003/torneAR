@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { AppIcon } from './ui/AppIcon';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useTeamStore } from '@/stores/teamStore';
 import { ActiveTeamSelector } from './ui/ActiveTeamSelector';
+import { fetchInbox } from '@/lib/chat-api';
 
 type GlobalHeaderProps = {
   onNotificationPress?: () => void;
   notificationCount?: number;
+  isMarketTab?: boolean;
 };
 
-export function GlobalHeader({ onNotificationPress, notificationCount }: GlobalHeaderProps) {
-  const router = useRouter();
+export function GlobalHeader({ onNotificationPress, notificationCount, isMarketTab }: GlobalHeaderProps) {
   const { profile } = useAuth();
   const [internalNotificationCount, setInternalNotificationCount] = useState(0);
+  const [chatCount, setChatCount] = useState(0);
 
   const loadUnreadNotificationsCount = useCallback(async () => {
     if (!profile?.id) {
@@ -67,13 +69,24 @@ export function GlobalHeader({ onNotificationPress, notificationCount }: GlobalH
   const { fetchMyTeams, activeTeamId } = useTeamStore();
 
   useEffect(() => {
-    // Fetch user's teams for the global Zustand store when they log in
-    if (profile?.id) {
-      if (!activeTeamId) { // Basic check to avoid re-fetching excessively if already set, though fetchMyTeams handles caching logic internally if wanted
-        void fetchMyTeams(profile.id);
-      }
+    if (profile?.id && !activeTeamId) {
+      void fetchMyTeams(profile.id);
     }
   }, [profile?.id, activeTeamId, fetchMyTeams]);
+
+  const loadChatCount = useCallback(async () => {
+    if (!profile?.id) return;
+    try {
+      const inbox = await fetchInbox();
+      setChatCount(inbox.length);
+    } catch { }
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (isMarketTab) {
+      void loadChatCount();
+    }
+  }, [isMarketTab, loadChatCount]);
 
   const resolvedNotificationCount = notificationCount ?? internalNotificationCount;
   const handleNotificationPress = onNotificationPress ?? (() => router.push('/notifications'));
@@ -83,7 +96,7 @@ export function GlobalHeader({ onNotificationPress, notificationCount }: GlobalH
       {/* Logo TorneAR */}
       <View className="flex-row items-center gap-2">
         <View className="h-8 w-8 items-center justify-center rounded-full">
-          <AppIcon family="material-community" name="soccer" size={20} color='#53E076'/>
+          <AppIcon family="material-community" name="soccer" size={20} color='#53E076' />
         </View>
         <Text className="font-displayBlack text-lg tracking-wider text-brand-primary">TORNEAR</Text>
       </View>
@@ -92,21 +105,41 @@ export function GlobalHeader({ onNotificationPress, notificationCount }: GlobalH
         <ActiveTeamSelector />
       </View>
 
-      {/* Notification Bell */}
-      <TouchableOpacity
-        onPress={handleNotificationPress}
-        activeOpacity={0.7}
-        className="relative"
-      >
-        <AppIcon family="material-community" name="bell" size={20}  />
-        {resolvedNotificationCount > 0 && (
-          <View className="absolute -top-1 -right-1 h-4 w-4 items-center justify-center rounded-full bg-brand-primary">
-            <Text className="font-uiBold text-[9px] text-[#003914]" style={{ fontVariant: ['tabular-nums'] }}>
-              {resolvedNotificationCount > 9 ? '9+' : resolvedNotificationCount}
-            </Text>
-          </View>
+      <View className="flex-row items-center gap-4">
+        {/* Market Chats Icon */}
+        {isMarketTab && (
+          <TouchableOpacity
+            onPress={() => router.push('/market-chats' as any)}
+            activeOpacity={0.7}
+            className="relative"
+          >
+            <AppIcon family="material-icons" name="chat" size={21} />
+            {chatCount > 0 && (
+              <View className="absolute -top-1.5 -right-1.5 h-4 w-4 items-center justify-center rounded-full bg-[#003914] border border-[#53E076]">
+                <Text className="font-uiBold text-[8px] text-[#53E076]" style={{ fontVariant: ['tabular-nums'] }}>
+                  {chatCount > 9 ? '9+' : chatCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         )}
-      </TouchableOpacity>
+
+        {/* Notification Bell */}
+        <TouchableOpacity
+          onPress={handleNotificationPress}
+          activeOpacity={0.7}
+          className="relative"
+        >
+          <AppIcon family="material-community" name="bell" size={20} />
+          {resolvedNotificationCount > 0 && (
+            <View className="absolute -top-1 -right-1 h-4 w-4 items-center justify-center rounded-full bg-brand-primary">
+              <Text className="font-uiBold text-[9px] text-[#003914]" style={{ fontVariant: ['tabular-nums'] }}>
+                {resolvedNotificationCount > 9 ? '9+' : resolvedNotificationCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

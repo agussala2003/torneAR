@@ -108,7 +108,7 @@ export function TeamManageHeader({
         </View>
       </View>
 
-      <View className="mt-4 rounded-xl bg-surface-low p-4">
+      <View className="mt-4 rounded-xl bg-surface-low">
         <Text className="font-display mb-3 text-xs uppercase tracking-wider text-neutral-on-surface-variant">
           Resumen
         </Text>

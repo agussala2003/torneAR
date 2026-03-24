@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { GlobalLoader } from '@/components/GlobalLoader';
@@ -17,7 +17,6 @@ import { ProfileSettingsSection } from '@/components/profile/ProfileSettingsSect
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const { signOut, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<ProfileViewData | null>(null);

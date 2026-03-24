@@ -20,7 +20,7 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showZonePicker, setShowZonePicker] = useState(false);
-  
+
   const { showAlert, AlertComponent } = useCustomAlert();
 
   const { control, handleSubmit, trigger, watch, setValue, formState: { errors } } = useForm<UserProfileFormData>({

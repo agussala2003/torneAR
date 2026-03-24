@@ -8,10 +8,13 @@ interface MarketTeamCardProps {
   logoUrl?: string | null;
   positionWanted: string;
   description?: string | null;
+  matchDate?: string | null;
+  matchTime?: string | null;
+  zone?: string | null;
   onPressAction: () => void;
 }
 
-export function MarketTeamCard({ teamName, logoUrl, positionWanted, description, onPressAction }: MarketTeamCardProps) {
+export function MarketTeamCard({ teamName, logoUrl, positionWanted, description, matchDate, matchTime, zone, onPressAction }: MarketTeamCardProps) {
   return (
     <View className="bg-surface-low rounded-xl overflow-hidden mb-4">
       <View className="p-4">
@@ -45,6 +48,19 @@ export function MarketTeamCard({ teamName, logoUrl, positionWanted, description,
             </Text>
           </View>
         </View>
+
+        {(matchDate || matchTime || zone) ? (
+          <View className="flex-row items-center gap-2 mb-3 bg-surface-high/30 p-2 rounded-lg border border-surface-high">
+            <AppIcon family="material-icons" name="event-available" size={14} color="#88998D" />
+            <Text className="text-neutral-on-surface-variant text-xs font-uiSemibold">
+              {[
+                matchDate ? `${matchDate}` : '',
+                matchTime ? `${matchTime} hs` : '',
+                zone ? `${zone}` : ''
+              ].filter(Boolean).join(' • ')}
+            </Text>
+          </View>
+        ) : null}
 
         {description ? (
           <Text className="text-neutral-on-surface-variant text-sm italic mb-1" numberOfLines={3}>
