@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { GlobalHeader } from '@/components/GlobalHeader';
