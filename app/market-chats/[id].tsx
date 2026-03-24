@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -35,10 +34,8 @@ export default function MarketChatScreen() {
   const [isSending, setIsSending] = useState(false);
 
   const [chatData, setChatData] = useState<MarketConversation | null>(null);
-  // true cuando el usuario actúa como CAPITÁN/SUBCAPITÁN del equipo en esta conversación
   const [isCaptainMode, setIsCaptainMode] = useState(false);
 
-  // Códigos reales obtenidos desde la BD
   const [teamInviteCode, setTeamInviteCode] = useState<string | null>(null);
   const [matchCode, setMatchCode] = useState<string | null>(null);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
@@ -48,20 +45,15 @@ export default function MarketChatScreen() {
 
     const loadConversation = async () => {
       try {
-        const [msgs, inbox] = await Promise.all([
-          fetchMessages(id),
-          fetchInbox(),
-        ]);
+        const [msgs, inbox] = await Promise.all([fetchMessages(id), fetchInbox()]);
         setMessages(msgs);
 
         const currentChat = inbox.find((c: MarketConversation) => c.id === id);
         if (currentChat) {
           setChatData(currentChat);
-          // Comparamos con profile.id (profiles.id), NO con auth user.id
           const actingAsCaptain = currentChat.player_id !== profile.id;
           setIsCaptainMode(actingAsCaptain);
 
-          // Si actúa como capitán, pre-carga los códigos de invitación
           if (actingAsCaptain) {
             setIsLoadingCodes(true);
             const [inviteCode, confirmedMatchCode] = await Promise.all([
@@ -89,7 +81,6 @@ export default function MarketChatScreen() {
 
     const senderTeamId = isCaptainMode && chatData ? chatData.team_id : undefined;
 
-    // Mensaje optimista
     const tempMsg: MarketMessage = {
       id: `temp-${Date.now()}`,
       conversation_id: id,
@@ -108,7 +99,6 @@ export default function MarketChatScreen() {
       setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? realMsg : m)));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error) {
-      // Revertir mensaje optimista en caso de error
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
       console.error('Error sending message:', error);
     } finally {
@@ -139,11 +129,13 @@ export default function MarketChatScreen() {
         <View
           className={`max-w-[75%] p-3 rounded-2xl border ${
             isMine
-              ? 'bg-primary border-primary rounded-tr-sm'
-              : 'bg-surface-container-high border-surface-container-highest rounded-tl-sm'
+              ? 'bg-brand-primary border-brand-primary rounded-tr-sm'
+              : 'bg-surface-high border-surface-variant rounded-tl-sm'
           } ${isTemp ? 'opacity-60' : ''}`}
         >
-          <Text className={isMine ? 'text-on-primary' : 'text-on-surface'}>{item.content}</Text>
+          <Text className={isMine ? 'text-[#003914]' : 'text-neutral-on-surface'}>
+            {item.content}
+          </Text>
         </View>
       </View>
     );
@@ -156,9 +148,9 @@ export default function MarketChatScreen() {
     : 'Cargando...';
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+    <View className="flex-1 bg-surface-base">
       {/* Header */}
-      <View className="px-6 py-4 flex-row items-center border-b border-surface-container-high bg-surface-base">
+      <View className="px-6 py-4 flex-row items-center border-b border-surface-high bg-surface-base">
         <TouchableOpacity
           onPress={() => router.back()}
           className="mr-4"
@@ -166,7 +158,10 @@ export default function MarketChatScreen() {
         >
           <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
         </TouchableOpacity>
-        <Text className="text-on-surface font-displayBlack text-xl tracking-wider" numberOfLines={1}>
+        <Text
+          className="text-neutral-on-surface font-displayBlack text-xl tracking-wider"
+          numberOfLines={1}
+        >
           {chatTitle}
         </Text>
       </View>
@@ -191,7 +186,7 @@ export default function MarketChatScreen() {
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View className="flex-1 items-center justify-center py-16">
-                <Text className="text-on-surface-variant font-uiMedium text-sm text-center">
+                <Text className="text-neutral-on-surface-variant font-ui text-sm text-center">
                   Aún no hay mensajes.{'\n'}¡Rompé el hielo!
                 </Text>
               </View>
@@ -199,8 +194,7 @@ export default function MarketChatScreen() {
           />
 
           {/* Barra de acciones + input */}
-          <View className="p-4 bg-surface-container-low border-t border-surface-container-high">
-            {/* Botones de acción rápida para CAPITÁN/SUBCAPITÁN */}
+          <View className="p-4 bg-surface-low border-t border-surface-high">
             {isCaptainMode && (
               <View className="flex-row gap-2 mb-3">
                 {isLoadingCodes ? (
@@ -212,15 +206,15 @@ export default function MarketChatScreen() {
                     <TouchableOpacity
                       className={`flex-1 py-2 rounded-lg items-center border ${
                         teamInviteCode
-                          ? 'bg-primary/10 border-primary/20'
-                          : 'bg-surface-container-high border-transparent opacity-40'
+                          ? 'bg-brand-primary/10 border-brand-primary/20'
+                          : 'bg-surface-high border-transparent opacity-40'
                       }`}
                       onPress={handleInviteToTeam}
                       disabled={!teamInviteCode || isSending}
                       activeOpacity={0.7}
                     >
                       <Text
-                        className={`text-xs font-uiBold ${teamInviteCode ? 'text-primary' : 'text-on-surface-variant'}`}
+                        className={`text-xs font-uiBold ${teamInviteCode ? 'text-brand-primary' : 'text-neutral-on-surface-variant'}`}
                       >
                         Invitar a Equipo
                       </Text>
@@ -229,15 +223,15 @@ export default function MarketChatScreen() {
                     <TouchableOpacity
                       className={`flex-1 py-2 rounded-lg items-center border ${
                         matchCode
-                          ? 'bg-surface-container-high border-surface-container-highest'
-                          : 'bg-surface-container-high border-transparent opacity-40'
+                          ? 'bg-surface-high border-surface-variant'
+                          : 'bg-surface-high border-transparent opacity-40'
                       }`}
                       onPress={handleInviteToMatch}
                       disabled={!matchCode || isSending}
                       activeOpacity={0.7}
                     >
                       <Text
-                        className={`text-xs font-uiMedium ${matchCode ? 'text-on-surface' : 'text-on-surface-variant'}`}
+                        className={`text-xs font-ui ${matchCode ? 'text-neutral-on-surface' : 'text-neutral-on-surface-variant'}`}
                       >
                         {matchCode ? 'Invitar a Partido' : 'Sin partido confirmado'}
                       </Text>
@@ -250,7 +244,7 @@ export default function MarketChatScreen() {
             {/* Input de mensaje */}
             <View className="flex-row items-center gap-2">
               <TextInput
-                className="flex-1 bg-surface-container-highest text-on-surface p-4 rounded-full font-ui"
+                className="flex-1 bg-surface-high text-neutral-on-surface p-4 rounded-full font-ui"
                 placeholder="Escribe un mensaje..."
                 placeholderTextColor="#88998D"
                 value={inputText}
@@ -260,7 +254,7 @@ export default function MarketChatScreen() {
               />
               <TouchableOpacity
                 className={`w-12 h-12 rounded-full items-center justify-center ${
-                  inputText.trim() && !isSending ? 'bg-primary' : 'bg-surface-container-high'
+                  inputText.trim() && !isSending ? 'bg-brand-primary' : 'bg-surface-high'
                 }`}
                 onPress={() => handleSend()}
                 disabled={!inputText.trim() || isSending}
@@ -281,6 +275,6 @@ export default function MarketChatScreen() {
           </View>
         </KeyboardAvoidingView>
       )}
-    </SafeAreaView>
+    </View>
   );
 }

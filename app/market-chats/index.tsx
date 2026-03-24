@@ -24,7 +24,6 @@ export default function MarketInboxScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Para el filtro por equipo (solo visible para CAPITÁN/SUBCAPITÁN)
   const [managedTeams, setManagedTeams] = useState<ManagedTeam[]>([]);
   const [filterTeamId, setFilterTeamId] = useState<string | null>(null);
 
@@ -53,7 +52,6 @@ export default function MarketInboxScreen() {
     loadData();
   };
 
-  // Filtro aplicado: si el capitán seleccionó un equipo, filtra por team_id
   const displayedChats = filterTeamId
     ? chats.filter((c) => c.team_id === filterTeamId)
     : chats;
@@ -77,26 +75,24 @@ export default function MarketInboxScreen() {
       ? (item.player?.full_name ?? 'Jugador')
       : (item.team?.name ?? 'Equipo');
 
-    const subtitle = asCaptain
-      ? (item.team?.name ?? '')
-      : '';
+    const subtitle = asCaptain ? (item.team?.name ?? '') : '';
 
     const avatar = asCaptain ? item.player?.avatar_url : item.team?.shield_url;
 
     return (
       <TouchableOpacity
-        className="flex-row items-center px-4 py-4 border-b border-surface-container-high"
+        className="flex-row items-center px-4 py-4 border-b border-surface-high"
         onPress={() => router.push(`/market-chats/${item.id}` as any)}
         activeOpacity={0.7}
       >
         {avatar ? (
           <Image
             source={{ uri: avatar }}
-            className="w-12 h-12 rounded-full bg-surface-container-high"
+            className="w-12 h-12 rounded-full bg-surface-high"
             contentFit="cover"
           />
         ) : (
-          <View className="w-12 h-12 rounded-full bg-surface-container-high items-center justify-center">
+          <View className="w-12 h-12 rounded-full bg-surface-high items-center justify-center">
             <AppIcon
               family="material-community"
               name={asCaptain ? 'account' : 'shield-account'}
@@ -107,17 +103,17 @@ export default function MarketInboxScreen() {
         )}
 
         <View className="ml-4 flex-1">
-          <Text className="text-on-surface font-uiBold text-base" numberOfLines={1}>
+          <Text className="text-neutral-on-surface font-uiBold text-base" numberOfLines={1}>
             {title}
           </Text>
           {subtitle ? (
-            <Text className="text-on-surface-variant text-xs font-ui" numberOfLines={1}>
+            <Text className="text-neutral-on-surface-variant text-xs font-ui" numberOfLines={1}>
               via {subtitle}
             </Text>
           ) : null}
         </View>
 
-        <Text className="text-on-surface-variant text-xs font-ui ml-2">
+        <Text className="text-neutral-on-surface-variant text-xs font-ui ml-2">
           {formatDate(item.created_at)}
         </Text>
       </TouchableOpacity>
@@ -125,9 +121,9 @@ export default function MarketInboxScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+    <View className="flex-1 bg-surface-base">
       {/* Header */}
-      <View className="px-6 py-4 flex-row items-center border-b border-surface-container-high bg-surface-base">
+      <View className="px-6 py-4 flex-row items-center border-b border-surface-high bg-surface-base">
         <TouchableOpacity
           onPress={() => router.back()}
           className="mr-4"
@@ -135,14 +131,14 @@ export default function MarketInboxScreen() {
         >
           <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
         </TouchableOpacity>
-        <Text className="text-on-surface font-displayBlack text-xl tracking-wider">
+        <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
           Mis Chats de Mercado
         </Text>
       </View>
 
-      {/* Filtro por equipo (solo aparece si el usuario gestiona múltiples equipos) */}
+      {/* Filtro por equipo */}
       {managedTeams.length > 1 && (
-        <View className="border-b border-surface-container-high">
+        <View className="border-b border-surface-high">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -153,12 +149,12 @@ export default function MarketInboxScreen() {
               activeOpacity={0.7}
               className={`px-4 py-1.5 rounded-full border ${
                 filterTeamId === null
-                  ? 'bg-primary border-primary'
-                  : 'bg-surface-container-low border-surface-container-high'
+                  ? 'bg-brand-primary border-brand-primary'
+                  : 'bg-surface-low border-surface-high'
               }`}
             >
               <Text
-                className={`text-xs font-uiBold ${filterTeamId === null ? 'text-on-primary' : 'text-on-surface-variant'}`}
+                className={`text-xs font-uiBold ${filterTeamId === null ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}
               >
                 Todos
               </Text>
@@ -170,12 +166,12 @@ export default function MarketInboxScreen() {
                 activeOpacity={0.7}
                 className={`px-4 py-1.5 rounded-full border ${
                   filterTeamId === team.id
-                    ? 'bg-primary border-primary'
-                    : 'bg-surface-container-low border-surface-container-high'
+                    ? 'bg-brand-primary border-brand-primary'
+                    : 'bg-surface-low border-surface-high'
                 }`}
               >
                 <Text
-                  className={`text-xs font-uiBold ${filterTeamId === team.id ? 'text-on-primary' : 'text-on-surface-variant'}`}
+                  className={`text-xs font-uiBold ${filterTeamId === team.id ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}
                 >
                   {team.name}
                 </Text>
@@ -192,7 +188,7 @@ export default function MarketInboxScreen() {
       ) : displayedChats.length === 0 ? (
         <View className="flex-1 justify-center items-center px-6">
           <AppIcon family="material-community" name="chat-outline" size={48} color="#3F4943" />
-          <Text className="text-on-surface-variant font-uiMedium text-base text-center mt-4">
+          <Text className="text-neutral-on-surface-variant font-uiMedium text-base text-center mt-4">
             No tenés chats activos.
           </Text>
         </View>
@@ -212,6 +208,6 @@ export default function MarketInboxScreen() {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }

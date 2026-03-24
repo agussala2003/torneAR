@@ -9,7 +9,6 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -164,7 +163,7 @@ export default function MarketScreen() {
     activeTab === 'TEAMS_LOOKING' ? teamPosts : playerPosts;
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base" edges={['top']}>
+    <View className="flex-1 bg-surface-base">
       <GlobalHeader />
 
       <View className="pt-4">
@@ -270,6 +269,6 @@ export default function MarketScreen() {
           <AppIcon family="material-icons" name="add" size={28} color="#003914" />
         )}
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 }
