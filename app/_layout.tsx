@@ -82,6 +82,8 @@ function RootLayoutNav() {
       <Stack.Screen name="team-requests" />
       <Stack.Screen name="team-manage" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="market-chats" />
+      <Stack.Screen name="(modals)" options={{ presentation: 'modal' }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
     </Stack>
   );

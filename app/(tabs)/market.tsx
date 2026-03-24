@@ -164,7 +164,7 @@ export default function MarketScreen() {
     activeTab === 'TEAMS_LOOKING' ? teamPosts : playerPosts;
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-surface-base" edges={['top']}>
       <GlobalHeader />
 
       <View className="pt-4">
@@ -177,7 +177,7 @@ export default function MarketScreen() {
         {/* Selector de equipo activo para capitanes con múltiples equipos */}
         {activeTab === 'PLAYERS_LOOKING' && managedTeams.length > 1 && (
           <View className="px-4 pt-3">
-            <Text className="text-on-surface-variant text-xs font-uiMedium mb-2">
+            <Text className="text-neutral-on-surface-variant text-xs font-uiMedium mb-2">
               Contactar como:
             </Text>
             <View className="flex-row gap-2 flex-wrap">
@@ -188,13 +188,13 @@ export default function MarketScreen() {
                   activeOpacity={0.7}
                   className={`px-3 py-1.5 rounded-full border ${
                     activeCaptainTeamId === team.id
-                      ? 'bg-primary border-primary'
-                      : 'bg-surface-container-low border-surface-container-high'
+                      ? 'bg-brand-primary border-brand-primary'
+                      : 'bg-surface-low border-surface-high'
                   }`}
                 >
                   <Text
                     className={`text-xs font-uiBold ${
-                      activeCaptainTeamId === team.id ? 'text-on-primary' : 'text-on-surface-variant'
+                      activeCaptainTeamId === team.id ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
                     }`}
                   >
                     {team.name}
@@ -207,12 +207,12 @@ export default function MarketScreen() {
 
         {/* Acceso rápido al inbox de chats */}
         <TouchableOpacity
-          className="flex-row items-center px-4 py-3 border-b border-surface-container-high"
+          className="flex-row items-center px-4 py-3 border-b border-surface-high"
           onPress={() => router.push('/market-chats' as any)}
           activeOpacity={0.7}
         >
           <AppIcon family="material-icons" name="chat-bubble-outline" size={18} color="#00E65B" />
-          <Text className="text-primary font-uiMedium text-sm ml-2">Mis Chats de Mercado</Text>
+          <Text className="text-brand-primary font-uiMedium text-sm ml-2">Mis Chats de Mercado</Text>
           <View className="flex-1" />
           <AppIcon family="material-icons" name="chevron-right" size={18} color="#88998D" />
         </TouchableOpacity>
@@ -241,7 +241,7 @@ export default function MarketScreen() {
             ListEmptyComponent={
               <View className="flex-1 justify-center items-center py-20">
                 <AppIcon family="material-community" name="soccer-field" size={48} color="#3F4943" />
-                <Text className="text-on-surface-variant font-uiMedium mt-4 text-center">
+                <Text className="text-neutral-on-surface-variant font-uiMedium mt-4 text-center">
                   No se encontraron publicaciones.
                 </Text>
               </View>

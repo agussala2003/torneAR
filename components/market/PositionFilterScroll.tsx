@@ -22,14 +22,14 @@ export function PositionFilterScroll({ selectedPosition, onPositionSelect }: Pos
             onPress={() => onPositionSelect(pos)}
             activeOpacity={0.8}
             className={`px-5 py-2 rounded-full ${
-              isActive 
-                ? 'border border-primary/30 bg-primary/10' 
-                : 'bg-surface-container-high'
+              isActive
+                ? 'border border-brand-primary/30 bg-brand-primary/10'
+                : 'bg-surface-high'
             }`}
           >
-            <Text 
+            <Text
               className={`text-xs font-display uppercase tracking-wider ${
-                isActive ? 'text-primary' : 'text-on-surface-variant'
+                isActive ? 'text-brand-primary' : 'text-neutral-on-surface-variant'
               }`}
             >
               {pos}
