@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -72,6 +72,14 @@ export default function MarketScreen() {
   };
 
   const handleCreatePost = () => {
+    const isTeamCreationFlow = activeTab === 'TEAMS_LOOKING';
+    const canCreateTeamPost = (viewData?.managedTeams?.length ?? 0) > 0;
+
+    if (isTeamCreationFlow && !canCreateTeamPost) {
+      showAlert('Acceso restringido', 'Debes ser Capitan o Subcapitan de un equipo para crear esta publicacion.');
+      return;
+    }
+
     const typeToCreate = activeTab === 'TEAMS_LOOKING' ? 'TEAM' : 'PLAYER';
     router.push({
       pathname: '/(modals)/market-create',
@@ -92,7 +100,7 @@ export default function MarketScreen() {
     }
   };
 
-  const handleContactPlayer = async (playerProfileId: string) => {
+   const handleContactPlayer = async (playerProfileId: string) => {
     if (!profile || !viewData) return;
 
     if (viewData.managedTeams.length === 0) {
@@ -111,6 +119,20 @@ export default function MarketScreen() {
     } finally {
       hideLoader();
     }
+  };
+
+  const handleViewTeamStats = (teamId: string) => {
+    router.push({
+      pathname: '/team-stats',
+      params: { teamId }
+    });
+  };
+
+  const handleViewPlayerStats = (playerProfileId: string) => {
+    router.push({
+      pathname: '/profile-stats',
+      params: { profileId: playerProfileId }
+    });
   };
 
   const handleDeletePost = (postId: string, isTeamPost: boolean) => {
@@ -138,6 +160,26 @@ export default function MarketScreen() {
     }
   };
 
+  const memberStatusMap = useMemo(() => {
+    const map: Record<string, 'own_team' | 'own_player'> = {};
+    if (!viewData) return map;
+
+    if (activeTab === 'TEAMS_LOOKING') {
+      for (const post of viewData.teamPosts) {
+        if (viewData.myTeamIds.includes(post.team_id)) {
+          map[post.id] = 'own_team';
+        }
+      }
+    } else {
+      for (const post of viewData.playerPosts) {
+        if (viewData.myManagedTeamsMemberProfileIds.includes(post.profile_id)) {
+          map[post.id] = 'own_player';
+        }
+      }
+    }
+    return map;
+  }, [viewData, activeTab]);
+
   if (!profile && !loading) {
     return (
       <View className="flex-1 items-center justify-center bg-surface-base px-6">
@@ -149,6 +191,8 @@ export default function MarketScreen() {
   const rawTeamPosts = viewData?.teamPosts ?? [];
   const teamPosts = filterDays.length > 0 ? filterPostsByDay(rawTeamPosts, filterDays) : rawTeamPosts;
   const posts = activeTab === 'TEAMS_LOOKING' ? teamPosts : (viewData?.playerPosts ?? []);
+  const canCreateTeamPost = (viewData?.managedTeams?.length ?? 0) > 0;
+  const showCreateButton = activeTab === 'TEAMS_LOOKING' ? canCreateTeamPost : true;
 
   const hasActiveFilters = filterZone !== null || filterDays.length > 0 || filterSort !== 'recent';
 
@@ -184,25 +228,30 @@ export default function MarketScreen() {
           posts={posts}
           activeTab={activeTab}
           currentProfileId={profile?.id ?? ''}
-          onRefresh={onRefresh}
+           onRefresh={onRefresh}
           onContactTeam={handleContactTeam}
           onContactPlayer={handleContactPlayer}
+          onViewTeamStats={handleViewTeamStats}
+          onViewPlayerStats={handleViewPlayerStats}
           onDeletePost={handleDeletePost}
+          memberStatusMap={memberStatusMap}
         />
       </View>
 
-      <TouchableOpacity
-        onPress={handleCreatePost}
-        activeOpacity={0.9}
-        className="items-center justify-center z-50 bg-brand-primary"
-        style={{
-          position: 'absolute', bottom: 110, right: 20, height: 56, width: 56,
-          borderRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.3, shadowRadius: 5, elevation: 5,
-        }}
-      >
-        <AppIcon family="material-icons" name="add" size={28} color="#003914" />
-      </TouchableOpacity>
+      {showCreateButton ? (
+        <TouchableOpacity
+          onPress={handleCreatePost}
+          activeOpacity={0.9}
+          className="items-center justify-center z-50 bg-brand-primary"
+          style={{
+            position: 'absolute', bottom: 110, right: 20, height: 56, width: 56,
+            borderRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3, shadowRadius: 5, elevation: 5,
+          }}
+        >
+          <AppIcon family="material-icons" name="add" size={28} color="#003914" />
+        </TouchableOpacity>
+      ) : null}
 
       <FilterModal
         visible={showFilterModal}

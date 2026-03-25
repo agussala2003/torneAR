@@ -12,9 +12,12 @@ interface MarketListSectionProps {
   activeTab: TabType;
   currentProfileId: string;
   onRefresh: () => void;
-  onContactTeam: (teamId: string) => void;
+   onContactTeam: (teamId: string) => void;
   onContactPlayer: (playerProfileId: string) => void;
+  onViewTeamStats: (teamId: string) => void;
+  onViewPlayerStats: (profileId: string) => void;
   onDeletePost: (postId: string, isTeamPost: boolean) => void;
+  memberStatusMap?: Record<string, 'own_team' | 'own_player'>;
 }
 
 export function MarketListSection({
@@ -24,9 +27,12 @@ export function MarketListSection({
   activeTab,
   currentProfileId,
   onRefresh,
-  onContactTeam,
+   onContactTeam,
   onContactPlayer,
+  onViewTeamStats,
+  onViewPlayerStats,
   onDeletePost,
+  memberStatusMap,
 }: MarketListSectionProps) {
   if (isLoading) {
     return (
@@ -40,6 +46,7 @@ export function MarketListSection({
     if (activeTab === 'TEAMS_LOOKING') {
       const post = item as MarketTeamPost;
       const isOwner = post.created_by === currentProfileId;
+      const memberStatus = memberStatusMap?.[post.id];
       return (
         <MarketTeamCard
           postId={post.id}
@@ -53,14 +60,17 @@ export function MarketListSection({
           matchDate={post.match_date}
           matchTime={post.match_time}
           complex={post.complex}
-          isOwner={isOwner}
+           isOwner={isOwner}
+          memberStatus={memberStatus}
           onPressAction={() => onContactTeam(post.team_id)}
+          onPressStats={() => onViewTeamStats(post.team_id)}
           onDelete={() => onDeletePost(post.id, true)}
         />
       );
     } else {
       const post = item as MarketPlayerPost;
       const isOwner = post.profile_id === currentProfileId;
+      const memberStatus = memberStatusMap?.[post.id];
       return (
         <MarketPlayerCard
           postId={post.id}
@@ -70,8 +80,10 @@ export function MarketListSection({
           position={post.position}
           postType={post.post_type}
           description={post.description}
-          isOwner={isOwner}
+           isOwner={isOwner}
+          memberStatus={memberStatus}
           onPressAction={() => onContactPlayer(post.profile_id)}
+          onPressStats={() => onViewPlayerStats(post.profile_id)}
           onDelete={() => onDeletePost(post.id, false)}
         />
       );

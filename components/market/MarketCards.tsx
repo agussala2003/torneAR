@@ -89,14 +89,17 @@ interface MarketTeamCardProps {
   matchTime?: string | null;
   complex?: string | null;
   isOwner: boolean;
-  /** Called when the non-owner taps "Postularme". Not called for owners. */
+  memberStatus?: 'own_team' | 'own_player';
+   /** Called when the non-owner taps "Postularme". Not called for owners. */
   onPressAction?: () => void;
+  /** Called when the user taps "Stats". */
+  onPressStats?: () => void;
   onDelete: () => void;
 }
 
 export function MarketTeamCard({
   postId, teamName, teamZone, matchZone, logoUrl, positionWanted, pitchType, description,
-  matchDate, matchTime, complex, isOwner, onPressAction, onDelete,
+  matchDate, matchTime, complex, isOwner, memberStatus, onPressAction, onPressStats, onDelete,
 }: MarketTeamCardProps) {
   const isUrgent = isUrgentPost(matchDate);
   const cleanDescription = sanitizeMarketDescription(description);
@@ -107,7 +110,7 @@ export function MarketTeamCard({
   const shouldShowComplex = !!normalizedComplex && !/^no$/i.test(normalizedComplex);
 
   return (
-    <View className="rounded-xl overflow-hidden mb-4" style={{ backgroundColor: '#1C1C1C' }}>
+    <View className="rounded-xl overflow-hidden mb-4" style={{ backgroundColor: '#1C1C1C', opacity: memberStatus ? 0.5 : 1 }}>
       {/* Image Header */}
       <ImageBackground
         source={CARD_IMAGES[imageIndexFromId(postId)]}
@@ -212,16 +215,37 @@ export function MarketTeamCard({
         >
           <Text className="text-[#FF8A80] font-uiBold text-[11px] tracking-widest uppercase">Cancelar Mi Publicación</Text>
         </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          onPress={onPressAction}
-          activeOpacity={0.8}
-          className="py-3 items-center bg-brand-primary"
+      ) : memberStatus ? (
+        <View
+          className="py-3 items-center"
+          style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}
         >
-          <Text className="font-displayBlack text-[11px] tracking-widest uppercase" style={{ color: '#003914' }}>
-            Postularme
+          <Text className="text-neutral-on-surface-variant font-uiBold text-[11px] tracking-widest uppercase">
+            {memberStatus === 'own_team' ? 'Ya sos parte de este equipo' : 'Ya está en tu equipo'}
           </Text>
-        </TouchableOpacity>
+        </View>
+      ) : (
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            onPress={onPressAction}
+            activeOpacity={0.8}
+            className="flex-1 py-3 items-center bg-brand-primary"
+          >
+            <Text className="font-displayBlack text-[11px] tracking-widest uppercase" style={{ color: '#003914' }}>
+              Postularme
+            </Text>
+          </TouchableOpacity>
+          <View style={{ width: 1, height: '100%', backgroundColor: 'rgba(0,0,0,0.1)' }} />
+          <TouchableOpacity
+            onPress={onPressStats}
+            activeOpacity={0.8}
+            className="flex-1 py-3 items-center bg-surface-high"
+          >
+            <Text className="font-displayBlack text-[11px] tracking-widest uppercase text-neutral-on-surface">
+              Stats
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -238,21 +262,24 @@ interface MarketPlayerCardProps {
   postType: string;
   description?: string | null;
   isOwner: boolean;
-  /** Called when the non-owner taps "Ver Perfil". Not called for owners. */
+  memberStatus?: 'own_team' | 'own_player';
+   /** Called when the non-owner taps the contact button. Not called for owners. */
   onPressAction?: () => void;
+  /** Called when the user taps "Stats". */
+  onPressStats?: () => void;
   onDelete: () => void;
 }
 
 export function MarketPlayerCard({
   postId, playerName, avatarUrl, username, position, postType,
-  description, isOwner, onPressAction, onDelete,
+  description, isOwner, memberStatus, onPressAction, onPressStats, onDelete,
 }: MarketPlayerCardProps) {
   const subtitle = postType === 'BUSCA_EQUIPO' ? 'Busca Equipo' : 'Busca Partido';
   const cleanDescription = sanitizeMarketDescription(description);
   const avatarImage = resolveAvatarUrl(avatarUrl);
 
   return (
-    <View className="rounded-xl overflow-hidden mb-4" style={{ backgroundColor: '#1C1C1C' }}>
+    <View className="rounded-xl overflow-hidden mb-4" style={{ backgroundColor: '#1C1C1C', opacity: memberStatus ? 0.5 : 1 }}>
       {/* Image Header */}
       <ImageBackground
         source={CARD_IMAGES[imageIndexFromId(postId)]}
@@ -263,6 +290,11 @@ export function MarketPlayerCard({
           colors={['rgba(8,10,8,0.05)', 'rgba(8,10,8,0.35)', 'rgba(8,10,8,0.92)']}
           locations={[0, 0.45, 1]}
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+        <LinearGradient
+          colors={['rgba(8,10,8,0)', 'rgba(28,28,28,0.75)', '#1C1C1C']}
+          locations={[0, 0.72, 1]}
+          style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 68 }}
         />
         <View className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded bg-brand-primary">
           <Text className="font-displayBlack text-[9px] tracking-wider uppercase" style={{ color: '#003914' }}>
@@ -307,16 +339,37 @@ export function MarketPlayerCard({
         >
           <Text className="text-[#FF8A80] font-uiBold text-[11px] tracking-widest uppercase">Cancelar Mi Publicación</Text>
         </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          onPress={onPressAction}
-          activeOpacity={0.8}
-          className="py-3 items-center bg-brand-primary mt-3"
+      ) : memberStatus ? (
+        <View
+          className="py-3 items-center mt-3"
+          style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }}
         >
-          <Text className="font-displayBlack text-[11px] tracking-widest uppercase" style={{ color: '#003914' }}>
-            Ver Perfil
+          <Text className="text-neutral-on-surface-variant font-uiBold text-[11px] tracking-widest uppercase">
+            {memberStatus === 'own_team' ? 'Ya sos parte de este equipo' : 'Ya está en tu equipo'}
           </Text>
-        </TouchableOpacity>
+        </View>
+      ) : (
+        <View className="flex-row items-center mt-3">
+          <TouchableOpacity
+            onPress={onPressAction}
+            activeOpacity={0.8}
+            className="flex-1 py-3 items-center bg-brand-primary"
+          >
+            <Text className="font-displayBlack text-[11px] tracking-widest uppercase" style={{ color: '#003914' }}>
+              Contactarme
+            </Text>
+          </TouchableOpacity>
+          <View style={{ width: 1, height: '100%', backgroundColor: 'rgba(0,0,0,0.1)' }} />
+          <TouchableOpacity
+            onPress={onPressStats}
+            activeOpacity={0.8}
+            className="flex-1 py-3 items-center bg-surface-high"
+          >
+            <Text className="font-displayBlack text-[11px] tracking-widest uppercase text-neutral-on-surface">
+              Stats
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
