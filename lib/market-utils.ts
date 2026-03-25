@@ -64,3 +64,68 @@ export function sanitizeMarketDescription(description: string | null | undefined
   const cleaned = description.replace(PITCH_META_RE, '').trim();
   return cleaned.length > 0 ? cleaned : null;
 }
+
+function parseMatchDateTime(matchDate?: string | null, matchTime?: string | null): Date | null {
+  if (!matchDate || !ISO_DATE_RE.test(matchDate)) return null;
+
+  const baseDate = new Date(`${matchDate}T00:00:00`);
+  if (Number.isNaN(baseDate.getTime())) return null;
+
+  if (!matchTime) return baseDate;
+
+  const match = matchTime.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return baseDate;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (
+    Number.isNaN(hours) ||
+    Number.isNaN(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return baseDate;
+  }
+
+  const withTime = new Date(baseDate);
+  withTime.setHours(hours, minutes, 0, 0);
+  return withTime;
+}
+
+function hasValidMatchTime(matchTime?: string | null): boolean {
+  if (!matchTime) return false;
+  const match = matchTime.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return false;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return !Number.isNaN(hours) && !Number.isNaN(minutes) && hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
+}
+
+export function getInitials(name: string): string {
+  if (!name.trim()) return '?';
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+// Keeps only active posts relative to current time when they include match date/time metadata.
+// - With match_date + match_time: post is active if datetime >= now.
+// - With only match_date: post is active until end of that day.
+// - Without valid match_date: post is kept (no schedule to expire).
+export function filterActiveTeamPostsBySchedule(posts: MarketTeamPost[], now = new Date()): MarketTeamPost[] {
+  return posts.filter((post) => {
+    const parsed = parseMatchDateTime(post.match_date, post.match_time);
+    if (!parsed) return true;
+
+    if (hasValidMatchTime(post.match_time)) {
+      return parsed.getTime() >= now.getTime();
+    }
+
+    const endOfDay = new Date(parsed);
+    endOfDay.setHours(23, 59, 59, 999);
+    return endOfDay.getTime() >= now.getTime();
+  });
+}

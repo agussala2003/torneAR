@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { imageIndexFromId, isUrgentPost, filterPostsByDay, sortPostsByNearest } from './market-utils';
+import { imageIndexFromId, isUrgentPost, filterPostsByDay, sortPostsByNearest, filterActiveTeamPostsBySchedule, getInitials } from './market-utils';
 import type { MarketTeamPost } from './market-api';
 
 describe('imageIndexFromId', () => {
@@ -76,5 +76,62 @@ describe('sortPostsByNearest', () => {
     // null/freetext at end
     expect(['b', 'd']).toContain(sorted[2].id);
     expect(['b', 'd']).toContain(sorted[3].id);
+  });
+});
+
+describe('getInitials', () => {
+  it('returns first letters of first two words', () => {
+    expect(getInitials('Los Pumas FC')).toBe('LP');
+    expect(getInitials('Juan Perez')).toBe('JP');
+  });
+
+  it('returns first two chars for single-word names', () => {
+    expect(getInitials('Tigre')).toBe('TI');
+  });
+
+  it('uppercases the result', () => {
+    expect(getInitials('los pumas')).toBe('LP');
+  });
+
+  it('handles empty string', () => {
+    expect(getInitials('')).toBe('?');
+  });
+});
+
+describe('filterActiveTeamPostsBySchedule', () => {
+  it('filters out posts with expired match date and time', () => {
+    const now = new Date('2026-03-25T18:00:00');
+    const posts = [
+      { id: 'expired-datetime', match_date: '2026-03-25', match_time: '17:59' },
+      { id: 'active-datetime', match_date: '2026-03-25', match_time: '18:00' },
+      { id: 'future-datetime', match_date: '2026-03-25', match_time: '19:30' },
+    ] as unknown as MarketTeamPost[];
+
+    const result = filterActiveTeamPostsBySchedule(posts, now);
+    expect(result.map((p) => p.id)).toEqual(['active-datetime', 'future-datetime']);
+  });
+
+  it('keeps date-only posts for the whole selected day and removes past days', () => {
+    const now = new Date('2026-03-25T18:00:00');
+    const posts = [
+      { id: 'past-day', match_date: '2026-03-24', match_time: null },
+      { id: 'today-day-only', match_date: '2026-03-25', match_time: null },
+      { id: 'future-day', match_date: '2026-03-26', match_time: null },
+    ] as unknown as MarketTeamPost[];
+
+    const result = filterActiveTeamPostsBySchedule(posts, now);
+    expect(result.map((p) => p.id)).toEqual(['today-day-only', 'future-day']);
+  });
+
+  it('keeps posts without valid schedule metadata', () => {
+    const now = new Date('2026-03-25T18:00:00');
+    const posts = [
+      { id: 'no-date', match_date: null, match_time: null },
+      { id: 'invalid-date', match_date: 'Viernes', match_time: '12:00' },
+      { id: 'invalid-time', match_date: '2026-03-25', match_time: '99:99' },
+    ] as unknown as MarketTeamPost[];
+
+    const result = filterActiveTeamPostsBySchedule(posts, now);
+    expect(result.map((p) => p.id)).toEqual(['no-date', 'invalid-date', 'invalid-time']);
   });
 });
