@@ -69,13 +69,16 @@ export default function MarketChatScreen() {
 
           if (actingAsCaptain) {
             setIsLoadingCodes(true);
-            const [inviteCode, confirmedMatchCode] = await Promise.all([
-              fetchTeamInviteCode(currentChat.team_id),
-              fetchConfirmedMatchForTeam(currentChat.team_id),
-            ]);
-            setTeamInviteCode(inviteCode);
-            setMatchCode(confirmedMatchCode);
-            setIsLoadingCodes(false);
+            try {
+              const [inviteCode, confirmedMatchCode] = await Promise.all([
+                fetchTeamInviteCode(currentChat.team_id),
+                fetchConfirmedMatchForTeam(currentChat.team_id),
+              ]);
+              setTeamInviteCode(inviteCode);
+              setMatchCode(confirmedMatchCode);
+            } finally {
+              setIsLoadingCodes(false);
+            }
           }
         }
       } catch (error) {
