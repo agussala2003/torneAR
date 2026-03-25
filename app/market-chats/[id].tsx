@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
+import * as Clipboard from 'expo-clipboard';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
 import { getInitials } from '@/lib/market-utils';
@@ -51,17 +52,21 @@ export default function MarketChatScreen() {
 
     const loadConversation = async () => {
       try {
-        const [msgs, inbox] = await Promise.all([fetchMessages(id), fetchInbox()]);
+        // Fetch inbox first to get team_id for sender role enrichment
+        const inbox = await fetchInbox();
+        const currentChat = inbox.find((c: MarketConversation) => c.id === id);
+
+        // Fetch messages with team_id (enables sender role lookup)
+        const msgs = await fetchMessages(id, currentChat?.team_id);
         setMessages(msgs);
-        // Mark as read — awaited so it reliably lands before the user navigates away
+
+        // Mark as read — non-fatal
         try {
           await markConversationAsRead(id);
         } catch (e) {
           console.error('markConversationAsRead failed:', e);
-          // Non-fatal: don't interrupt the chat load if this fails
         }
 
-        const currentChat = inbox.find((c: MarketConversation) => c.id === id);
         if (currentChat) {
           setChatData(currentChat);
           const actingAsCaptain = currentChat.player_id !== profile.id;
@@ -91,7 +96,10 @@ export default function MarketChatScreen() {
     loadConversation();
   }, [profile, id]);
 
-  const handleSend = async (content?: string) => {
+  const handleSend = async (
+    content?: string,
+    messageType: 'TEXT' | 'TEAM_INVITE' | 'MATCH_INVITE' = 'TEXT',
+  ) => {
     const textToSend = content ?? inputText.trim();
     if (!textToSend || !profile || !id) return;
 
@@ -104,8 +112,8 @@ export default function MarketChatScreen() {
       sender_team_id: senderTeamId ?? null,
       content: textToSend,
       created_at: new Date().toISOString(),
-      message_type: 'TEXT',
-      sender_full_name: profile.full_name ?? 'Desconocido',
+      message_type: messageType,
+      sender_full_name: profile.full_name ?? '',
       sender_role: null,
     };
 
@@ -114,7 +122,7 @@ export default function MarketChatScreen() {
     setIsSending(true);
 
     try {
-      const realMsg = await sendMessage(id, textToSend, senderTeamId);
+      const realMsg = await sendMessage(id, textToSend, senderTeamId, messageType);
       setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? realMsg : m)));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error) {
@@ -132,33 +140,142 @@ export default function MarketChatScreen() {
 
   const confirmInviteToTeam = () => {
     setShowInviteConfirmModal(false);
-    handleSend(
-      `¡Queremos que te unas a nuestro equipo! Ingresá este código en la sección "Unirse a Equipo": ${teamInviteCode}`,
-    );
+    if (teamInviteCode) handleSend(teamInviteCode, 'TEAM_INVITE');
   };
 
   const handleInviteToMatch = () => {
     if (!matchCode) return;
-    handleSend(
-      `Te invitamos a jugar un partido con nosotros. Usá este código para sumarte: ${matchCode}`,
-    );
+    handleSend(matchCode, 'MATCH_INVITE');
   };
+
+  function formatRole(role: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | null): string {
+    if (!role) return '';
+    const map: Record<string, string> = {
+      CAPITAN: 'Capitán',
+      SUBCAPITAN: 'Subcapitán',
+      JUGADOR: 'Jugador',
+    };
+    return map[role] ?? '';
+  }
+
+  function formatTime(iso: string): string {
+    return new Date(iso).toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
 
   const renderMessage = ({ item }: { item: MarketMessage }) => {
     const isMine = item.sender_profile_id === profile?.id;
     const isTemp = item.id.startsWith('temp-');
+    const isSpecial = item.message_type === 'TEAM_INVITE' || item.message_type === 'MATCH_INVITE';
+
+    const roleLabel = formatRole(item.sender_role);
+    const senderLabel =
+      item.sender_full_name && roleLabel
+        ? `${item.sender_full_name} · ${roleLabel}`
+        : item.sender_full_name;
+    const time = formatTime(item.created_at);
+
+    // Colors for code block adapt to bubble side
+    const codeBlockBorder = isMine ? '#003914' : '#53E076';
+    const codeText = isMine ? '#003914' : '#53E076';
+    const copyBg = isMine ? 'rgba(0,57,20,0.2)' : 'rgba(83,224,118,0.12)';
+
+    const inviteHeaderText =
+      item.message_type === 'TEAM_INVITE'
+        ? '¡Queremos que te unas a nuestro equipo!'
+        : 'Te invitamos a jugar un partido con nosotros.';
+    const codeLabel =
+      item.message_type === 'TEAM_INVITE' ? '🛡️ Código de equipo' : '⚽ Código de partido';
 
     return (
       <View className={`mb-4 px-4 flex-row ${isMine ? 'justify-end' : 'justify-start'}`}>
-        <View
-          className={`max-w-[75%] p-3 rounded-2xl border ${isMine
-            ? 'bg-brand-primary border-brand-primary rounded-tr-sm'
-            : 'bg-surface-high border-surface-variant rounded-tl-sm'
+        <View className="max-w-[80%]">
+          {!isMine && senderLabel ? (
+            <Text className="text-neutral-on-surface-variant font-ui text-[10px] mb-1 ml-1">
+              {senderLabel}
+            </Text>
+          ) : null}
+          <View
+            className={`p-3 rounded-2xl border ${
+              isMine
+                ? 'bg-brand-primary border-brand-primary rounded-tr-sm'
+                : 'bg-surface-high border-surface-variant rounded-tl-sm'
             } ${isTemp ? 'opacity-60' : ''}`}
-        >
-          <Text className={isMine ? 'text-[#003914]' : 'text-neutral-on-surface'}>
-            {item.content}
-          </Text>
+          >
+            {isSpecial ? (
+              <>
+                <Text
+                  className={`${isMine ? 'text-[#003914]' : 'text-neutral-on-surface'} font-ui text-sm mb-2`}
+                >
+                  {inviteHeaderText}
+                </Text>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: codeBlockBorder,
+                    borderRadius: 10,
+                    padding: 10,
+                    backgroundColor: isMine
+                      ? 'rgba(0,57,20,0.15)'
+                      : 'rgba(83,224,118,0.07)',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: codeText,
+                      fontSize: 10,
+                      textTransform: 'uppercase',
+                      letterSpacing: 1,
+                      marginBottom: 6,
+                      opacity: 0.7,
+                    }}
+                  >
+                    {codeLabel}
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text
+                      style={{
+                        color: codeText,
+                        fontSize: 20,
+                        fontWeight: '900',
+                        letterSpacing: 4,
+                        flex: 1,
+                      }}
+                    >
+                      {item.content}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => void Clipboard.setStringAsync(item.content)}
+                      style={{
+                        backgroundColor: copyBg,
+                        borderWidth: 1,
+                        borderColor: codeBlockBorder,
+                        borderRadius: 6,
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      <Text style={{ color: codeText, fontSize: 10, fontWeight: 'bold' }}>
+                        COPIAR
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <Text className={`${isMine ? 'text-[#003914]' : 'text-neutral-on-surface'} font-ui text-sm`}>
+                {item.content}
+              </Text>
+            )}
+            <Text
+              className={`${isMine ? 'text-[#003914]' : 'text-neutral-on-surface-variant'} font-ui text-[10px] text-right mt-1 opacity-60`}
+            >
+              {time}
+            </Text>
+          </View>
         </View>
       </View>
     );
