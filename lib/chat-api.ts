@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { computeUnread } from './chat-utils';
 
 export interface MarketConversation {
   id: string;
@@ -14,6 +15,11 @@ export interface MarketConversation {
     name: string;
     shield_url: string | null;
   };
+  last_msg_content: string | null;
+  last_msg_at: string | null;
+  last_msg_sender: string | null;
+  last_read_at: string | null;
+  unread: boolean;
 }
 
 export interface MarketMessage {
@@ -25,11 +31,6 @@ export interface MarketMessage {
   created_at: string;
 }
 
-export interface MarketMessagePreview {
-  conversation_id: string;
-  content: string;
-  created_at: string;
-}
 
 /**
  * Resuelve el profiles.id del usuario autenticado.
@@ -63,7 +64,7 @@ export async function getOrCreateMarketChat(
     .eq('team_id', teamId)
     .single();
 
-  if (existing) return existing as MarketConversation;
+  if (existing) return existing as unknown as MarketConversation;
 
   if (searchError && searchError.code === 'PGRST116') {
     const { data: newChat, error: createError } = await supabase
@@ -73,7 +74,7 @@ export async function getOrCreateMarketChat(
       .single();
 
     if (createError) throw createError;
-    return newChat as MarketConversation;
+    return newChat as unknown as MarketConversation;
   }
 
   if (searchError) throw searchError;
@@ -87,38 +88,33 @@ export async function getOrCreateMarketChat(
 export async function fetchInbox(): Promise<MarketConversation[]> {
   const profileId = await getProfileId();
 
-  const { data: managedTeams } = await supabase
-    .from('team_members')
-    .select('team_id')
-    .eq('profile_id', profileId)
-    .in('role', ['CAPITAN', 'SUBCAPITAN']);
-
-  const teamIds = managedTeams ? managedTeams.map((t) => t.team_id) : [];
-
-  let query = supabase
-    .from('conversations')
-    .select(`
-      *,
-      player:profiles!player_id(full_name, avatar_url),
-      team:teams!team_id(name, shield_url)
-    `)
-    .eq('type', 'MARKET_DM')
-    .order('created_at', { ascending: false });
-
-  if (teamIds.length > 0) {
-    query = query.or(`player_id.eq.${profileId},team_id.in.(${teamIds.join(',')})`);
-  } else {
-    query = query.eq('player_id', profileId);
-  }
-
-  const { data, error } = await query;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('get_market_inbox', { p_profile_id: profileId });
   if (error) throw error;
 
-  return (data ?? []).map((c: any) => ({
-    ...c,
-    player: Array.isArray(c.player) ? c.player[0] : c.player,
-    team: Array.isArray(c.team) ? c.team[0] : c.team,
-  })) as MarketConversation[];
+  return ((data ?? []) as Record<string, unknown>[]).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    type: row.type as string,
+    player_id: row.player_id as string,
+    team_id: row.team_id as string,
+    created_at: row.created_at as string,
+    player: row.player_full_name
+      ? { full_name: row.player_full_name as string, avatar_url: (row.player_avatar as string | null) ?? null }
+      : undefined,
+    team: row.team_name
+      ? { name: row.team_name as string, shield_url: (row.team_shield as string | null) ?? null }
+      : undefined,
+    last_msg_content: (row.last_msg_content as string | null) ?? null,
+    last_msg_at: (row.last_msg_at as string | null) ?? null,
+    last_msg_sender: (row.last_msg_sender as string | null) ?? null,
+    last_read_at: (row.last_read_at as string | null) ?? null,
+    unread: computeUnread(
+      row.last_msg_at as string | null,
+      row.last_msg_sender as string | null,
+      row.last_read_at as string | null,
+      profileId,
+    ),
+  }));
 }
 
 /**
@@ -135,31 +131,31 @@ export async function fetchMessages(conversationId: string): Promise<MarketMessa
   return (data ?? []) as MarketMessage[];
 }
 
-export async function fetchLatestMessagesForConversations(
-  conversationIds: string[],
-): Promise<Record<string, MarketMessagePreview>> {
-  if (conversationIds.length === 0) return {};
 
-  const { data, error } = await supabase
-    .from('messages')
-    .select('conversation_id, content, created_at')
-    .in('conversation_id', conversationIds)
-    .order('created_at', { ascending: false });
+export async function markConversationAsRead(conversationId: string): Promise<void> {
+  const profileId = await getProfileId();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from('conversation_reads')
+    .upsert(
+      { profile_id: profileId, conversation_id: conversationId, last_read_at: new Date().toISOString() },
+      { onConflict: 'profile_id,conversation_id' }
+    );
 
   if (error) throw error;
+}
 
-  const latestByConversation: Record<string, MarketMessagePreview> = {};
-  for (const row of data ?? []) {
-    if (!latestByConversation[row.conversation_id]) {
-      latestByConversation[row.conversation_id] = {
-        conversation_id: row.conversation_id,
-        content: row.content,
-        created_at: row.created_at,
-      };
-    }
-  }
+export async function fetchUnreadChatCount(): Promise<number> {
+  const profileId = await getProfileId();
 
-  return latestByConversation;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('get_unread_market_chat_count', {
+    p_profile_id: profileId,
+  });
+
+  if (error) throw error;
+  return (data as number) ?? 0;
 }
 
 /**
