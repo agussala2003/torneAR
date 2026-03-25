@@ -16,9 +16,7 @@ import { ActiveTeamSelector } from '@/components/ui/ActiveTeamSelector';
 import { useTeamStore } from '@/stores/teamStore';
 import {
   fetchInbox,
-  fetchLatestMessagesForConversations,
   MarketConversation,
-  MarketMessagePreview,
 } from '@/lib/chat-api';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
@@ -30,7 +28,6 @@ export default function MarketInboxScreen() {
   const { activeTeamId, fetchMyTeams } = useTeamStore();
 
   const [chats, setChats] = useState<MarketConversation[]>([]);
-  const [lastMessagesByConversation, setLastMessagesByConversation] = useState<Record<string, MarketMessagePreview>>({});
   const [chatFilter, setChatFilter] = useState<ChatFilter>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -41,10 +38,6 @@ export default function MarketInboxScreen() {
     try {
       const inbox = await fetchInbox();
       setChats(inbox);
-
-      const conversationIds = inbox.map((chat) => chat.id);
-      const latestByConversation = await fetchLatestMessagesForConversations(conversationIds);
-      setLastMessagesByConversation(latestByConversation);
     } catch (error) {
       showAlert('Error', 'No se pudieron cargar los chats.');
     } finally {
@@ -109,11 +102,10 @@ export default function MarketInboxScreen() {
       ? (item.player?.full_name ?? 'Jugador')
       : (item.team?.name ?? 'Equipo');
 
-    const lastMessage = lastMessagesByConversation[item.id];
-    const previewText = lastMessage?.content?.trim() || 'Iniciá la conversación';
+    const previewText = item.last_msg_content?.trim() || 'Iniciá la conversación';
 
     const avatar = resolveAvatar(asCaptain ? item.player?.avatar_url : item.team?.shield_url, asCaptain);
-    const dateLabel = formatDate(lastMessage?.created_at ?? item.created_at);
+    const dateLabel = formatDate(item.last_msg_at ?? item.created_at);
 
     return (
       <TouchableOpacity
@@ -122,14 +114,19 @@ export default function MarketInboxScreen() {
         onPress={() => router.push(`/market-chats/${item.id}` as any)}
         activeOpacity={0.7}
       >
+        {/* Usamos style explícito para garantizar las dimensiones y borderRadius */}
         {avatar ? (
           <Image
             source={{ uri: avatar }}
-            className="w-12 h-12 rounded-full bg-surface-high"
+            className="shrink-0 bg-surface-high"
+            style={{ width: 48, height: 48, borderRadius: 24 }}
             contentFit="cover"
           />
         ) : (
-          <View className="w-12 h-12 rounded-full bg-surface-high items-center justify-center">
+          <View 
+            className="shrink-0 bg-surface-high items-center justify-center"
+            style={{ width: 48, height: 48, borderRadius: 24 }}
+          >
             <AppIcon
               family="material-community"
               name={asCaptain ? 'account' : 'shield-account'}
@@ -144,7 +141,12 @@ export default function MarketInboxScreen() {
             <Text className="text-neutral-on-surface font-uiBold text-base" numberOfLines={1}>
               {title}
             </Text>
-            <Text className="text-brand-primary text-[12px] font-uiBold">{dateLabel}</Text>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-brand-primary text-[12px] font-uiBold">{dateLabel}</Text>
+              {item.unread && (
+                <View className="w-2 h-2 rounded-full bg-brand-primary ml-1 mt-0.5 shrink-0" />
+              )}
+            </View>
           </View>
 
           <Text className="text-neutral-on-surface-variant text-sm font-ui" numberOfLines={1}>

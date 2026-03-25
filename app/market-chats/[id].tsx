@@ -21,6 +21,7 @@ import {
   sendMessage,
   fetchInbox,
   fetchConfirmedMatchForTeam,
+  markConversationAsRead,
   MarketMessage,
   MarketConversation,
 } from '@/lib/chat-api';
@@ -52,6 +53,13 @@ export default function MarketChatScreen() {
       try {
         const [msgs, inbox] = await Promise.all([fetchMessages(id), fetchInbox()]);
         setMessages(msgs);
+        // Mark as read — awaited so it reliably lands before the user navigates away
+        try {
+          await markConversationAsRead(id);
+        } catch (e) {
+          console.error('markConversationAsRead failed:', e);
+          // Non-fatal: don't interrupt the chat load if this fails
+        }
 
         const currentChat = inbox.find((c: MarketConversation) => c.id === id);
         if (currentChat) {
