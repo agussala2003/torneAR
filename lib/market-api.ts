@@ -191,6 +191,36 @@ export async function fetchUserManagedTeams(authUserId: string): Promise<Managed
 }
 
 /**
+ * Returns IDs of all teams the user belongs to (any role).
+ * Different from fetchUserManagedTeams which filters by CAPITAN/SUBCAPITAN.
+ */
+export async function fetchAllUserTeamIds(profileId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('team_id')
+    .eq('profile_id', profileId);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.team_id);
+}
+
+/**
+ * Returns profile IDs of all members of the given teams.
+ * Used to detect if a player already belongs to one of the captain's teams.
+ */
+export async function fetchManagedTeamMemberIds(teamIds: string[]): Promise<string[]> {
+  if (teamIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('team_members')
+    .select('profile_id')
+    .in('team_id', teamIds);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.profile_id);
+}
+
+/**
  * Obtiene el código de invitación de un equipo (teams.invite_code).
  */
 export async function fetchTeamInviteCode(teamId: string): Promise<string | null> {

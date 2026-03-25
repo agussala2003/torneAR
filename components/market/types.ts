@@ -6,6 +6,8 @@ export type MarketViewData = {
   teamPosts: MarketTeamPost[];
   playerPosts: MarketPlayerPost[];
   managedTeams: ManagedTeam[];
+  myTeamIds: string[];
+  myManagedTeamsMemberProfileIds: string[];
 };
 
 export type MarketSortBy = 'nearest' | 'recent';
