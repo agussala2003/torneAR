@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useTeamStore } from '@/stores/teamStore';
 import { ActiveTeamSelector } from './ui/ActiveTeamSelector';
-import { fetchInbox } from '@/lib/chat-api';
+import { fetchUnreadChatCount } from '@/lib/chat-api';
 
 type GlobalHeaderProps = {
   onNotificationPress?: () => void;
@@ -77,8 +77,8 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
   const loadChatCount = useCallback(async () => {
     if (!profile?.id) return;
     try {
-      const inbox = await fetchInbox();
-      setChatCount(inbox.length);
+      const count = await fetchUnreadChatCount();
+      setChatCount(count);
     } catch { }
   }, [profile?.id]);
 
