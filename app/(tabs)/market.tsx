@@ -9,6 +9,7 @@ import { MarketListSection } from '@/components/market/MarketListSection';
 import { FilterModal } from '@/components/market/FilterModal';
 import { useAuth } from '@/context/AuthContext';
 import { useUI } from '@/context/UIContext';
+import { useTeamStore } from '@/stores/teamStore';
 import { fetchMarketViewData } from '@/lib/market-data';
 import { togglePostStatus } from '@/lib/market-api';
 import { filterPostsByDay } from '@/lib/market-utils';
@@ -18,6 +19,7 @@ import { getOrCreateMarketChat } from '@/lib/chat-api';
 export default function MarketScreen() {
   const { profile } = useAuth();
   const { showAlert, showLoader, hideLoader } = useUI();
+  const { fetchMyTeams } = useTeamStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('TEAMS_LOOKING');
   const [selectedPosition] = useState<string>('CUALQUIERA');
@@ -59,7 +61,8 @@ export default function MarketScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadMarketData(true);
-    }, [loadMarketData])
+      if (profile?.id) void fetchMyTeams(profile.id);
+    }, [loadMarketData, profile?.id, fetchMyTeams])
   );
 
   useEffect(() => {
