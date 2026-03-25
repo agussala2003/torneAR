@@ -37,7 +37,6 @@ export function ZonePickerDialog({ visible, onClose, selectedZone, onSelect }: Z
   if (!visible) return null;
 
   return (
-    // SOLUCIÓN: Reemplazamos <Modal> por una View absoluta con z-index altísimo
     <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 99 }]} className="flex-1">
       <TouchableWithoutFeedback onPress={onClose}>
         <View className="flex-1 items-center justify-center bg-black/80 px-6">

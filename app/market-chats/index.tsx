@@ -4,72 +4,102 @@ import {
   Text,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { useAuth } from '@/context/AuthContext';
-import { fetchInbox, MarketConversation } from '@/lib/chat-api';
-import { fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
+import { ActiveTeamSelector } from '@/components/ui/ActiveTeamSelector';
+import { useTeamStore } from '@/stores/teamStore';
+import {
+  fetchInbox,
+  fetchLatestMessagesForConversations,
+  MarketConversation,
+  MarketMessagePreview,
+} from '@/lib/chat-api';
+import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+
+type ChatFilter = 'ALL' | 'TEAMS' | 'PLAYERS';
 
 export default function MarketInboxScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
+  const { activeTeamId, fetchMyTeams } = useTeamStore();
 
   const [chats, setChats] = useState<MarketConversation[]>([]);
+  const [lastMessagesByConversation, setLastMessagesByConversation] = useState<Record<string, MarketMessagePreview>>({});
+  const [chatFilter, setChatFilter] = useState<ChatFilter>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   const { showAlert, AlertComponent } = useCustomAlert();
 
-  const [managedTeams, setManagedTeams] = useState<ManagedTeam[]>([]);
-  const [filterTeamId, setFilterTeamId] = useState<string | null>(null);
-
   const loadData = useCallback(async () => {
     try {
-      const [inbox, teams] = await Promise.all([
-        fetchInbox(),
-        user ? fetchUserManagedTeams(user.id) : Promise.resolve([]),
-      ]);
+      const inbox = await fetchInbox();
       setChats(inbox);
-      setManagedTeams(teams);
+
+      const conversationIds = inbox.map((chat) => chat.id);
+      const latestByConversation = await fetchLatestMessagesForConversations(conversationIds);
+      setLastMessagesByConversation(latestByConversation);
     } catch (error) {
       showAlert('Error', 'No se pudieron cargar los chats.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [user, showAlert]);
+  }, [showAlert]);
 
   useEffect(() => {
     if (user) loadData();
   }, [user, loadData]);
+
+  useEffect(() => {
+    if (profile?.id) {
+      void fetchMyTeams(profile.id);
+    }
+  }, [profile?.id, fetchMyTeams]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
     loadData();
   };
 
-  const displayedChats = filterTeamId
-    ? chats.filter((c) => c.team_id === filterTeamId)
-    : chats;
-
   const isActingAsCaptain = (chat: MarketConversation) =>
     profile ? chat.player_id !== profile.id : false;
+
+  const displayedChats = chats.filter((chat) => {
+    const actingAsCaptain = isActingAsCaptain(chat);
+
+    // Captain-side chats follow the currently selected team.
+    if (actingAsCaptain && activeTeamId && chat.team_id !== activeTeamId) {
+      return false;
+    }
+
+    if (chatFilter === 'ALL') return true;
+    if (chatFilter === 'TEAMS') return !actingAsCaptain;
+    if (chatFilter === 'PLAYERS') return actingAsCaptain;
+    return true;
+  });
+
+  const resolveAvatar = (avatar: string | null | undefined, asCaptain: boolean) => {
+    if (!avatar) return null;
+    if (avatar.startsWith('http')) return avatar;
+    return asCaptain
+      ? getSupabaseStorageUrl('avatars', avatar)
+      : getSupabaseStorageUrl('shields', avatar);
+  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Hoy';
-    if (diffDays === 1) return 'Ayer';
-    return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+    if (diffDays === 0) return date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    if (diffDays === 1) return 'AYER';
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }).toUpperCase();
   };
 
   const renderItem = ({ item }: { item: MarketConversation }) => {
@@ -79,13 +109,16 @@ export default function MarketInboxScreen() {
       ? (item.player?.full_name ?? 'Jugador')
       : (item.team?.name ?? 'Equipo');
 
-    const subtitle = asCaptain ? (item.team?.name ?? '') : '';
+    const lastMessage = lastMessagesByConversation[item.id];
+    const previewText = lastMessage?.content?.trim() || 'Iniciá la conversación';
 
-    const avatar = asCaptain ? item.player?.avatar_url : item.team?.shield_url;
+    const avatar = resolveAvatar(asCaptain ? item.player?.avatar_url : item.team?.shield_url, asCaptain);
+    const dateLabel = formatDate(lastMessage?.created_at ?? item.created_at);
 
     return (
       <TouchableOpacity
-        className="flex-row items-center px-4 py-4 border-b border-surface-high"
+        className="flex-row items-center px-4 py-3 mb-2 rounded-2xl"
+        style={{ backgroundColor: '#1A1F1A' }}
         onPress={() => router.push(`/market-chats/${item.id}` as any)}
         activeOpacity={0.7}
       >
@@ -107,19 +140,17 @@ export default function MarketInboxScreen() {
         )}
 
         <View className="ml-4 flex-1">
-          <Text className="text-neutral-on-surface font-uiBold text-base" numberOfLines={1}>
-            {title}
-          </Text>
-          {subtitle ? (
-            <Text className="text-neutral-on-surface-variant text-xs font-ui" numberOfLines={1}>
-              via {subtitle}
+          <View className="flex-row items-center justify-between gap-2">
+            <Text className="text-neutral-on-surface font-uiBold text-base" numberOfLines={1}>
+              {title}
             </Text>
-          ) : null}
-        </View>
+            <Text className="text-brand-primary text-[12px] font-uiBold">{dateLabel}</Text>
+          </View>
 
-        <Text className="text-neutral-on-surface-variant text-xs font-ui ml-2">
-          {formatDate(item.created_at)}
-        </Text>
+          <Text className="text-neutral-on-surface-variant text-sm font-ui" numberOfLines={1}>
+            {previewText}
+          </Text>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -127,7 +158,7 @@ export default function MarketInboxScreen() {
   return (
     <View className="flex-1 bg-surface-base">
       {/* Header */}
-      <View className="px-6 py-4 flex-row items-center border-b border-surface-high bg-surface-base">
+      <View className="px-6 pb-4 pt-10 flex-row items-center border-b border-surface-high bg-surface-base">
         <TouchableOpacity
           onPress={() => router.back()}
           className="mr-4"
@@ -135,55 +166,38 @@ export default function MarketInboxScreen() {
         >
           <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
         </TouchableOpacity>
-        <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
-          Mis Chats de Mercado
-        </Text>
+        <View className="flex-1 flex-row items-center justify-between gap-2">
+          <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
+            Mis Chats de Mercado
+          </Text>
+          <ActiveTeamSelector />
+        </View>
       </View>
 
-      {/* Filtro por equipo */}
-      {managedTeams.length > 1 && (
-        <View className="border-b border-surface-high">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}
-          >
-            <TouchableOpacity
-              onPress={() => setFilterTeamId(null)}
-              activeOpacity={0.7}
-              className={`px-4 py-1.5 rounded-full border ${
-                filterTeamId === null
-                  ? 'bg-brand-primary border-brand-primary'
-                  : 'bg-surface-low border-surface-high'
-              }`}
-            >
-              <Text
-                className={`text-xs font-uiBold ${filterTeamId === null ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}
-              >
-                Todos
-              </Text>
-            </TouchableOpacity>
-            {managedTeams.map((team) => (
+      <View className="px-4 pt-3 pb-3">
+        <View className="flex-row gap-2 p-1 bg-surface-low rounded-xl">
+          {([
+            { key: 'ALL', label: 'Todos' },
+            { key: 'TEAMS', label: 'Equipos' },
+            { key: 'PLAYERS', label: 'Jugadores' },
+          ] as const).map((item) => {
+            const active = chatFilter === item.key;
+            return (
               <TouchableOpacity
-                key={team.id}
-                onPress={() => setFilterTeamId(team.id)}
-                activeOpacity={0.7}
-                className={`px-4 py-1.5 rounded-full border ${
-                  filterTeamId === team.id
-                    ? 'bg-brand-primary border-brand-primary'
-                    : 'bg-surface-low border-surface-high'
-                }`}
+                key={item.key}
+                onPress={() => setChatFilter(item.key)}
+                className="flex-1 py-2.5 rounded-lg items-center"
+                style={active ? { backgroundColor: '#53E076' } : undefined}
+                activeOpacity={0.8}
               >
-                <Text
-                  className={`text-xs font-uiBold ${filterTeamId === team.id ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}
-                >
-                  {team.name}
+                <Text className="font-uiBold text-sm" style={{ color: active ? '#003914' : '#BCCBB9' }}>
+                  {item.label}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+            );
+          })}
         </View>
-      )}
+      </View>
 
       {isLoading ? (
         <View className="flex-1 mt-10">
@@ -202,6 +216,7 @@ export default function MarketInboxScreen() {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 22 }}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

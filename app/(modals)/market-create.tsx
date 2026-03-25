@@ -1,424 +1,344 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { AppIcon } from '@/components/ui/AppIcon';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { PitchSelector } from '@/components/ui/PitchSelector';
 import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
+import { ActiveTeamSelector } from '@/components/ui/ActiveTeamSelector';
 import { useAuth } from '@/context/AuthContext';
 import { useUI } from '@/context/UIContext';
+import { useTeamStore } from '@/stores/teamStore';
 
-import {
-  createTeamPostSchema,
-  createPlayerPostSchema,
-  CreateTeamPostInput,
-  CreatePlayerPostInput,
-} from '@/lib/schemas/marketSchema';
 import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
+import { TEAM_FORMAT_OPTIONS, TeamFormat } from '@/lib/team-options';
 
-type CreationType = 'TEAM' | 'PLAYER';
+type PostType = 'BUSCA_EQUIPO' | 'BUSCA_PARTIDO';
 
-export function MarketCreateContent({ onClose }: { onClose: () => void }) {
-  const { user } = useAuth();
-  const { showAlert } = useUI();
+export default function MarketCreateModal() {
+  const { type } = useLocalSearchParams<{ type: string }>();
+  const creationType = type === 'PLAYER' ? 'PLAYER' : 'TEAM';
 
-  const [creationType, setCreationType] = useState<CreationType>('TEAM');
+  const { user, profile } = useAuth();
+  const { showAlert, showLoader, hideLoader } = useUI();
+  const { activeTeamId, fetchMyTeams } = useTeamStore();
+
   const [managedTeams, setManagedTeams] = useState<ManagedTeam[]>([]);
   const [isLoadingTeams, setIsLoadingTeams] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Compartidos
+  const [position, setPosition] = useState<string>('CUALQUIERA');
+  const [description, setDescription] = useState('');
+
+  // Específicos de Equipo
+  const [matchDate, setMatchDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [matchTime, setMatchTime] = useState<Date | null>(null);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [zone, setZone] = useState('');
+  const [showZonePicker, setShowZonePicker] = useState(false);
+  const [complex, setComplex] = useState('');
+  const [pitchType, setPitchType] = useState<TeamFormat | null>(null);
+
+  // Específicos de Jugador
+  const [playerPostType, setPlayerPostType] = useState<PostType>('BUSCA_EQUIPO');
 
   useEffect(() => {
     if (!user) return;
     fetchUserManagedTeams(user.id)
-      .then((teams) => setManagedTeams(teams))
+      .then((teams) => {
+        setManagedTeams(teams);
+      })
       .catch((err) => console.error('Error fetching managed teams', err))
       .finally(() => setIsLoadingTeams(false));
   }, [user]);
 
+  useEffect(() => {
+    if (profile?.id) {
+      void fetchMyTeams(profile.id);
+    }
+  }, [profile?.id, fetchMyTeams]);
+
+  const formatDate = (date: Date): string => {
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  };
+
+  const formatLocalIsoDate = (date: Date): string => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    showLoader('Creando publicación...');
+    try {
+      if (creationType === 'TEAM') {
+        const selectedTeamId = activeTeamId ?? managedTeams[0]?.id;
+        const canPostWithSelectedTeam = !!selectedTeamId && managedTeams.some((team) => team.id === selectedTeamId);
+
+        if (!canPostWithSelectedTeam || !selectedTeamId) {
+          showAlert('Error', 'Seleccioná en el header un equipo donde seas Capitán o Subcapitán.');
+          setIsSubmitting(false);
+          hideLoader();
+          return;
+        }
+        await createTeamPost({
+          teamId: selectedTeamId,
+          positionWanted: position as any,
+          pitchType: pitchType ?? undefined,
+          matchDate: matchDate ? formatLocalIsoDate(matchDate) : '',
+          matchTime: matchTime ? matchTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+          zone,
+          complex,
+          description,
+        });
+        showAlert('¡Éxito!', 'La publicación del equipo ha sido creada.');
+        router.back();
+      } else {
+        await createPlayerPost({
+          postType: playerPostType,
+          position: position as any,
+          description
+        });
+        showAlert('¡Éxito!', 'Has publicado tu búsqueda correctamente.');
+        router.back();
+      }
+
+    } catch {
+      showAlert('Error', 'Hubo un problema al crear la publicación.');
+    } finally {
+      setIsSubmitting(false);
+      hideLoader();
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-surface-base" edges={['top']}>
+      {/* Header Dinámico */}
       <View className="px-6 py-4 flex-row items-center border-b border-surface-high bg-surface-base">
         <TouchableOpacity
-          onPress={onClose}
+          onPress={() => router.back()}
           className="mr-4"
-          activeOpacity={0.7} // IMPORTANTE: SIN CLASES ACTIVE: DE TAILWIND
+          activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
         </TouchableOpacity>
-        <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
-          Nueva Publicación
-        </Text>
-      </View>
-
-      <View className="flex-row mx-6 mt-4 p-1 bg-surface-low rounded-xl">
-        <TouchableOpacity
-          className={`flex-1 py-3 items-center rounded-lg ${creationType === 'TEAM' ? 'bg-brand-primary shadow-lg' : ''}`}
-          onPress={() => setCreationType('TEAM')}
-          activeOpacity={0.8} // IMPORTANTE
-        >
-          <Text className={`font-uiBold text-xs ${creationType === 'TEAM' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
-            Busco Jugador
+        <View className="flex-1 flex-row items-center justify-between gap-2">
+          <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
+            {creationType === 'TEAM' ? 'Buscar Jugador' : 'Buscar Equipo / Partido'}
           </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          className={`flex-1 py-3 items-center rounded-lg ${creationType === 'PLAYER' ? 'bg-brand-primary shadow-lg' : ''}`}
-          onPress={() => setCreationType('PLAYER')}
-          activeOpacity={0.8} // IMPORTANTE
-        >
-          <Text className={`font-uiBold text-xs ${creationType === 'PLAYER' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
-            Busco Equipo / Partido
-          </Text>
-        </TouchableOpacity>
+          {creationType === 'TEAM' ? <ActiveTeamSelector /> : null}
+        </View>
       </View>
 
       <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-        {creationType === 'TEAM' ? (
-          <TeamPostForm managedTeams={managedTeams} isLoadingTeams={isLoadingTeams} onSuccess={onClose} showAlert={showAlert} />
-        ) : (
-          <PlayerPostForm onSuccess={onClose} showAlert={showAlert} />
-        )}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
 
-// ESTE ES EL COMPONENTE QUE EXPO ROUTER LLAMA AUTOMÁTICAMENTE
-export default function MarketCreateModal() {
-  return <MarketCreateContent onClose={() => router.back()} />;
-}
-
-// ... EL RESTO DEL CÓDIGO (TeamPostForm y PlayerPostForm) QUEDA IGUAL AL QUE TENÍAMOS ...
-function TeamPostForm({
-  managedTeams,
-  isLoadingTeams,
-  onSuccess,
-  showAlert,
-}: {
-  managedTeams: ManagedTeam[];
-  isLoadingTeams: boolean;
-  onSuccess: () => void;
-  showAlert: (title: string, message: string) => void;
-}) {
-  const {
-    control,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateTeamPostInput>({
-    resolver: zodResolver(createTeamPostSchema),
-    defaultValues: { positionWanted: 'CUALQUIERA', description: '', teamId: undefined, matchDate: '', matchTime: '', zone: '' },
-  });
-
-  const [showZonePicker, setShowZonePicker] = useState(false);
-  const currentZone = watch('zone');
-
-  useEffect(() => {
-    if (managedTeams.length === 1) {
-      setValue('teamId', managedTeams[0].id);
-    }
-  }, [managedTeams, setValue]);
-
-  const onSubmit = async (data: CreateTeamPostInput) => {
-    try {
-      await createTeamPost(data);
-      showAlert('¡Éxito!', 'La publicación del equipo ha sido creada.');
-      setTimeout(() => onSuccess(), 1500);
-    } catch {
-      showAlert('Error', 'Hubo un problema al crear la publicación.');
-    }
-  };
-
-  if (isLoadingTeams) {
-    return <ActivityIndicator size="large" color="#00E65B" className="mt-10" />;
-  }
-
-  if (managedTeams.length === 0) {
-    return (
-      <View className="bg-surface-high p-6 rounded-xl mt-4 border border-error/20">
-        <Text className="text-error font-uiBold text-base mb-2 text-center">
-          Acceso Restringido
-        </Text>
-        <Text className="text-neutral-on-surface-variant text-sm text-center">
-          Debés ser Capitán o Subcapitán de un equipo para crear esta publicación.
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View>
-      <View className="mb-6">
-        <Text className="text-neutral-on-surface font-uiBold mb-2">Equipo</Text>
-        {managedTeams.length === 1 ? (
-          <View className="bg-surface-low p-4 rounded-xl border border-brand-primary/20">
-            <Text className="text-neutral-on-surface font-uiMedium">{managedTeams[0].name}</Text>
-          </View>
-        ) : (
-          <Controller
-            control={control}
-            name="teamId"
-            render={({ field: { onChange, value } }) => (
-              <View className="gap-2">
-                {managedTeams.map((team) => (
-                  <TouchableOpacity
-                    key={team.id}
-                    onPress={() => onChange(team.id)}
-                    className={`p-4 rounded-xl border ${value === team.id ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      className={`font-uiMedium ${value === team.id ? 'text-brand-primary' : 'text-neutral-on-surface'}`}
-                    >
-                      {team.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          />
-        )}
-        {errors.teamId && (
-          <Text className="text-error text-xs mt-1">{errors.teamId.message}</Text>
-        )}
-      </View>
-
-      <View className="mb-6">
-        <Text className="text-neutral-on-surface font-uiBold mb-2">Posición Buscada</Text>
-        <Controller
-          control={control}
-          name="positionWanted"
-          render={({ field: { onChange, value } }) => (
-            <View>
-              {/* @ts-ignore */}
-              <PitchSelector value={value} onChange={onChange} />
-              <TouchableOpacity
-                className="mt-4 p-3 border border-brand-primary/30 rounded-lg items-center bg-surface-low"
-                onPress={() => onChange('CUALQUIERA')}
-                activeOpacity={0.7}
-              >
-                <Text className="text-brand-primary font-uiMedium text-sm">
-                  Cualquier posición / Flexible
+        {/* --- CAMPOS EXCLUSIVOS DE EQUIPO --- */}
+        {creationType === 'TEAM' && (
+          <View>
+            {isLoadingTeams ? (
+              <ActivityIndicator size="large" color="#00E65B" className="mb-6" />
+            ) : managedTeams.length === 0 ? (
+              <View className="bg-surface-high p-6 rounded-xl mb-6 border border-error/20">
+                <Text className="text-error font-uiBold text-base mb-2 text-center">Acceso Restringido</Text>
+                <Text className="text-neutral-on-surface-variant text-sm text-center">
+                  Debés ser Capitán o Subcapitán de un equipo para crear esta publicación.
                 </Text>
-              </TouchableOpacity>
+              </View>
+            ) : null}
+
+            <View className="mb-6 p-4 bg-surface-low rounded-xl border border-surface-high">
+              <Text className="text-neutral-on-surface font-uiBold mb-1">¿Es para un partido específico?</Text>
+              <Text className="text-neutral-on-surface-variant font-ui text-xs mb-4">Completá estos datos si les falta 1 para jugar pronto. Dejalo en blanco si buscan fijo.</Text>
+
+              <View className="mb-4">
+                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Día</Text>
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.7}
+                  className="bg-surface-high p-3 rounded-lg"
+                >
+                  <Text className={`font-ui ${matchDate ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
+                    {matchDate ? formatDate(matchDate) : 'Seleccionar fecha'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View className="mb-4">
+                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Hora</Text>
+                <TouchableOpacity
+                  onPress={() => setShowTimePicker(true)}
+                  activeOpacity={0.7}
+                  className="bg-surface-high p-3 rounded-lg"
+                >
+                  <Text className={`font-ui ${matchTime ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
+                    {matchTime
+                      ? `${matchTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })} hs`
+                      : 'Seleccionar hora'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View>
+                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Zona</Text>
+                <TouchableOpacity
+                  onPress={() => setShowZonePicker(true)}
+                  activeOpacity={0.7}
+                  className="flex-row items-center justify-between bg-surface-high p-3 rounded-lg"
+                >
+                  <Text className={`font-ui ${zone ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
+                    {zone || 'Seleccionar zona'}
+                  </Text>
+                  <AppIcon family="material-icons" name="arrow-drop-down" size={20} color="#88998D" />
+                </TouchableOpacity>
+              </View>
+
+              <View className="mt-4">
+                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Complejo (opcional)</Text>
+                <TextInput
+                  value={complex}
+                  onChangeText={setComplex}
+                  placeholder="Ej: Complejo El Potrero"
+                  placeholderTextColor="#88998D"
+                  className="bg-surface-high p-3 rounded-lg text-neutral-on-surface font-ui"
+                />
+              </View>
+
+              <View className="mt-4">
+                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-2">Tipo de cancha (opcional)</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {TEAM_FORMAT_OPTIONS.map((item) => {
+                    const active = pitchType === item.value;
+                    return (
+                      <TouchableOpacity
+                        key={item.value}
+                        onPress={() => setPitchType(active ? null : item.value)}
+                        activeOpacity={0.75}
+                        className={`px-4 py-2 rounded-full border ${active ? 'border-brand-primary bg-brand-primary/10' : 'border-surface-high bg-surface-high'}`}
+                      >
+                        <Text className={`font-uiBold text-xs ${active ? 'text-brand-primary' : 'text-neutral-on-surface-variant'}`}>
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
             </View>
-          )}
-        />
-        {errors.positionWanted && (
-          <Text className="text-error text-xs mt-1">{errors.positionWanted.message}</Text>
+          </View>
         )}
-      </View>
 
-      <View className="mb-6 p-4 bg-surface-low rounded-xl border border-surface-high">
-        <Text className="text-neutral-on-surface font-uiBold mb-1">¿Es para un partido específico?</Text>
-        <Text className="text-neutral-on-surface-variant font-ui text-xs mb-4">Completá estos datos si les falta 1 para jugar pronto. Dejalo en blanco si buscan fijo.</Text>
-
-        <View className="flex-row gap-4 mb-4">
-          <View className="flex-1">
-            <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Día (Ej: Hoy, Jueves)</Text>
-            <Controller
-              control={control}
-              name="matchDate"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  value={value}
-                  onChangeText={onChange}
-                  placeholder="Viernes"
-                  placeholderTextColor="#88998D"
-                  className="bg-surface-high p-3 rounded-lg text-neutral-on-surface font-ui"
-                />
-              )}
-            />
-          </View>
-          <View className="flex-1">
-            <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Hora (Ej: 21:00)</Text>
-            <Controller
-              control={control}
-              name="matchTime"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  value={value}
-                  onChangeText={onChange}
-                  placeholder="20:30 hs"
-                  placeholderTextColor="#88998D"
-                  className="bg-surface-high p-3 rounded-lg text-neutral-on-surface font-ui"
-                />
-              )}
-            />
-          </View>
-        </View>
-
-        <View>
-          <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Zona</Text>
-          <TouchableOpacity
-            onPress={() => setShowZonePicker(true)}
-            activeOpacity={0.7}
-            className="flex-row items-center justify-between bg-surface-high p-3 rounded-lg"
-          >
-            <Text className={`font-ui ${currentZone ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
-              {currentZone || 'Seleccionar zona'}
-            </Text>
-            <AppIcon family="material-icons" name="arrow-drop-down" size={20} color="#88998D" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View className="mb-8">
-        <Text className="text-neutral-on-surface font-uiBold mb-2">Descripción (Opcional)</Text>
-        <Controller
-          control={control}
-          name="description"
-          render={({ field: { onChange, value } }) => (
-            <TextInput
-              value={value}
-              onChangeText={onChange}
-              multiline
-              numberOfLines={4}
-              placeholder="Ej: Buscamos arquero con experiencia para torneo los sábados..."
-              placeholderTextColor="#88998D"
-              className="bg-surface-low p-4 rounded-xl text-neutral-on-surface font-ui min-h-[100px]"
-              textAlignVertical="top"
-            />
-          )}
-        />
-      </View>
-
-      <HeroButton
-        label="Crear Publicación"
-        onPress={handleSubmit(onSubmit)}
-        disabled={isSubmitting}
-      />
-
-      <ZonePickerDialog
-        visible={showZonePicker}
-        onClose={() => setShowZonePicker(false)}
-        selectedZone={currentZone || ''}
-        onSelect={(val) => setValue('zone', val)}
-      />
-    </View>
-  );
-}
-
-function PlayerPostForm({
-  onSuccess,
-  showAlert,
-}: {
-  onSuccess: () => void;
-  showAlert: (title: string, message: string) => void;
-}) {
-  const {
-    control,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<CreatePlayerPostInput>({
-    resolver: zodResolver(createPlayerPostSchema),
-    defaultValues: { postType: 'BUSCA_EQUIPO', position: 'CUALQUIERA', description: '' },
-  });
-
-  const onSubmit = async (data: CreatePlayerPostInput) => {
-    try {
-      await createPlayerPost(data);
-      showAlert('¡Éxito!', 'Has publicado tu búsqueda correctamente.');
-      setTimeout(() => onSuccess(), 1500);
-    } catch {
-      showAlert('Error', 'Hubo un problema al crear la publicación.');
-    }
-  };
-
-  return (
-    <View>
-      <View className="mb-6">
-        <Text className="text-neutral-on-surface font-uiBold mb-2">¿Qué estás buscando?</Text>
-        <Controller
-          control={control}
-          name="postType"
-          render={({ field: { onChange, value } }) => (
+        {/* --- CAMPOS EXCLUSIVOS DE JUGADOR --- */}
+        {creationType === 'PLAYER' && (
+          <View className="mb-6">
+            <Text className="text-neutral-on-surface font-uiBold mb-2">¿Qué estás buscando?</Text>
             <View className="flex-row gap-2">
               <TouchableOpacity
-                onPress={() => onChange('BUSCA_EQUIPO')}
+                onPress={() => setPlayerPostType('BUSCA_EQUIPO')}
                 activeOpacity={0.8}
-                className={`flex-1 p-4 rounded-xl border items-center ${value === 'BUSCA_EQUIPO' ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
+                className={`flex-1 p-4 rounded-xl border items-center ${playerPostType === 'BUSCA_EQUIPO' ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
               >
-                <Text
-                  className={`font-uiMedium text-center ${value === 'BUSCA_EQUIPO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}
-                >
+                <Text className={`font-uiMedium text-center ${playerPostType === 'BUSCA_EQUIPO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
                   Unirme a Equipo
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => onChange('BUSCA_PARTIDO')}
+                onPress={() => setPlayerPostType('BUSCA_PARTIDO')}
                 activeOpacity={0.8}
-                className={`flex-1 p-4 rounded-xl border items-center ${value === 'BUSCA_PARTIDO' ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
+                className={`flex-1 p-4 rounded-xl border items-center ${playerPostType === 'BUSCA_PARTIDO' ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
               >
-                <Text
-                  className={`font-uiMedium text-center ${value === 'BUSCA_PARTIDO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}
-                >
+                <Text className={`font-uiMedium text-center ${playerPostType === 'BUSCA_PARTIDO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
                   Jugar un Partido
                 </Text>
               </TouchableOpacity>
             </View>
-          )}
-        />
-        {errors.postType && (
-          <Text className="text-error text-xs mt-1">{errors.postType.message}</Text>
+          </View>
         )}
-      </View>
 
-      <View className="mb-6">
-        <Text className="text-neutral-on-surface font-uiBold mb-2">Mi Posición</Text>
-        <Controller
-          control={control}
-          name="position"
-          render={({ field: { onChange, value } }) => (
-            <View>
-              {/* @ts-ignore */}
-              <PitchSelector value={value} onChange={onChange} />
-              <TouchableOpacity
-                className="mt-4 p-3 border border-brand-primary/30 rounded-lg items-center bg-surface-low"
-                onPress={() => onChange('CUALQUIERA')}
-                activeOpacity={0.7}
-              >
-                <Text className="text-brand-primary font-uiMedium text-sm">
-                  Soy Flexible / Cualquier posición
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
+        {/* --- CAMPOS COMPARTIDOS --- */}
+        <View className="mb-6">
+          <Text className="text-neutral-on-surface font-uiBold mb-2">
+            {creationType === 'TEAM' ? 'Posición Buscada' : 'Mi Posición'}
+          </Text>
+          {/* @ts-ignore */}
+          <PitchSelector value={position} onChange={(val) => setPosition(val)} />
+          <TouchableOpacity
+            className="mt-4 p-3 border border-brand-primary/30 rounded-lg items-center bg-surface-low"
+            onPress={() => setPosition('CUALQUIERA')}
+            activeOpacity={0.7}
+          >
+            <Text className="text-brand-primary font-uiMedium text-sm">
+              {creationType === 'TEAM' ? 'Cualquier posición / Flexible' : 'Soy Flexible / Cualquier posición'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View className="mb-8">
+          <Text className="text-neutral-on-surface font-uiBold mb-2">Descripción (Opcional)</Text>
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+            placeholder={creationType === 'TEAM' ? "Ej: Buscamos arquero con experiencia para torneo los sábados..." : "Ej: Juego de 5, tengo disponibilidad por la noche..."}
+            placeholderTextColor="#88998D"
+            className="bg-surface-low p-4 rounded-xl text-neutral-on-surface font-ui min-h-[100px]"
+            textAlignVertical="top"
+          />
+        </View>
+
+        <HeroButton
+          label="Crear Publicación"
+          onPress={handleSubmit}
+          disabled={isSubmitting || (creationType === 'TEAM' && managedTeams.length === 0)}
         />
-        {errors.position && (
-          <Text className="text-error text-xs mt-1">{errors.position.message}</Text>
-        )}
-      </View>
 
-      <View className="mb-8">
-        <Text className="text-neutral-on-surface font-uiBold mb-2">Descripción (Opcional)</Text>
-        <Controller
-          control={control}
-          name="description"
-          render={({ field: { onChange, value } }) => (
-            <TextInput
-              value={value}
-              onChangeText={onChange}
-              multiline
-              numberOfLines={4}
-              placeholder="Ej: Juego de 5, tengo disponibilidad por la noche..."
-              placeholderTextColor="#88998D"
-              className="bg-surface-low p-4 rounded-xl text-neutral-on-surface font-ui min-h-[100px]"
-              textAlignVertical="top"
-            />
-          )}
-        />
-      </View>
+      </ScrollView>
 
-      <HeroButton
-        label="Crear Publicación"
-        onPress={handleSubmit(onSubmit)}
-        disabled={isSubmitting}
+      <ZonePickerDialog
+        visible={showZonePicker}
+        onClose={() => setShowZonePicker(false)}
+        selectedZone={zone}
+        onSelect={(val) => setZone(val)}
       />
-    </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={matchDate ?? new Date()}
+          mode="date"
+          display="default"
+          minimumDate={new Date()}
+          locale="es-AR"
+          onChange={(_, date) => {
+            setShowDatePicker(false);
+            if (date) setMatchDate(date);
+          }}
+        />
+      )}
+
+      {showTimePicker && (
+        <DateTimePicker
+          value={matchTime ?? new Date()}
+          mode="time"
+          display="default"
+          onChange={(_, date) => {
+            setShowTimePicker(false);
+            if (date) setMatchTime(date);
+          }}
+        />
+      )}
+    </SafeAreaView>
   );
 }

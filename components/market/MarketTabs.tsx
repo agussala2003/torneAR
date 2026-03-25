@@ -8,7 +8,7 @@ interface MarketTabsProps {
 
 export function MarketTabs({ activeTab, onTabChange }: MarketTabsProps) {
   return (
-    <View className="flex-row gap-2 p-1 bg-surface-low rounded-xl mb-6">
+    <View className="flex-row gap-2 p-1 bg-surface-low rounded-xl">
       <TouchableOpacity
         className="flex-1 py-3 items-center rounded-lg"
         style={activeTab === 'TEAMS_LOOKING' ? { backgroundColor: '#53E076' } : undefined}

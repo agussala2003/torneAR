@@ -10,9 +10,11 @@ interface MarketListSectionProps {
   isRefreshing: boolean;
   posts: (MarketTeamPost | MarketPlayerPost)[];
   activeTab: TabType;
+  currentProfileId: string;
   onRefresh: () => void;
   onContactTeam: (teamId: string) => void;
   onContactPlayer: (playerProfileId: string) => void;
+  onDeletePost: (postId: string, isTeamPost: boolean) => void;
 }
 
 export function MarketListSection({
@@ -20,9 +22,11 @@ export function MarketListSection({
   isRefreshing,
   posts,
   activeTab,
+  currentProfileId,
   onRefresh,
   onContactTeam,
   onContactPlayer,
+  onDeletePost,
 }: MarketListSectionProps) {
   if (isLoading) {
     return (
@@ -35,29 +39,40 @@ export function MarketListSection({
   const renderItem = ({ item }: { item: MarketTeamPost | MarketPlayerPost }) => {
     if (activeTab === 'TEAMS_LOOKING') {
       const post = item as MarketTeamPost;
+      const isOwner = post.created_by === currentProfileId;
       return (
         <MarketTeamCard
+          postId={post.id}
           teamName={post.teams?.name ?? 'Equipo'}
+          teamZone={post.teams?.zone}
+          matchZone={post.zone}
           logoUrl={post.teams?.shield_url}
           positionWanted={post.position_wanted}
+          pitchType={post.pitch_type}
           description={post.description}
           matchDate={post.match_date}
           matchTime={post.match_time}
-          zone={post.zone}
+          complex={post.complex}
+          isOwner={isOwner}
           onPressAction={() => onContactTeam(post.team_id)}
+          onDelete={() => onDeletePost(post.id, true)}
         />
       );
     } else {
       const post = item as MarketPlayerPost;
+      const isOwner = post.profile_id === currentProfileId;
       return (
         <MarketPlayerCard
+          postId={post.id}
           playerName={post.profiles?.full_name ?? 'Jugador'}
           username={post.profiles?.username ?? 'user'}
           avatarUrl={post.profiles?.avatar_url}
           position={post.position}
           postType={post.post_type}
           description={post.description}
+          isOwner={isOwner}
           onPressAction={() => onContactPlayer(post.profile_id)}
+          onDelete={() => onDeletePost(post.id, false)}
         />
       );
     }

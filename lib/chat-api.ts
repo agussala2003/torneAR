@@ -25,6 +25,12 @@ export interface MarketMessage {
   created_at: string;
 }
 
+export interface MarketMessagePreview {
+  conversation_id: string;
+  content: string;
+  created_at: string;
+}
+
 /**
  * Resuelve el profiles.id del usuario autenticado.
  * IMPORTANTE: profiles.id ≠ auth.users.id — siempre usar este helper.
@@ -127,6 +133,33 @@ export async function fetchMessages(conversationId: string): Promise<MarketMessa
 
   if (error) throw error;
   return (data ?? []) as MarketMessage[];
+}
+
+export async function fetchLatestMessagesForConversations(
+  conversationIds: string[],
+): Promise<Record<string, MarketMessagePreview>> {
+  if (conversationIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('conversation_id, content, created_at')
+    .in('conversation_id', conversationIds)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const latestByConversation: Record<string, MarketMessagePreview> = {};
+  for (const row of data ?? []) {
+    if (!latestByConversation[row.conversation_id]) {
+      latestByConversation[row.conversation_id] = {
+        conversation_id: row.conversation_id,
+        content: row.content,
+        created_at: row.created_at,
+      };
+    }
+  }
+
+  return latestByConversation;
 }
 
 /**

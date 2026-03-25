@@ -9,16 +9,20 @@ export interface ManagedTeam {
 export interface MarketTeamPost {
   id: string;
   team_id: string;
+  created_by: string;
   position_wanted: string;
+  pitch_type?: string | null;
   description: string | null;
   match_date?: string | null;
   match_time?: string | null;
   zone?: string | null;
+  complex?: string | null;
   is_active: boolean;
   created_at: string;
   teams: {
     id: string;
     name: string;
+    zone?: string | null;
     shield_url: string | null;
   } | null;
 }
@@ -58,7 +62,7 @@ async function getProfileId(): Promise<string> {
 /**
  * Obtiene las publicaciones activas de equipos que buscan jugadores.
  */
-export async function fetchTeamPosts(positionFilter?: string): Promise<MarketTeamPost[]> {
+export async function fetchTeamPosts(positionFilter?: string, zoneFilter?: string | null): Promise<MarketTeamPost[]> {
   let query = supabase
     .from('market_team_posts')
     .select(`
@@ -66,6 +70,7 @@ export async function fetchTeamPosts(positionFilter?: string): Promise<MarketTea
       teams (
         id,
         name,
+        zone,
         shield_url
       )
     `)
@@ -74,6 +79,10 @@ export async function fetchTeamPosts(positionFilter?: string): Promise<MarketTea
 
   if (positionFilter && positionFilter !== 'CUALQUIERA') {
     query = query.eq('position_wanted', positionFilter as any);
+  }
+
+  if (zoneFilter && zoneFilter !== 'CUALQUIERA') {
+    query = query.eq('zone', zoneFilter as any);
   }
 
   const { data, error } = await query;
@@ -107,6 +116,8 @@ export async function fetchPlayerPosts(positionFilter?: string, typeFilter?: str
     query = query.eq('post_type', typeFilter as any);
   }
 
+  // Note: market_player_posts has no zone column — zone filtering applies to team posts only.
+
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as MarketPlayerPost[];
@@ -124,10 +135,12 @@ export async function createTeamPost(postData: CreateTeamPostInput): Promise<voi
     .insert({
       team_id: postData.teamId,
       position_wanted: postData.positionWanted,
+      pitch_type: postData.pitchType || null,
       description: postData.description || null,
       match_date: postData.matchDate || null,
       match_time: postData.matchTime || null,
       zone: postData.zone || null,
+      complex: postData.complex || null,
       created_by: profileId,
     });
 
