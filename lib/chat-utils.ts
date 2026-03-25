@@ -12,3 +12,20 @@ export function computeUnread(
   if (!last_read_at) return true;
   return last_msg_at > last_read_at;
 }
+
+/**
+ * Derives the display role for a message sender.
+ * - If senderTeamId is null: the sender is the player side → 'JUGADOR'
+ * - If senderTeamId is set: look up their role in the roleMap (team_members for that team)
+ *   Returns null if the sender is not found (should not happen in normal flow).
+ */
+export function deriveRole(
+  senderTeamId: string | null,
+  senderProfileId: string,
+  roleMap: Record<string, string>,
+): 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | null {
+  if (!senderTeamId) return 'JUGADOR';
+  const role = roleMap[senderProfileId];
+  if (!role) return null;
+  return role as 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR';
+}

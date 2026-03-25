@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeUnread } from './chat-utils';
+import { computeUnread, deriveRole } from './chat-utils';
 
 describe('computeUnread', () => {
   const myId = 'user-1';
@@ -25,5 +25,24 @@ describe('computeUnread', () => {
 
   it('is not unread when there are no messages', () => {
     expect(computeUnread(null, null, null, myId)).toBe(false);
+  });
+});
+
+// --- deriveRole ---
+describe('deriveRole', () => {
+  it('returns JUGADOR when no senderTeamId (player side)', () => {
+    expect(deriveRole(null, 'p1', {})).toBe('JUGADOR');
+  });
+
+  it('returns CAPITAN when sender is capitan of the team', () => {
+    expect(deriveRole('t1', 'p1', { p1: 'CAPITAN' })).toBe('CAPITAN');
+  });
+
+  it('returns SUBCAPITAN when sender is subcapitan of the team', () => {
+    expect(deriveRole('t1', 'p2', { p1: 'CAPITAN', p2: 'SUBCAPITAN' })).toBe('SUBCAPITAN');
+  });
+
+  it('returns null when sender_team_id is set but profile not found in roleMap', () => {
+    expect(deriveRole('t1', 'p99', { p1: 'CAPITAN' })).toBeNull();
   });
 });
