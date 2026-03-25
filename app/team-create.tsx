@@ -4,6 +4,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
+import { useTeamStore } from '@/stores/teamStore';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { TEAM_CATEGORY_OPTIONS, TEAM_FORMAT_OPTIONS, TeamCategory, TeamFormat } from '@/lib/team-options';
 import { fetchZones, createTeam } from '@/lib/team-create-data';
@@ -13,6 +14,7 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 export default function TeamCreateScreen() {
   const router = useRouter();
   const { profile } = useAuth();
+  const { fetchMyTeams } = useTeamStore();
   const { showAlert, AlertComponent } = useCustomAlert();
 
   const [name, setName] = useState('');
@@ -61,7 +63,10 @@ export default function TeamCreateScreen() {
       setIsSubmitting(true);
       const teamData = await createTeam(profile.id, sanitizedName, sanitizedZone, category, format);
       
-      showAlert('Equipo creado', `Tu equipo ${teamData.name} ya esta listo.`, () => {
+      showAlert('Equipo creado', `Tu equipo ${teamData.name} ya esta listo.`, async () => {
+        if (profile?.id) {
+          await fetchMyTeams(profile.id);
+        }
         router.replace({ pathname: '/team-manage', params: { teamId: teamData.id } });
       });
     } catch (error: unknown) {

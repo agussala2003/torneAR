@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/supabase';
+import { useTeamStore } from '@/stores/teamStore';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
 
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const syncVersionRef = useRef(0);
+  const authUserIdRef = useRef<string | null>(null);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -60,6 +62,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const syncAuthState = async (nextSession: Session | null) => {
     const syncVersion = ++syncVersionRef.current;
+    const previousUserId = authUserIdRef.current;
+    const nextUserId = nextSession?.user?.id ?? null;
+
+    if (!nextUserId || (previousUserId && previousUserId !== nextUserId)) {
+      useTeamStore.getState().clearStore();
+    }
+
+    authUserIdRef.current = nextUserId;
 
     setSession(nextSession);
     setUser(nextSession?.user ?? null);

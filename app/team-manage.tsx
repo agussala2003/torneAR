@@ -9,9 +9,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
+import { useTeamStore } from '@/stores/teamStore';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { supabase } from '@/lib/supabase';
-import { TEAM_CATEGORY_OPTIONS, TEAM_FORMAT_OPTIONS, getTeamRoleLabel, TeamCategory, TeamFormat } from '@/lib/team-options';
+import { TEAM_CATEGORY_OPTIONS, TEAM_FORMAT_OPTIONS, getTeamRoleLabel, TeamCategory, TeamFormat, TeamRole } from '@/lib/team-options';
 import { allowedRolesToAssign, canManageMember } from '@/lib/team-helpers';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 
@@ -20,7 +21,6 @@ import { TeamManagePendingRequests } from '@/components/team-manage/TeamManagePe
 import { TeamManageHistoryRequests } from '@/components/team-manage/TeamManageHistoryRequests';
 import { TeamMembersList } from '@/components/team-manage/TeamMembersList';
 import { TeamManageViewData, TeamMemberRow, TeamJoinRequestRow } from '@/components/team-manage/types';
-import { TeamRole } from '@/lib/team-options';
 import { 
   fetchTeamManageViewData, 
   uploadTeamShield, 
@@ -38,6 +38,7 @@ export default function TeamManageScreen() {
   const params = useLocalSearchParams<{ teamId?: string | string[] }>();
   const { profile } = useAuth();
   const { showAlert, AlertComponent } = useCustomAlert();
+  const { fetchMyTeams } = useTeamStore();
 
   const teamId = useMemo(() => {
     if (Array.isArray(params.teamId)) {
@@ -224,10 +225,11 @@ export default function TeamManageScreen() {
     if (!teamId || !team) return;
     try {
       setProcessingRequestId(request.id);
-      
       await acceptJoinRequest(request, { id: team.id, name: team.name });
-
       await loadTeamData();
+      if (profile?.id) {
+        await fetchMyTeams(profile.id);
+      }
       showAlert('Solicitud aprobada', 'El jugador fue agregado al plantel.');
     } catch (error) {
       showAlert('Error al aprobar', getGenericSupabaseErrorMessage(error, 'No se pudo aprobar la solicitud.'));
