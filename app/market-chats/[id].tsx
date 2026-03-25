@@ -238,7 +238,7 @@ export default function MarketChatScreen() {
           />
 
           {/* Barra de acciones + input */}
-          <View className="p-4 pb-16 bg-surface-low border-t border-surface-high">
+          <View className="p-4 bg-surface-low border-t border-surface-high">
             {isCaptainMode && (
               <View className="flex-row gap-2 mb-3">
                 {isLoadingCodes ? (
