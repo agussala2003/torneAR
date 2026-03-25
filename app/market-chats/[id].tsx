@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
@@ -42,6 +43,7 @@ export default function MarketChatScreen() {
   const [teamInviteCode, setTeamInviteCode] = useState<string | null>(null);
   const [matchCode, setMatchCode] = useState<string | null>(null);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
+  const [showInviteConfirmModal, setShowInviteConfirmModal] = useState(false);
 
   useEffect(() => {
     if (!profile || !id) return;
@@ -111,6 +113,11 @@ export default function MarketChatScreen() {
 
   const handleInviteToTeam = () => {
     if (!teamInviteCode) return;
+    setShowInviteConfirmModal(true);
+  };
+
+  const confirmInviteToTeam = () => {
+    setShowInviteConfirmModal(false);
     handleSend(
       `¡Queremos que te unas a nuestro equipo! Ingresá este código en la sección "Unirse a Equipo": ${teamInviteCode}`,
     );
@@ -316,6 +323,39 @@ export default function MarketChatScreen() {
           </View>
         </KeyboardAvoidingView>
       )}
+      <Modal
+        visible={showInviteConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowInviteConfirmModal(false)}
+      >
+        <View className="flex-1 bg-black/65 items-center justify-center px-6">
+          <View className="w-full rounded-2xl border border-surface-high bg-surface-container p-5">
+            <Text className="text-neutral-on-surface font-displayBlack text-lg mb-2">
+              Invitar a tu equipo
+            </Text>
+            <Text className="text-neutral-on-surface-variant font-ui text-sm mb-5">
+              ¿Confirmás que querés invitar a este jugador? Se le va a enviar el código de invitación.
+            </Text>
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setShowInviteConfirmModal(false)}
+                activeOpacity={0.8}
+                className="flex-1 py-3 rounded-xl bg-surface-high items-center"
+              >
+                <Text className="text-neutral-on-surface font-uiBold">Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={confirmInviteToTeam}
+                activeOpacity={0.8}
+                className="flex-1 py-3 rounded-xl bg-brand-primary items-center"
+              >
+                <Text className="font-uiBold" style={{ color: '#003914' }}>Sí, invitar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
