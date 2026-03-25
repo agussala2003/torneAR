@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,24 @@ import {
   MarketConversation,
 } from '@/lib/chat-api';
 import { fetchTeamInviteCode } from '@/lib/market-api';
+
+function formatRole(role: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | null): string {
+  if (!role) return '';
+  const map: Record<string, string> = {
+    CAPITAN: 'Capitán',
+    SUBCAPITAN: 'Subcapitán',
+    JUGADOR: 'Jugador',
+  };
+  return map[role] ?? '';
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
 
 export default function MarketChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -148,25 +166,7 @@ export default function MarketChatScreen() {
     handleSend(matchCode, 'MATCH_INVITE');
   };
 
-  function formatRole(role: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | null): string {
-    if (!role) return '';
-    const map: Record<string, string> = {
-      CAPITAN: 'Capitán',
-      SUBCAPITAN: 'Subcapitán',
-      JUGADOR: 'Jugador',
-    };
-    return map[role] ?? '';
-  }
-
-  function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString('es-AR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-  }
-
-  const renderMessage = ({ item }: { item: MarketMessage }) => {
+  const renderMessage = useCallback(({ item }: { item: MarketMessage }) => {
     const isMine = item.sender_profile_id === profile?.id;
     const isTemp = item.id.startsWith('temp-');
     const isSpecial = item.message_type === 'TEAM_INVITE' || item.message_type === 'MATCH_INVITE';
@@ -179,8 +179,7 @@ export default function MarketChatScreen() {
     const time = formatTime(item.created_at);
 
     // Colors for code block adapt to bubble side
-    const codeBlockBorder = isMine ? '#003914' : '#53E076';
-    const codeText = isMine ? '#003914' : '#53E076';
+    const codeColor = isMine ? '#003914' : '#53E076';
     const copyBg = isMine ? 'rgba(0,57,20,0.2)' : 'rgba(83,224,118,0.12)';
 
     const inviteHeaderText =
@@ -215,7 +214,7 @@ export default function MarketChatScreen() {
                 <View
                   style={{
                     borderWidth: 1,
-                    borderColor: codeBlockBorder,
+                    borderColor: codeColor,
                     borderRadius: 10,
                     padding: 10,
                     backgroundColor: isMine
@@ -225,7 +224,7 @@ export default function MarketChatScreen() {
                 >
                   <Text
                     style={{
-                      color: codeText,
+                      color: codeColor,
                       fontSize: 10,
                       textTransform: 'uppercase',
                       letterSpacing: 1,
@@ -238,7 +237,7 @@ export default function MarketChatScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text
                       style={{
-                        color: codeText,
+                        color: codeColor,
                         fontSize: 20,
                         fontWeight: '900',
                         letterSpacing: 4,
@@ -252,13 +251,13 @@ export default function MarketChatScreen() {
                       style={{
                         backgroundColor: copyBg,
                         borderWidth: 1,
-                        borderColor: codeBlockBorder,
+                        borderColor: codeColor,
                         borderRadius: 6,
                         paddingHorizontal: 8,
                         paddingVertical: 4,
                       }}
                     >
-                      <Text style={{ color: codeText, fontSize: 10, fontWeight: 'bold' }}>
+                      <Text style={{ color: codeColor, fontSize: 10, fontWeight: 'bold' }}>
                         COPIAR
                       </Text>
                     </TouchableOpacity>
@@ -279,7 +278,7 @@ export default function MarketChatScreen() {
         </View>
       </View>
     );
-  };
+  }, [profile]);
 
   const chatTitle = chatData
     ? isCaptainMode
