@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { computeUnread } from './chat-utils';
+import { computeUnread, deriveRole } from './chat-utils';
 
 export interface MarketConversation {
   id: string;
@@ -29,6 +29,21 @@ export interface MarketMessage {
   sender_team_id: string | null;
   content: string;
   created_at: string;
+  message_type: 'TEXT' | 'TEAM_INVITE' | 'MATCH_INVITE';
+  sender_full_name: string;
+  sender_role: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | null;
+}
+
+// (private — not exported)
+interface RawMessageRow {
+  id: string;
+  conversation_id: string;
+  sender_profile_id: string;
+  sender_team_id: string | null;
+  content: string;
+  created_at: string;
+  message_type: string;
+  sender_profile: { full_name: string } | null;
 }
 
 
@@ -118,17 +133,46 @@ export async function fetchInbox(): Promise<MarketConversation[]> {
 }
 
 /**
- * Retorna los mensajes de una conversación, ordenados cronológicamente.
+ * Retorna los mensajes de una conversación enriquecidos con nombre y rol del remitente.
+ * teamId es el equipo de la conversación — se usa para resolver el rol de miembros del equipo.
  */
-export async function fetchMessages(conversationId: string): Promise<MarketMessage[]> {
+export async function fetchMessages(
+  conversationId: string,
+  teamId?: string,
+): Promise<MarketMessage[]> {
+  // Build role map from team_members if teamId provided
+  const roleMap: Record<string, string> = {};
+  if (teamId) {
+    const { data: members } = await supabase
+      .from('team_members')
+      .select('profile_id, role')
+      .eq('team_id', teamId);
+    for (const m of (members ?? [])) {
+      roleMap[(m as { profile_id: string; role: string }).profile_id] =
+        (m as { profile_id: string; role: string }).role;
+    }
+  }
+
   const { data, error } = await supabase
     .from('messages')
-    .select('*')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .select('*, sender_profile:profiles!sender_profile_id(full_name)' as any)
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as MarketMessage[];
+
+  return ((data ?? []) as unknown as RawMessageRow[]).map((row) => ({
+    id: row.id,
+    conversation_id: row.conversation_id,
+    sender_profile_id: row.sender_profile_id,
+    sender_team_id: row.sender_team_id,
+    content: row.content,
+    created_at: row.created_at,
+    message_type: (row.message_type ?? 'TEXT') as 'TEXT' | 'TEAM_INVITE' | 'MATCH_INVITE',
+    sender_full_name: row.sender_profile?.full_name ?? 'Desconocido',
+    sender_role: deriveRole(row.sender_team_id, row.sender_profile_id, roleMap),
+  }));
 }
 
 
@@ -161,27 +205,44 @@ export async function fetchUnreadChatCount(): Promise<number> {
 /**
  * Envía un mensaje en una conversación.
  * senderTeamId se popula cuando el usuario actúa en nombre de un equipo.
+ * messageType distingue mensajes de texto de burbujas especiales de código.
  */
 export async function sendMessage(
   conversationId: string,
   content: string,
   senderTeamId?: string,
+  messageType: 'TEXT' | 'TEAM_INVITE' | 'MATCH_INVITE' = 'TEXT',
 ): Promise<MarketMessage> {
   const profileId = await getProfileId();
 
   const { data, error } = await supabase
     .from('messages')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
       conversation_id: conversationId,
       sender_profile_id: profileId,
       sender_team_id: senderTeamId || null,
       content,
-    })
-    .select()
+      message_type: messageType,
+    } as any)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .select('*, sender_profile:profiles!sender_profile_id(full_name)' as any)
     .single();
 
   if (error) throw error;
-  return data as MarketMessage;
+
+  const row = data as unknown as RawMessageRow;
+  return {
+    id: row.id,
+    conversation_id: row.conversation_id,
+    sender_profile_id: row.sender_profile_id,
+    sender_team_id: row.sender_team_id,
+    content: row.content,
+    created_at: row.created_at,
+    message_type: (row.message_type ?? 'TEXT') as 'TEXT' | 'TEAM_INVITE' | 'MATCH_INVITE',
+    sender_full_name: row.sender_profile?.full_name ?? 'Desconocido',
+    sender_role: null, // role not critical for optimistic update; replaced by next fetchMessages
+  };
 }
 
 /**

@@ -104,6 +104,9 @@ export default function MarketChatScreen() {
       sender_team_id: senderTeamId ?? null,
       content: textToSend,
       created_at: new Date().toISOString(),
+      message_type: 'TEXT',
+      sender_full_name: profile.full_name ?? 'Desconocido',
+      sender_role: null,
     };
 
     setMessages((prev) => [...prev, tempMsg]);
