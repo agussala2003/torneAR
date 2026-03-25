@@ -69,10 +69,10 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
   const { fetchMyTeams, activeTeamId } = useTeamStore();
 
   useEffect(() => {
-    if (profile?.id && !activeTeamId) {
+    if (profile?.id) {
       void fetchMyTeams(profile.id);
     }
-  }, [profile?.id, activeTeamId, fetchMyTeams]);
+  }, [profile?.id, fetchMyTeams]);
 
   const loadChatCount = useCallback(async () => {
     if (!profile?.id) return;
@@ -83,10 +83,25 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
   }, [profile?.id]);
 
   useEffect(() => {
-    if (isMarketTab) {
-      void loadChatCount();
-    }
-  }, [isMarketTab, loadChatCount]);
+    if (!isMarketTab || !profile?.id) return;
+
+    void loadChatCount();
+
+    const channel = supabase
+      .channel(`market-messages-badge-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        () => {
+          void loadChatCount();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [isMarketTab, profile?.id, loadChatCount]);
 
   const resolvedNotificationCount = notificationCount ?? internalNotificationCount;
   const handleNotificationPress = onNotificationPress ?? (() => router.push('/notifications'));
