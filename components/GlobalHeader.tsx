@@ -66,7 +66,7 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
     };
   }, [loadUnreadNotificationsCount, profile?.id]);
 
-  const { fetchMyTeams, activeTeamId } = useTeamStore();
+  const { fetchMyTeams } = useTeamStore();
 
   useEffect(() => {
     if (profile?.id) {
@@ -91,6 +91,11 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
       .channel(`market-messages-badge-${profile.id}`)
       .on(
         'postgres_changes',
+        // TODO: This subscription fires for all messages in the system, not just
+        // the user's conversations. Supabase Realtime cannot filter by
+        // conversation_id at the channel level without a dedicated view or
+        // function. The re-fetch is cheap (a single RPC with RLS) and traffic is
+        // low, but this should be revisited if message volume grows.
         { event: 'INSERT', schema: 'public', table: 'messages' },
         () => {
           void loadChatCount();
