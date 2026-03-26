@@ -16,6 +16,7 @@ import * as Clipboard from 'expo-clipboard';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
 import { getInitials } from '@/lib/market-utils';
+import { supabase } from '@/lib/supabase';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import {
   fetchMessages,
@@ -112,6 +113,35 @@ export default function MarketChatScreen() {
     };
 
     loadConversation();
+
+    // --- CONFIGURACIÓN DE REALTIME ---
+    const channel = supabase
+      .channel(`chat_${id}`) // Canal único para esta conversación
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${id}`, // Solo mensajes de este chat
+        },
+        (payload) => {
+          const newMessage = payload.new as MarketMessage;
+          // Ignoramos el mensaje si fuimos nosotros quienes lo enviamos (para evitar duplicados por el manejo optimista)
+          if (newMessage.sender_profile_id !== profile.id) {
+            setMessages((prev) => [...prev, newMessage]);
+            // Marcamos como leído si tenemos el chat abierto
+            markConversationAsRead(id).catch(console.error);
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+          }
+        }
+      )
+      .subscribe();
+
+    // Limpieza al desmontar el componente
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile, id]);
 
   const handleSend = async (

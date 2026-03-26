@@ -43,24 +43,22 @@ export function NotificationsListSection({
             key={item.id}
             onPress={() => onOpenNotification(item)}
             activeOpacity={0.9}
-            className={`rounded-xl border p-3 ${
-              item.is_read
+            className={`rounded-xl border p-3 ${item.is_read
                 ? 'border-neutral-outline-variant/20 bg-surface-low'
                 : 'border-info-secondary/35 bg-info-secondary/10'
-            }`}
+              }`}
           >
             <View className="flex-row items-start gap-3">
               <View
-                className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                  item.is_read ? 'bg-surface-bright/60' : 'bg-info-secondary'
-                }`}
+                className={`mt-1 h-2.5 w-2.5 rounded-full ${item.is_read ? 'bg-surface-bright/60' : 'bg-info-secondary'
+                  }`}
               />
               <View className="flex-1">
                 <View className="flex-row items-center justify-between gap-2">
                   <Text
-                    className={`font-uiBold text-sm ${
-                      item.is_read ? 'text-neutral-on-surface-variant' : 'text-neutral-on-surface'
-                    }`}
+                    numberOfLines={1}
+                    className={`flex-1 font-uiBold text-sm ${item.is_read ? 'text-neutral-on-surface-variant' : 'text-neutral-on-surface'
+                      }`}
                   >
                     {item.title}
                   </Text>
