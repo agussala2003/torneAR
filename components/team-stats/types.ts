@@ -60,3 +60,16 @@ export type TeamStatsViewData = {
   members: TeamMemberStat[];
   isOwnTeam: boolean;
 };
+
+export interface H2HMatch {
+  matchId: string;
+  scheduledAt: string;
+  matchType: 'RANKING' | 'AMISTOSO';
+  teamAId: string;
+  teamAName: string;
+  teamAGoals: number;
+  teamBId: string;
+  teamBName: string;
+  teamBGoals: number;
+  status: string;
+}

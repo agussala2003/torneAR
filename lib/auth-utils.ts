@@ -8,6 +8,7 @@ export function isProfileComplete(profile: Profile | null): boolean {
   return Boolean(
     profile.username?.trim() &&
     profile.full_name?.trim() &&
-    profile.preferred_position?.trim()
+    profile.preferred_position?.trim() &&
+    profile.zone?.trim()
   );
 }

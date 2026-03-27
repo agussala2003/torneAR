@@ -228,11 +228,10 @@ export default function MarketChatScreen() {
             </Text>
           ) : null}
           <View
-            className={`p-3 rounded-2xl border ${
-              isMine
-                ? 'bg-brand-primary border-brand-primary rounded-tr-sm'
-                : 'bg-surface-high border-surface-variant rounded-tl-sm'
-            } ${isTemp ? 'opacity-60' : ''}`}
+            className={`p-3 rounded-2xl border ${isMine
+              ? 'bg-brand-primary border-brand-primary rounded-tr-sm'
+              : 'bg-surface-high border-surface-variant rounded-tl-sm'
+              } ${isTemp ? 'opacity-60' : ''}`}
           >
             {isSpecial ? (
               <>

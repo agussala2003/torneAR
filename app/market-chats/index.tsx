@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { GlobalLoader } from '@/components/GlobalLoader';
@@ -46,15 +46,12 @@ export default function MarketInboxScreen() {
     }
   }, [showAlert]);
 
-  useEffect(() => {
-    if (user) loadData();
-  }, [user, loadData]);
-
-  useEffect(() => {
-    if (profile?.id) {
-      void fetchMyTeams(profile.id);
-    }
-  }, [profile?.id, fetchMyTeams]);
+  useFocusEffect(
+    useCallback(() => {
+      if (user) void loadData();
+      if (profile?.id) void fetchMyTeams(profile.id);
+    }, [user, profile?.id, loadData, fetchMyTeams])
+  );
 
   const onRefresh = () => {
     setIsRefreshing(true);

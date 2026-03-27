@@ -73,6 +73,8 @@ function RootNavigation() {
       <Stack.Screen name="team-manage" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="market-chats" />
+      <Stack.Screen name="team-stats" />
+      <Stack.Screen name="challenge-inbox" />
       <Stack.Screen name="(modals)" />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
     </Stack>

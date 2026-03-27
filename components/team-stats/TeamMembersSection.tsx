@@ -27,7 +27,7 @@ type TeamMembersSectionProps = {
 
 export function TeamMembersSection({ members }: TeamMembersSectionProps) {
   return (
-    <View className="mt-8">
+    <View className="mt-4">
       <Text className="font-display mb-3 px-1 text-sm uppercase tracking-wider text-neutral-on-surface-variant">
         Plantilla · {members.length}
       </Text>

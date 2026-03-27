@@ -19,10 +19,9 @@ import { getOrCreateMarketChat } from '@/lib/chat-api';
 export default function MarketScreen() {
   const { profile } = useAuth();
   const { showAlert, showLoader, hideLoader } = useUI();
-  const { fetchMyTeams } = useTeamStore();
+  const { fetchMyTeams, activeTeamId } = useTeamStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('TEAMS_LOOKING');
-  const [selectedPosition] = useState<string>('CUALQUIERA');
 
   const [filterZone, setFilterZone] = useState<string | null>(null);
   const [filterDays, setFilterDays] = useState<string[]>([]);
@@ -44,7 +43,7 @@ export default function MarketScreen() {
 
     try {
       if (showFullLoader) setLoading(true);
-      const data = await fetchMarketViewData(profile, selectedPosition, { zone: filterZone, sortBy: filterSort });
+      const data = await fetchMarketViewData(profile, 'CUALQUIERA', { zone: filterZone, sortBy: filterSort });
       setViewData(data);
 
       if (data.managedTeams.length > 0) {
@@ -56,7 +55,7 @@ export default function MarketScreen() {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [profile, selectedPosition, filterZone, filterSort, showAlert]);
+  }, [profile, filterZone, filterSort, showAlert]);
 
   useFocusEffect(
     useCallback(() => {
@@ -103,7 +102,7 @@ export default function MarketScreen() {
     }
   };
 
-   const handleContactPlayer = async (playerProfileId: string) => {
+  const handleContactPlayer = async (playerProfileId: string) => {
     if (!profile || !viewData) return;
 
     if (viewData.managedTeams.length === 0) {
@@ -111,7 +110,7 @@ export default function MarketScreen() {
       return;
     }
 
-    const teamId = activeCaptainTeamId ?? viewData.managedTeams[0].id;
+    const teamId = activeTeamId ?? activeCaptainTeamId ?? viewData.managedTeams[0].id;
 
     showLoader('Abriendo chat...');
     try {
@@ -207,19 +206,14 @@ export default function MarketScreen() {
           <View className="flex-1">
             <MarketTabs activeTab={activeTab} onTabChange={setActiveTab} />
           </View>
+          {/* Botón Filtro Cuadrado */}
           <TouchableOpacity
-            onPress={() => setShowFilterModal(true)}
             activeOpacity={0.8}
-            className="h-12 w-12 rounded-xl items-center justify-center border"
-            style={{
-              borderColor: hasActiveFilters ? '#53E076' : 'rgba(188,203,185,0.25)',
-              backgroundColor: hasActiveFilters ? 'rgba(83,224,118,0.12)' : '#1A1F1A',
-            }}
+            onPress={() => setShowFilterModal(true)}
+            className={`h-[48px] w-[48px] items-center justify-center rounded-xl border ${hasActiveFilters ? 'border-brand-primary/30 bg-brand-primary/10' : 'border-transparent bg-surface-low'
+              }`}
           >
-            <AppIcon family="material-community" name="filter-variant" size={21} color={hasActiveFilters ? '#53E076' : '#BCCBB9'} />
-            {hasActiveFilters && (
-              <View className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#53E076]" />
-            )}
+            <AppIcon family="material-community" name="tune" size={20} color={hasActiveFilters ? '#53E076' : '#BCCBB9'} />
           </TouchableOpacity>
         </View>
       </View>
@@ -231,7 +225,7 @@ export default function MarketScreen() {
           posts={posts}
           activeTab={activeTab}
           currentProfileId={profile?.id ?? ''}
-           onRefresh={onRefresh}
+          onRefresh={onRefresh}
           onContactTeam={handleContactTeam}
           onContactPlayer={handleContactPlayer}
           onViewTeamStats={handleViewTeamStats}

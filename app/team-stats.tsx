@@ -13,15 +13,24 @@ import { TeamHeader } from '@/components/team-stats/TeamHeader';
 import { TeamFormAndSeason } from '@/components/team-stats/TeamFormAndSeason';
 import { TeamRecentMatches } from '@/components/team-stats/TeamRecentMatches';
 import { TeamMembersSection } from '@/components/team-stats/TeamMembersSection';
+import { fetchTeamH2H } from '@/lib/team-h2h-data';
+import { TeamH2HSection } from '@/components/team-stats/TeamH2HSection';
+import { ChallengeButton } from '@/components/ranking/ChallengeButton';
+import { getActiveChallengeWithTeam } from '@/lib/challenge-actions';
+import type { H2HMatch } from '@/components/team-stats/types';
 
 export default function TeamStatsScreen() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { teamId } = useLocalSearchParams<{ teamId?: string }>();
+  const { teamId, viewerTeamId } = useLocalSearchParams<{ teamId: string, viewerTeamId?: string }>();
 
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<TeamStatsViewData | null>(null);
   const { showAlert, AlertComponent } = useCustomAlert();
+  const [h2hMatches, setH2hMatches] = useState<H2HMatch[]>([]);
+  const [alreadyChallenged, setAlreadyChallenged] = useState(false);
+
+  const isRival = Boolean(viewerTeamId && viewerTeamId !== teamId);
 
   const loadData = useCallback(async () => {
     if (!teamId) {
@@ -30,7 +39,17 @@ export default function TeamStatsScreen() {
     }
     try {
       setLoading(true);
-      setViewData(await fetchTeamStatsViewData(teamId, profile?.id ?? null));
+      const data = await fetchTeamStatsViewData(teamId, profile?.id ?? null);
+      setViewData(data);
+
+      if (isRival && viewerTeamId) {
+        const [h2h, challenged] = await Promise.all([
+          fetchTeamH2H(viewerTeamId, teamId).catch(() => []),
+          getActiveChallengeWithTeam(viewerTeamId, teamId).catch(() => false),
+        ]);
+        setH2hMatches(h2h as H2HMatch[]);
+        setAlreadyChallenged(challenged as boolean);
+      }
     } catch (error) {
       showAlert(
         'Error al cargar stats',
@@ -39,7 +58,7 @@ export default function TeamStatsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [teamId, profile?.id, showAlert]);
+  }, [teamId, viewerTeamId, isRival, profile?.id, showAlert]);
 
   useEffect(() => {
     void loadData();
@@ -67,16 +86,18 @@ export default function TeamStatsScreen() {
     <View className="flex-1 bg-surface-base">
       <GlobalHeader />
       <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 16, paddingBottom: 114 }}>
-        <View className="mb-2 flex-row items-center justify-between">
+
+        {/* Botón Volver */}
+        <View className="mb-4 flex-row items-center justify-between">
           <TouchableOpacity
             onPress={() => router.back()}
             activeOpacity={0.85}
             className="flex-row items-center gap-1 rounded-lg bg-surface-high px-3 py-2"
           >
-            <AppIcon family="material-icons" name="arrow-back" size={16} color="#BCCBB9" />
+            <AppIcon family="material-community" name="arrow-left" size={16} color="#BCCBB9" />
             <Text className="font-ui text-xs text-neutral-on-surface-variant">Volver</Text>
           </TouchableOpacity>
-          <Text className="font-display text-sm uppercase tracking-widest text-brand-primary">
+          <Text className="font-displayBlack text-xs uppercase tracking-widest text-brand-primary">
             Stats del Equipo
           </Text>
         </View>
@@ -84,25 +105,42 @@ export default function TeamStatsScreen() {
         <TeamHeader header={viewData.header} />
         <TeamFormAndSeason form={viewData.form} season={viewData.season} />
         <TeamRecentMatches matches={viewData.recentMatches} />
+
+        {isRival && (
+          <TeamH2HSection
+            h2h={h2hMatches}
+            myTeamId={viewerTeamId!}
+            opponentName={viewData.header.name}
+          />
+        )}
+
+        {/* Plantilla primero */}
         <TeamMembersSection members={viewData.members} />
 
-        {!viewData.isOwnTeam && (
-          <View className="mt-8">
-            <TouchableOpacity
-              activeOpacity={0.85}
-              disabled
-              className="flex-row items-center justify-center gap-2 rounded-xl border border-neutral-outline-variant/20 bg-surface-low py-4 opacity-40"
-            >
-              <AppIcon family="material-community" name="sword-cross" size={18} color="#BCCBB9" />
-              <Text className="font-display text-sm uppercase tracking-wide text-neutral-on-surface-variant">
-                Desafiar equipo
-              </Text>
-            </TouchableOpacity>
-            <Text className="mt-2 text-center font-ui text-xs text-neutral-on-surface-variant">
-              Próximamente disponible
-            </Text>
+        {/* Botones de desafío al final, después de ver la plantilla */}
+        {isRival && profile && viewerTeamId && (
+          <View className="mt-4 gap-3">
+            <ChallengeButton
+              challengerTeamId={viewerTeamId}
+              opponentTeamId={teamId}
+              matchType="RANKING"
+              createdBy={profile.id}
+              showAlert={showAlert}
+              alreadyChallenged={alreadyChallenged}
+              onSuccess={loadData}
+            />
+            <ChallengeButton
+              challengerTeamId={viewerTeamId}
+              opponentTeamId={teamId}
+              matchType="AMISTOSO"
+              createdBy={profile.id}
+              showAlert={showAlert}
+              alreadyChallenged={alreadyChallenged}
+              onSuccess={loadData}
+            />
           </View>
         )}
+
       </ScrollView>
       {AlertComponent}
     </View>
