@@ -42,9 +42,13 @@ export default function ChallengesInboxScreen() {
     async function handleAccept(c: ChallengeInboxEntry) {
         try {
             setActionLoading(c.challengeId);
-            await acceptChallengeWithNotification(c.challengeId, c.opponentTeamId);
-            showAlert('¡Listo!', 'Desafío aceptado con éxito.');
+            const { matchId } = await acceptChallengeWithNotification(c.challengeId, c.opponentTeamId);
             await loadInbox();
+            showAlert(
+                '¡Partido creado!',
+                'El desafío fue aceptado. Ya tienen un partido en estado Pendiente.',
+                () => router.push({ pathname: '/match-detail' as never, params: { matchId } }),
+            );
         } catch (error: any) {
             showAlert('Error', error.message || 'No se pudo aceptar el desafío.');
         } finally {

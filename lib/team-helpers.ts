@@ -47,7 +47,8 @@ export function canManageMember(currentUserRole: TeamRole | null, memberRole: Te
 
 export function allowedRolesToAssign(currentUserRole: TeamRole | null): TeamRole[] {
   if (currentUserRole === 'CAPITAN') {
-    return ['JUGADOR', 'SUBCAPITAN', 'DIRECTOR_TECNICO'];
+    // CAPITAN puede asignar su propio rol a otro (ceder capitanía, quedando como SUBCAPITÁN)
+    return ['CAPITAN', 'SUBCAPITAN', 'JUGADOR', 'DIRECTOR_TECNICO'];
   }
   if (currentUserRole === 'SUBCAPITAN') {
     return ['JUGADOR', 'DIRECTOR_TECNICO'];

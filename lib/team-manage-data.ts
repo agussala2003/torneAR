@@ -150,7 +150,7 @@ export async function updateMemberRole(
 
   await supabase.from('notifications').insert({
     profile_id: profileId,
-    type: 'MENSAJE_NUEVO',
+    type: 'ROL_ACTUALIZADO',
     title: 'Rol de equipo actualizado',
     body: `Tu rol en el equipo ${team.name} ahora es ${getTeamRoleLabel(role)}.`,
     data: { team_id: teamId },
@@ -158,8 +158,8 @@ export async function updateMemberRole(
 }
 
 export async function removeMember(
-  teamId: string, 
-  profileId: string, 
+  teamId: string,
+  profileId: string,
   team: { id: string; name: string },
   pushToken?: string | null
 ): Promise<void> {
@@ -181,7 +181,7 @@ export async function removeMember(
 
   await supabase.from('notifications').insert({
     profile_id: profileId,
-    type: 'MENSAJE_NUEVO',
+    type: 'EXPULSADO_EQUIPO',
     title: 'Eliminado del equipo',
     body: `Fuiste removido del equipo ${team.name}.`,
     data: { team_id: teamId },
@@ -198,9 +198,44 @@ export async function leaveTeam(teamId: string, profileId: string): Promise<void
   if (error) throw error;
 }
 
+// Transfiere la capitanía y deja al capitán actual en el equipo como SUBCAPITÁN.
+// Usar cuando el capitán cede el rol sin abandonar el equipo.
+export async function grantCaptainRole(
+  teamId: string,
+  currentCaptainId: string,
+  newCaptainId: string,
+  newCaptainPreviousRole: TeamRole
+): Promise<void> {
+  const { error: promoteError } = await supabase
+    .from('team_members')
+    .update({ role: 'CAPITAN' })
+    .eq('team_id', teamId)
+    .eq('profile_id', newCaptainId);
+
+  if (promoteError) throw promoteError;
+
+  const { error: demoteError } = await supabase
+    .from('team_members')
+    .update({ role: 'SUBCAPITAN' })
+    .eq('team_id', teamId)
+    .eq('profile_id', currentCaptainId);
+
+  if (demoteError) {
+    // Rollback: restaurar rol previo del nuevo capitán
+    await supabase
+      .from('team_members')
+      .update({ role: newCaptainPreviousRole })
+      .eq('team_id', teamId)
+      .eq('profile_id', newCaptainId);
+    throw demoteError;
+  }
+}
+
+// Transfiere la capitanía Y el capitán actual abandona el equipo.
+// Usar cuando el capitán quiere salir y hay otros miembros.
 export async function transferCaptain(
-  teamId: string, 
-  fromProfileId: string, 
+  teamId: string,
+  fromProfileId: string,
   toProfileId: string,
   newCaptainPreviousRole: TeamRole
 ): Promise<void> {
@@ -226,4 +261,15 @@ export async function transferCaptain(
       .eq('profile_id', toProfileId);
     throw leaveError;
   }
+}
+
+// Elimina el equipo completo. Solo debe llamarse cuando el capitán es el último miembro.
+// team_members tiene ON DELETE CASCADE, por lo que se eliminan todos los registros relacionados.
+export async function deleteTeam(teamId: string): Promise<void> {
+  const { error } = await supabase
+    .from('teams')
+    .delete()
+    .eq('id', teamId);
+
+  if (error) throw error;
 }

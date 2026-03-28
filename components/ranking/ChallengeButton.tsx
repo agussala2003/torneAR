@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
-import { sendChallenge } from '@/lib/challenge-actions';
+import { sendChallenge, validateRankingChallenge } from '@/lib/challenge-actions';
 
 interface Props {
     challengerTeamId: string;
@@ -14,9 +14,34 @@ interface Props {
 
 export function ChallengeButton({ challengerTeamId, opponentTeamId, matchType, createdBy, showAlert, onSuccess, alreadyChallenged }: Props) {
     const [loading, setLoading] = useState(false);
+    const [validating, setValidating] = useState(false);
     const [confirming, setConfirming] = useState(false);
+    const [eloDiffWarning, setEloDiffWarning] = useState(false);
 
     const isRanking = matchType === 'RANKING';
+
+    async function handleInitiate() {
+        if (isRanking) {
+            // Validar restricciones de ranking antes de mostrar confirmación
+            try {
+                setValidating(true);
+                const result = await validateRankingChallenge(challengerTeamId, opponentTeamId);
+                if (!result.canChallenge) {
+                    showAlert('No se puede desafiar', result.errorMessage ?? 'Este desafío no está permitido.');
+                    return;
+                }
+                setEloDiffWarning(result.eloDiffWarning);
+                setConfirming(true);
+            } catch {
+                showAlert('Error', 'No se pudo verificar las condiciones del desafío.');
+            } finally {
+                setValidating(false);
+            }
+        } else {
+            setEloDiffWarning(false);
+            setConfirming(true);
+        }
+    }
 
     async function handleConfirm() {
         setConfirming(false);
@@ -44,9 +69,16 @@ export function ChallengeButton({ challengerTeamId, opponentTeamId, matchType, c
     if (confirming) {
         return (
             <View className={`rounded-xl ${isRanking ? 'bg-brand-primary/10 border border-brand-primary/30' : 'border border-info-secondary/20 bg-transparent'} px-4 py-3`}>
-                <Text className="mb-3 text-center font-ui text-xs text-neutral-on-surface-variant">
+                <Text className="mb-2 text-center font-ui text-xs text-neutral-on-surface-variant">
                     ¿Confirmar desafío {isRanking ? 'por el ranking' : 'amistoso'}?
                 </Text>
+                {eloDiffWarning && (
+                    <View className="mb-3 rounded-lg bg-warning-tertiary/10 px-3 py-2">
+                        <Text className="text-center font-ui text-[10px] text-warning-tertiary">
+                            ⚠️ Diferencia de rating {'>'} 400 pts. Bajo impacto en el ranking.
+                        </Text>
+                    </View>
+                )}
                 <View className="flex-row gap-2">
                     <TouchableOpacity
                         activeOpacity={0.7}
@@ -72,11 +104,11 @@ export function ChallengeButton({ challengerTeamId, opponentTeamId, matchType, c
     return (
         <TouchableOpacity
             activeOpacity={0.8}
-            disabled={loading}
-            onPress={() => setConfirming(true)}
+            disabled={loading || validating}
+            onPress={handleInitiate}
             className={`items-center rounded-xl py-3 ${isRanking ? 'bg-brand-primary' : 'border border-info-secondary/30 bg-transparent'}`}
         >
-            {loading ? (
+            {loading || validating ? (
                 <ActivityIndicator color={isRanking ? '#131313' : '#8CCDFF'} size="small" />
             ) : (
                 <Text className={`font-displayBlack uppercase tracking-widest ${isRanking ? 'text-[13px] text-surface-base' : 'text-[12px] text-info-secondary'}`}>

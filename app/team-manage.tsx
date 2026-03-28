@@ -21,16 +21,18 @@ import { TeamManagePendingRequests } from '@/components/team-manage/TeamManagePe
 import { TeamManageHistoryRequests } from '@/components/team-manage/TeamManageHistoryRequests';
 import { TeamMembersList } from '@/components/team-manage/TeamMembersList';
 import { TeamManageViewData, TeamMemberRow, TeamJoinRequestRow } from '@/components/team-manage/types';
-import { 
-  fetchTeamManageViewData, 
-  uploadTeamShield, 
-  updateTeam, 
-  acceptJoinRequest, 
-  rejectJoinRequest, 
-  updateMemberRole, 
-  removeMember, 
-  leaveTeam, 
-  transferCaptain 
+import {
+  fetchTeamManageViewData,
+  uploadTeamShield,
+  updateTeam,
+  acceptJoinRequest,
+  rejectJoinRequest,
+  updateMemberRole,
+  removeMember,
+  leaveTeam,
+  transferCaptain,
+  grantCaptainRole,
+  deleteTeam,
 } from '@/lib/team-manage-data';
 
 export default function TeamManageScreen() {
@@ -80,6 +82,7 @@ export default function TeamManageScreen() {
   const [transferCaptainToProfileId, setTransferCaptainToProfileId] = useState<string | null>(null);
 
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+  const [showDeleteTeamModal, setShowDeleteTeamModal] = useState(false);
 
   const myRole = useMemo(() => {
     if (!profile) return null;
@@ -265,22 +268,31 @@ export default function TeamManageScreen() {
   };
 
   const handleConfirmRoleChange = async () => {
-    if (!teamId || !memberForRoleUpdate || !team) return;
+    if (!teamId || !memberForRoleUpdate || !team || !profile) return;
     try {
       setProcessingMemberId(memberForRoleUpdate.profile_id);
-      
-      await updateMemberRole(
-        teamId, 
-        memberForRoleUpdate.profile_id, 
-        selectedRoleToAssign, 
-        { id: team.id, name: team.name }, 
-        memberForRoleUpdate.profiles?.expo_push_token
-      );
 
-      await loadTeamData();
-      setShowRoleModal(false);
-      setMemberForRoleUpdate(null);
-      showAlert('Rol actualizado', `Nuevo rol: ${getTeamRoleLabel(selectedRoleToAssign)}.`);
+      if (selectedRoleToAssign === 'CAPITAN') {
+        // Ceder capitanía: el capitán actual queda como SUBCAPITÁN
+        await grantCaptainRole(teamId, profile.id, memberForRoleUpdate.profile_id, memberForRoleUpdate.role);
+        await loadTeamData();
+        if (profile?.id) await fetchMyTeams(profile.id);
+        setShowRoleModal(false);
+        setMemberForRoleUpdate(null);
+        showAlert('Capitanía cedida', `${memberForRoleUpdate.profiles?.full_name ?? 'El jugador'} es el nuevo Capitán. Vos quedás como Subcapitán.`);
+      } else {
+        await updateMemberRole(
+          teamId,
+          memberForRoleUpdate.profile_id,
+          selectedRoleToAssign,
+          { id: team.id, name: team.name },
+          memberForRoleUpdate.profiles?.expo_push_token
+        );
+        await loadTeamData();
+        setShowRoleModal(false);
+        setMemberForRoleUpdate(null);
+        showAlert('Rol actualizado', `Nuevo rol: ${getTeamRoleLabel(selectedRoleToAssign)}.`);
+      }
     } catch (error) {
       showAlert('Error al cambiar rol', getGenericSupabaseErrorMessage(error, 'No se pudo actualizar el rol del miembro.'));
     } finally {
@@ -344,7 +356,8 @@ export default function TeamManageScreen() {
     if (!myRole) return;
     if (myRole === 'CAPITAN') {
       if (transferableCaptainCandidates.length === 0) {
-        showAlert('No se puede abandonar', 'Necesitas al menos otro miembro para transferir la capitania y salir.');
+        // Capitán es el único miembro → ofrecer eliminar el equipo
+        setShowDeleteTeamModal(true);
         return;
       }
       setTransferCaptainToProfileId((current) => current ?? transferableCaptainCandidates[0].profile_id);
@@ -352,6 +365,23 @@ export default function TeamManageScreen() {
       return;
     }
     setShowLeaveConfirmModal(true);
+  };
+
+  const handleConfirmDeleteTeam = async () => {
+    if (!teamId || !profile) return;
+    try {
+      setProcessingMemberId(profile.id);
+      await deleteTeam(teamId);
+      setShowDeleteTeamModal(false);
+      if (profile?.id) await fetchMyTeams(profile.id);
+      showAlert('Equipo eliminado', 'El equipo fue eliminado correctamente.', () => {
+        router.replace('/(tabs)/profile');
+      });
+    } catch (error) {
+      showAlert('Error al eliminar', getGenericSupabaseErrorMessage(error, 'No se pudo eliminar el equipo.'));
+    } finally {
+      setProcessingMemberId(null);
+    }
   };
 
   const handleConfirmTransferCaptainAndLeave = async () => {
@@ -622,6 +652,13 @@ export default function TeamManageScreen() {
                     );
                   })}
                 </View>
+                {selectedRoleToAssign === 'CAPITAN' && (
+                  <View className="mt-3 rounded-lg bg-warning-tertiary/10 px-3 py-2.5">
+                    <Text className="font-ui text-[11px] text-warning-tertiary">
+                      ⚠️ Cederás la capitanía y quedarás automáticamente como Subcapitán.
+                    </Text>
+                  </View>
+                )}
                 <View className="mt-5 flex-row gap-2">
                   <TouchableOpacity activeOpacity={0.9} onPress={() => setShowRoleModal(false)} className="flex-1 items-center rounded-lg bg-surface-low py-3">
                     <Text className="font-display text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">Cancelar</Text>
@@ -704,6 +741,36 @@ export default function TeamManageScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity activeOpacity={0.9} disabled={processingMemberId === profile?.id} onPress={handleConfirmLeaveTeam} className={`flex-1 items-center rounded-lg py-3 ${processingMemberId === profile?.id ? 'bg-danger-error/35' : 'bg-danger-error/80'}`}>
                     {processingMemberId === profile?.id ? <ActivityIndicator size="small" color="#1A0E0D" /> : <Text className="font-display text-[11px] uppercase tracking-wide text-[#1A0E0D]">Abandonar</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      <Modal transparent animationType="fade" visible={showDeleteTeamModal} onRequestClose={() => setShowDeleteTeamModal(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowDeleteTeamModal(false)}>
+          <View className="flex-1 items-center justify-center bg-black/80 px-6">
+            <TouchableWithoutFeedback>
+              <View className="w-full max-w-sm rounded-2xl border border-neutral-outline-variant/15 bg-surface-high p-5">
+                <Text className="font-display mb-2 text-lg text-neutral-on-surface">Eliminar equipo</Text>
+                <Text className="font-ui text-sm text-neutral-on-surface-variant">
+                  Sos el único miembro. Si eliminás el equipo, se perderán todos sus datos permanentemente.
+                </Text>
+                <View className="mt-5 flex-row gap-2">
+                  <TouchableOpacity activeOpacity={0.9} onPress={() => setShowDeleteTeamModal(false)} className="flex-1 items-center rounded-lg bg-surface-low py-3">
+                    <Text className="font-display text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    disabled={processingMemberId === profile?.id}
+                    onPress={handleConfirmDeleteTeam}
+                    className={`flex-1 items-center rounded-lg py-3 ${processingMemberId === profile?.id ? 'bg-danger-error/35' : 'bg-danger-error/80'}`}
+                  >
+                    {processingMemberId === profile?.id
+                      ? <ActivityIndicator size="small" color="#1A0E0D" />
+                      : <Text className="font-display text-[11px] uppercase tracking-wide text-[#1A0E0D]">Eliminar</Text>}
                   </TouchableOpacity>
                 </View>
               </View>

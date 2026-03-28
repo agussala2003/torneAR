@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import type {
     RankingFiltersState, RankingTeamEntry, RivalTeamEntry,
     PlayerLeaderboardEntry, RankingViewData, LeaderboardStat
@@ -10,7 +11,7 @@ function mapToRankingTeamEntry(row: any, userTeamIds: string[]): RankingTeamEntr
         rankPosition: Number(row.rank_position),
         teamId: row.team_id,
         teamName: row.team_name,
-        shieldUrl: row.shield_url,
+        shieldUrl: row.shield_url ? getSupabaseStorageUrl('shields', row.shield_url) : null,
         zone: row.zone,
         category: row.category,
         preferredFormat: row.preferred_format,
