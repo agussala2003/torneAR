@@ -42,3 +42,20 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
+
+// ─── Typed RPC helper ─────────────────────────────────────────────────────────
+// Supabase generates types only for RPCs present in types/supabase.ts at build
+// time. New RPCs added after the last `supabase gen types` run are not yet
+// reflected in the generated types and would cause TS errors if called via the
+// typed `supabase.rpc()` overload.
+//
+// This helper casts to a minimally-typed client so callers can invoke any RPC
+// by name without using `any`. Regenerate `types/supabase.ts` (Item 11 follow-up)
+// to eventually remove the need for this cast entirely.
+type UntypedRpcClient = {
+  rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+};
+
+export function supabaseRpc(fn: string, args: Record<string, unknown>) {
+  return (supabase as unknown as UntypedRpcClient).rpc(fn, args);
+}

@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
+import * as Location from 'expo-location';
 import { useTeamStore } from '@/stores/teamStore';
+import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
-import { fetchMatchDetailViewData } from '@/lib/match-detail-data';
+import { fetchMatchDetailViewData, fetchDisputeState } from '@/lib/match-detail-data';
+import type { DisputeState } from '@/lib/match-detail-data';
 import * as Clipboard from 'expo-clipboard';
 import {
   submitProposal,
@@ -15,6 +18,8 @@ import {
   doCheckin,
   requestCancellation,
   claimWo,
+  submitDisputeVote,
+  resolveMatchDispute,
 } from '@/lib/match-actions';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -27,6 +32,7 @@ import { ProposalModal } from '@/components/matches/ProposalModal';
 import { ResultModal } from '@/components/matches/ResultModal';
 import { CancellationModal } from '@/components/matches/CancellationModal';
 import { WoModal } from '@/components/matches/WoModal';
+import { DisputeSection } from '@/components/matches/DisputeSection';
 import type { MatchDetailViewData, MatchProposalFormData } from '@/components/matches/types';
 
 export default function MatchDetailScreen() {
@@ -38,11 +44,13 @@ export default function MatchDetailScreen() {
   }>();
   const { activeTeamId } = useTeamStore();
   const myTeamId = paramTeamId ?? activeTeamId ?? '';
+  const { profile } = useAuth();
 
   const { showAlert, AlertComponent } = useCustomAlert();
 
   const [loading, setLoading] = useState(true);
   const [match, setMatch] = useState<MatchDetailViewData | null>(null);
+  const [disputeState, setDisputeState] = useState<DisputeState | null>(null);
 
   // Modal visibility state
   const [showProposalModal, setShowProposalModal] = useState(false);
@@ -59,12 +67,18 @@ export default function MatchDetailScreen() {
       setLoading(true);
       const data = await fetchMatchDetailViewData(matchId, myTeamId);
       setMatch(data);
+      if (data.status === 'EN_DISPUTA' && profile?.id) {
+        const dispute = await fetchDisputeState(matchId, profile.id, data.teamA.id, data.teamB.id);
+        setDisputeState(dispute);
+      } else {
+        setDisputeState(null);
+      }
     } catch (err) {
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [matchId, myTeamId, showAlert]);
+  }, [matchId, myTeamId, profile?.id, showAlert]);
 
   useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
 
@@ -119,8 +133,51 @@ export default function MatchDetailScreen() {
   async function handleCheckin() {
     if (!match) return;
     try {
-      await doCheckin(match.id, myTeamId);
+      // Request location permission and get coords for geofence validation
+      let coords: { lat: number; lng: number } | undefined;
+      if (match.venueId) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          showAlert(
+            'Permiso requerido',
+            'Para hacer check-in necesitamos acceder a tu ubicación y verificar que estás en la cancha.',
+          );
+          return;
+        }
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+      }
+
+      await doCheckin(match.id, myTeamId, coords);
       showAlert('¡Check-in realizado!', 'Marcaste tu llegada al partido.', () => void loadData());
+    } catch (err) {
+      showAlert('Error', getGenericSupabaseErrorMessage(err));
+    }
+  }
+
+  async function handleVoteSubmit(teamId: string) {
+    if (!match) return;
+    try {
+      await submitDisputeVote(match.id, teamId);
+      showAlert('¡Voto registrado!', 'Tu voto fue enviado correctamente.', () => void loadData());
+    } catch (err) {
+      showAlert('Error', getGenericSupabaseErrorMessage(err));
+    }
+  }
+
+  async function handleDisputeResolve() {
+    if (!match) return;
+    try {
+      const result = await resolveMatchDispute(match.id);
+      const winnerName =
+        result.winnerTeamId === match.teamA.id ? match.teamA.name : match.teamB.name;
+      const method =
+        result.resolutionMethod === 'votes' ? 'por votación' : 'por Fair Play Score';
+      showAlert(
+        '¡Disputa resuelta!',
+        `Ganó ${winnerName} ${method}. El partido pasó a FINALIZADO.`,
+        () => void loadData(),
+      );
     } catch (err) {
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
@@ -303,17 +360,16 @@ export default function MatchDetailScreen() {
         {/* ─── EN_DISPUTA ─── */}
         {status === 'EN_DISPUTA' && (
           <>
-            <View className="mt-4 rounded-2xl bg-warning-tertiary/10 p-4">
-              <View className="mb-2 flex-row items-center gap-2">
-                <AppIcon family="material-community" name="alert" size={18} color="#FABD32" />
-                <Text className="font-uiBold text-sm text-warning-tertiary">Resultado en disputa</Text>
-              </View>
-              <Text className="font-ui text-sm leading-5 text-neutral-on-surface-variant">
-                Los resultados cargados por ambos equipos no coinciden. Un administrador revisará
-                el caso y resolverá la disputa.
-              </Text>
-            </View>
             <ResultSection match={match} />
+            {profile ? (
+              <DisputeSection
+                match={match}
+                profileId={profile.id}
+                disputeState={disputeState}
+                onVote={(teamId) => void handleVoteSubmit(teamId)}
+                onResolve={() => void handleDisputeResolve()}
+              />
+            ) : null}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
             />

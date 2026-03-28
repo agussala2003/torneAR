@@ -124,7 +124,6 @@ export default function TeamStatsScreen() {
               challengerTeamId={viewerTeamId}
               opponentTeamId={teamId}
               matchType="RANKING"
-              createdBy={profile.id}
               showAlert={showAlert}
               alreadyChallenged={alreadyChallenged}
               onSuccess={loadData}
@@ -133,7 +132,6 @@ export default function TeamStatsScreen() {
               challengerTeamId={viewerTeamId}
               opponentTeamId={teamId}
               matchType="AMISTOSO"
-              createdBy={profile.id}
               showAlert={showAlert}
               alreadyChallenged={alreadyChallenged}
               onSuccess={loadData}

@@ -10,7 +10,10 @@ import type {
   ProfileSnippet,
   WoClaimEntry,
   CancellationRequestEntry,
+  DisputeState,
 } from '@/components/matches/types';
+
+export type { DisputeState };
 import type { Database } from '@/types/supabase';
 
 type MatchStatus = Database['public']['Enums']['match_status'];
@@ -167,6 +170,32 @@ function mapResult(raw: RawResult): MatchResultEntry {
     submittedAt: raw.submitted_at,
     scorers,
     mvp,
+  };
+}
+
+// Rows returned by a direct select on match_dispute_votes (not in generated types yet)
+type DisputeVoteRow = { voted_team_id: string; profile_id: string };
+
+export async function fetchDisputeState(
+  matchId: string,
+  profileId: string,
+  teamAId: string,
+  teamBId: string,
+): Promise<DisputeState> {
+  const { data, error } = await supabase
+    .from('match_dispute_votes' as Parameters<typeof supabase.from>[0])
+    .select('voted_team_id, profile_id')
+    .eq('match_id', matchId);
+  if (error) throw error;
+
+  const rows = (data ?? []) as DisputeVoteRow[];
+  const myRow = rows.find((r) => r.profile_id === profileId);
+
+  return {
+    votesForTeamA: rows.filter((r) => r.voted_team_id === teamAId).length,
+    votesForTeamB: rows.filter((r) => r.voted_team_id === teamBId).length,
+    hasVoted: myRow !== undefined,
+    votedForTeamId: myRow?.voted_team_id ?? null,
   };
 }
 

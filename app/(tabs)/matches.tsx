@@ -3,6 +3,7 @@ import { ScrollView, Text, View, TouchableOpacity } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { GlobalHeader } from '@/components/GlobalHeader';
 import { GlobalLoader } from '@/components/GlobalLoader';
+import { AppIcon } from '@/components/ui/AppIcon';
 import { useTeamStore } from '@/stores/teamStore';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { fetchMatchesViewData } from '@/lib/matches-data';
@@ -10,6 +11,7 @@ import { acceptProposal, rejectProposal } from '@/lib/match-actions';
 import { MatchCard } from '@/components/matches/MatchCard';
 import { LiveMatchBanner } from '@/components/matches/LiveMatchBanner';
 import { MatchSectionHeader } from '@/components/matches/MatchSectionHeader';
+import { GuestJoinModal } from '@/components/matches/GuestJoinModal';
 import type { MatchesViewData } from '@/components/matches/types';
 
 export default function MatchesScreen() {
@@ -18,6 +20,7 @@ export default function MatchesScreen() {
 
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<MatchesViewData | null>(null);
+  const [showGuestModal, setShowGuestModal] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!activeTeamId) {
@@ -76,6 +79,19 @@ export default function MatchesScreen() {
   return (
     <View className="flex-1 bg-surface-base">
       <GlobalHeader />
+
+      {/* Guest join banner — always visible */}
+      <TouchableOpacity
+        onPress={() => setShowGuestModal(true)}
+        activeOpacity={0.8}
+        className="mx-4 mt-3 flex-row items-center gap-2 rounded-xl border border-brand-primary/20 bg-brand-primary/8 px-4 py-2.5"
+      >
+        <AppIcon family="material-community" name="ticket-confirmation-outline" size={16} color="#53E076" />
+        <Text className="font-uiBold flex-1 text-sm text-brand-primary">
+          ¿Te invitaron a un partido? Ingresá el código
+        </Text>
+        <AppIcon family="material-community" name="chevron-right" size={18} color="#53E076" />
+      </TouchableOpacity>
 
       {/* No team selected */}
       {!activeTeamId && (
@@ -188,6 +204,14 @@ export default function MatchesScreen() {
             )}
         </ScrollView>
       )}
+
+      <GuestJoinModal
+        visible={showGuestModal}
+        onClose={() => setShowGuestModal(false)}
+        onJoined={(matchId, myTeamId) =>
+          router.push({ pathname: '/match-detail' as never, params: { matchId, myTeamId } })
+        }
+      />
 
       {AlertComponent}
     </View>

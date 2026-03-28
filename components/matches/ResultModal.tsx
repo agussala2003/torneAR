@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
 import type { MatchResultFormData, MatchParticipantEntry } from '@/components/matches/types';
 
 interface Props {
@@ -59,18 +60,28 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
   const [scorers, setScorers] = useState<Record<string, number>>({});
   const [mvpId, setMvpId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   function setScorerGoals(profileId: string, goals: number) {
     setScorers((prev) => ({ ...prev, [profileId]: Math.max(0, goals) }));
   }
 
   async function handleSubmit() {
+    const scorerEntries = myParticipants
+      .filter((p) => (scorers[p.profileId] ?? 0) > 0)
+      .map((p) => ({ profileId: p.profileId, goals: scorers[p.profileId] ?? 0 }));
+
+    const totalScorerGoals = scorerEntries.reduce((sum, s) => sum + s.goals, 0);
+    if (totalScorerGoals > 0 && totalScorerGoals !== goalsScored) {
+      showAlert(
+        'Goles inconsistentes',
+        `Los goles de los anotadores suman ${totalScorerGoals} pero cargaste ${goalsScored} gol${goalsScored !== 1 ? 'es' : ''}. Revisá los goleadores.`,
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      const scorerEntries = myParticipants
-        .filter((p) => (scorers[p.profileId] ?? 0) > 0)
-        .map((p) => ({ profileId: p.profileId, goals: scorers[p.profileId] ?? 0 }));
-
       await onSubmit({
         goalsScored,
         goalsAgainst,
@@ -185,6 +196,7 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
           </ScrollView>
         </View>
       </View>
+      {AlertComponent}
     </Modal>
   );
 }

@@ -166,6 +166,15 @@ export interface MatchDetailViewData {
     cancellationRequest: CancellationRequestEntry | null;
 }
 
+// ─── Dispute voting ───────────────────────────────────────────────────────────
+
+export interface DisputeState {
+  votesForTeamA: number;
+  votesForTeamB: number;
+  hasVoted: boolean;
+  votedForTeamId: string | null;
+}
+
 // ─── Tab screen view data ─────────────────────────────────────────────────────
 
 export interface MatchesViewData {

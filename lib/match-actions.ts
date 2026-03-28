@@ -1,14 +1,5 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseRpc } from '@/lib/supabase';
 import type { MatchResultFormData, CancellationFormData, WoClaimFormData } from '@/components/matches/types';
-
-// Typed helper for RPCs not yet in generated types
-type AnyRpc = {
-  rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
-};
-
-function rpc(fn: string, args: Record<string, unknown>) {
-  return (supabase as unknown as AnyRpc).rpc(fn, args);
-}
 
 // ─── Proposal ────────────────────────────────────────────────────────────────
 
@@ -45,7 +36,7 @@ export async function submitProposal(
 }
 
 export async function acceptProposal(proposalId: string, matchId: string): Promise<void> {
-  const { error } = await rpc('confirm_match_proposal', {
+  const { error } = await supabaseRpc('confirm_match_proposal', {
     p_proposal_id: proposalId,
     p_match_id: matchId,
   });
@@ -72,10 +63,16 @@ export async function cancelProposal(proposalId: string): Promise<void> {
 // Stamps the team's arrival, marks the caller as result-loader, and flips the
 // match to EN_VIVO once both teams are checked in.
 
-export async function doCheckin(matchId: string, teamId: string): Promise<void> {
-  const { error } = await rpc('checkin_team', {
+export async function doCheckin(
+  matchId: string,
+  teamId: string,
+  coords?: { lat: number; lng: number },
+): Promise<void> {
+  const { error } = await supabaseRpc('checkin_team', {
     p_match_id: matchId,
     p_team_id: teamId,
+    p_lat: coords?.lat ?? null,
+    p_lng: coords?.lng ?? null,
   });
   if (error) throw error;
 }
@@ -114,7 +111,14 @@ export async function submitMatchResult(
     scorers: scorersJson,
     mvp_id: data.mvpProfileId ?? null,
   });
-  if (error) throw error;
+
+  if (error) {
+    // Código 23505 = unique_violation: el resultado ya fue enviado (UNIQUE match_id + team_id).
+    // Esto ocurre cuando el usuario reintenta tras un timeout de red donde el servidor sí
+    // procesó el INSERT. Es idempotente: el resultado ya está guardado correctamente.
+    if (error.code === '23505') return;
+    throw error;
+  }
 }
 
 // ─── Cancellation ─────────────────────────────────────────────────────────────
@@ -126,13 +130,60 @@ export async function requestCancellation(
   teamId: string,
   data: CancellationFormData,
 ): Promise<void> {
-  const { error } = await rpc('request_match_cancellation', {
+  const { error } = await supabaseRpc('request_match_cancellation', {
     p_match_id: matchId,
     p_team_id: teamId,
     p_reason: data.reason,
     p_notes: data.notes ?? null,
   });
   if (error) throw error;
+}
+
+// ─── Guest join ───────────────────────────────────────────────────────────────
+// SECURITY DEFINER RPC — any authenticated user can join via unique code.
+
+export interface GuestJoinResult {
+  matchId: string;
+  teamId: string;
+  teamSide: 'A' | 'B';
+  teamAName: string;
+  teamBName: string;
+}
+
+export async function joinMatchAsGuest(
+  uniqueCode: string,
+  teamSide: 'A' | 'B',
+): Promise<GuestJoinResult> {
+  const { data, error } = await supabaseRpc('join_match_as_guest', {
+    p_unique_code: uniqueCode,
+    p_team_side: teamSide,
+  });
+  if (error) throw error;
+  return data as GuestJoinResult;
+}
+
+// ─── Dispute ──────────────────────────────────────────────────────────────────
+
+export async function submitDisputeVote(matchId: string, votedTeamId: string): Promise<void> {
+  const { error } = await supabaseRpc('submit_dispute_vote', {
+    p_match_id: matchId,
+    p_voted_team_id: votedTeamId,
+  });
+  if (error) throw error;
+}
+
+export interface DisputeResolveResult {
+  winnerTeamId: string;
+  loserTeamId: string;
+  votesA: number;
+  votesB: number;
+  resolutionMethod: 'votes' | 'fair_play_score';
+}
+
+export async function resolveMatchDispute(matchId: string): Promise<DisputeResolveResult> {
+  const { data, error } = await supabaseRpc('resolve_match_dispute', { p_match_id: matchId });
+  if (error) throw error;
+  return data as DisputeResolveResult;
 }
 
 // ─── WO Claim ─────────────────────────────────────────────────────────────────
