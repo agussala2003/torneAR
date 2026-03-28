@@ -53,7 +53,7 @@ export function FilterModal({
       setLocalDays(selectedDays);
       setLocalSortBy(sortBy);
     }
-  }, [visible]);
+  }, [visible, zone, selectedDays, sortBy]);
 
   // Fetch zones once on mount
   useEffect(() => {

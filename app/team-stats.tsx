@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchTeamStatsViewData } from '@/lib/team-stats-api';
-import type { TeamStatsViewData } from '@/components/team-stats/types';
+import type { TeamStatsViewData, H2HMatch } from '@/components/team-stats/types';
 import { TeamHeader } from '@/components/team-stats/TeamHeader';
 import { TeamFormAndSeason } from '@/components/team-stats/TeamFormAndSeason';
 import { TeamRecentMatches } from '@/components/team-stats/TeamRecentMatches';
@@ -17,7 +17,6 @@ import { fetchTeamH2H } from '@/lib/team-h2h-data';
 import { TeamH2HSection } from '@/components/team-stats/TeamH2HSection';
 import { ChallengeButton } from '@/components/ranking/ChallengeButton';
 import { getActiveChallengeWithTeam } from '@/lib/challenge-actions';
-import type { H2HMatch } from '@/components/team-stats/types';
 
 export default function TeamStatsScreen() {
   const router = useRouter();

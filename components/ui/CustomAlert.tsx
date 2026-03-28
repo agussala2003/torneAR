@@ -1,14 +1,33 @@
-import React from 'react';
+import * as Haptics from 'expo-haptics';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
+
+export type AlertType = 'success' | 'error' | 'warning' | 'info';
 
 interface CustomAlertProps {
   visible: boolean;
   title: string;
   message: string;
   onClose: () => void;
+  type?: AlertType;
 }
 
-export default function CustomAlert({ visible, title, message, onClose }: CustomAlertProps) {
+export default function CustomAlert({ visible, title, message, onClose, type = 'info' }: CustomAlertProps) {
+  useEffect(() => {
+    if (!visible) return;
+    switch (type) {
+      case 'success':
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        break;
+      case 'error':
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        break;
+      case 'warning':
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        break;
+    }
+  }, [visible, type]);
+
   if (!visible) {
     return null;
   }

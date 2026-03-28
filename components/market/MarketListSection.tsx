@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, FlatList, Text, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, FlatList, Text, RefreshControl } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { MarketTeamCard, MarketPlayerCard } from '@/components/market/MarketCards';
+import { MarketCardSkeleton } from '@/components/market/MarketCardSkeleton';
 import { MarketTeamPost, MarketPlayerPost } from '@/lib/market-api';
 import { TabType } from './types';
 
@@ -36,8 +37,11 @@ export function MarketListSection({
 }: MarketListSectionProps) {
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color="#00E65B" />
+      <View style={{ paddingBottom: 100 }}>
+        <MarketCardSkeleton />
+        <MarketCardSkeleton />
+        <MarketCardSkeleton />
+        <MarketCardSkeleton />
       </View>
     );
   }

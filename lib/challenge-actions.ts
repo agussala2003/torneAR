@@ -9,9 +9,9 @@ type NotificationType = Database['public']['Enums']['notification_type'];
 type ChallengesInboxRow = {
   challenge_id: string;
   created_at: string;
-  status: string;
-  match_type: string;
-  direction: string;
+  status: 'ENVIADA' | 'ACEPTADA' | 'RECHAZADA' | 'CANCELADA';
+  match_type: 'RANKING' | 'AMISTOSO';
+  direction: 'ENVIADO' | 'RECIBIDO';
   opponent_team_id: string;
   opponent_team_name: string;
   opponent_shield_url: string | null;

@@ -22,7 +22,7 @@ export default function NotificationsScreen() {
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [openingNotificationId, setOpeningNotificationId] = useState<string | null>(null);
 
-  const notifications = viewData?.notifications ?? [];
+  const notifications = useMemo(() => viewData?.notifications ?? [], [viewData?.notifications]);
   const unreadCount = useMemo(() => notifications.filter((item) => !item.is_read).length, [notifications]);
 
   const loadNotificationsData = useCallback(async (showBaseLoader = true) => {

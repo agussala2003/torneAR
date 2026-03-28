@@ -53,9 +53,9 @@ export default function TeamManageScreen() {
   const [viewData, setViewData] = useState<TeamManageViewData | null>(null);
 
   const team = viewData?.team ?? null;
-  const members = viewData?.members ?? [];
-  const pendingRequests = viewData?.pendingRequests ?? [];
-  const historyRequests = viewData?.historyRequests ?? [];
+  const members = useMemo(() => viewData?.members ?? [], [viewData?.members]);
+  const pendingRequests = useMemo(() => viewData?.pendingRequests ?? [], [viewData?.pendingRequests]);
+  const historyRequests = useMemo(() => viewData?.historyRequests ?? [], [viewData?.historyRequests]);
 
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [processingMemberId, setProcessingMemberId] = useState<string | null>(null);
@@ -97,7 +97,7 @@ export default function TeamManageScreen() {
     return members.filter((member) => member.profile_id !== profile.id);
   }, [members, profile]);
 
-  const loadZoneOptions = async () => {
+  const loadZoneOptions = useCallback(async () => {
     try {
       setLoadingZones(true);
       const { data, error } = await supabase
@@ -113,7 +113,7 @@ export default function TeamManageScreen() {
     } finally {
       setLoadingZones(false);
     }
-  };
+  }, [editZone, team?.zone]);
 
   const loadTeamData = useCallback(async () => {
     if (!teamId) return;
@@ -136,7 +136,7 @@ export default function TeamManageScreen() {
     }, [loadTeamData])
   );
 
-  const handlePickShield = async () => {
+  const handlePickShield = useCallback(async () => {
     if (!team || !teamId || !canEditTeam) {
       showAlert('Sin permisos', 'Solo capitan y subcapitan pueden actualizar el escudo.');
       return;
@@ -173,9 +173,9 @@ export default function TeamManageScreen() {
     } finally {
       setUploadingShield(false);
     }
-  };
+  }, [team, teamId, canEditTeam, showAlert, loadTeamData]);
 
-  const openEditTeamModal = async () => {
+  const openEditTeamModal = useCallback(async () => {
     if (!team) return;
     if (!canEditTeam) {
       showAlert('Sin permisos', 'Solo capitan y subcapitan pueden editar los datos del equipo.');
@@ -188,9 +188,9 @@ export default function TeamManageScreen() {
     setEditFormat(team.preferred_format);
     setShowEditTeamModal(true);
     await loadZoneOptions();
-  };
+  }, [team, canEditTeam, showAlert, loadZoneOptions]);
 
-  const handleSaveTeam = async () => {
+  const handleSaveTeam = useCallback(async () => {
     if (!teamId) return;
 
     const sanitizedName = editName.trim();
@@ -222,9 +222,9 @@ export default function TeamManageScreen() {
     } finally {
       setSavingTeam(false);
     }
-  };
+  }, [teamId, editName, editZone, editCategory, editFormat, loadTeamData, showAlert]);
 
-  const handleApproveRequest = async (request: TeamJoinRequestRow) => {
+  const handleApproveRequest = useCallback(async (request: TeamJoinRequestRow) => {
     if (!teamId || !team) return;
     try {
       setProcessingRequestId(request.id);
@@ -239,9 +239,9 @@ export default function TeamManageScreen() {
     } finally {
       setProcessingRequestId(null);
     }
-  };
+  }, [teamId, team, profile, loadTeamData, fetchMyTeams, showAlert]);
 
-  const handleRejectRequest = async (request: TeamJoinRequestRow) => {
+  const handleRejectRequest = useCallback(async (request: TeamJoinRequestRow) => {
     try {
       setProcessingRequestId(request.id);
       await rejectJoinRequest(request.id);
@@ -253,7 +253,7 @@ export default function TeamManageScreen() {
     } finally {
       setProcessingRequestId(null);
     }
-  };
+  }, [loadTeamData, showAlert]);
 
   const openRoleModal = (member: TeamMemberRow, isSelf: boolean) => {
     if (!canManageMember(myRole, member.role, isSelf)) {
@@ -267,7 +267,7 @@ export default function TeamManageScreen() {
     setShowRoleModal(true);
   };
 
-  const handleConfirmRoleChange = async () => {
+  const handleConfirmRoleChange = useCallback(async () => {
     if (!teamId || !memberForRoleUpdate || !team || !profile) return;
     try {
       setProcessingMemberId(memberForRoleUpdate.profile_id);
@@ -298,7 +298,7 @@ export default function TeamManageScreen() {
     } finally {
       setProcessingMemberId(null);
     }
-  };
+  }, [teamId, memberForRoleUpdate, team, profile, selectedRoleToAssign, loadTeamData, fetchMyTeams, showAlert]);
 
   const askRemoveMember = (member: TeamMemberRow, isSelf: boolean) => {
     if (!canManageMember(myRole, member.role, isSelf)) {
@@ -309,7 +309,7 @@ export default function TeamManageScreen() {
     setShowRemoveConfirmModal(true);
   };
 
-  const handleConfirmRemoveMember = async () => {
+  const handleConfirmRemoveMember = useCallback(async () => {
     if (!teamId || !memberForRemove || !team) return;
     try {
       setProcessingMemberId(memberForRemove.profile_id);
@@ -329,9 +329,9 @@ export default function TeamManageScreen() {
     } finally {
       setProcessingMemberId(null);
     }
-  };
+  }, [teamId, memberForRemove, team, loadTeamData, showAlert]);
 
-  const handleConfirmLeaveTeam = async () => {
+  const handleConfirmLeaveTeam = useCallback(async () => {
     if (!teamId || !profile) return;
     if (myRole === 'CAPITAN') {
       showAlert('Accion no disponible', 'El capitan no puede abandonar el equipo sin transferir la capitania.');
@@ -350,7 +350,7 @@ export default function TeamManageScreen() {
     } finally {
       setProcessingMemberId(null);
     }
-  };
+  }, [teamId, profile, myRole, router, showAlert]);
 
   const startLeaveFlow = () => {
     if (!myRole) return;
@@ -367,7 +367,7 @@ export default function TeamManageScreen() {
     setShowLeaveConfirmModal(true);
   };
 
-  const handleConfirmDeleteTeam = async () => {
+  const handleConfirmDeleteTeam = useCallback(async () => {
     if (!teamId || !profile) return;
     try {
       setProcessingMemberId(profile.id);
@@ -382,9 +382,9 @@ export default function TeamManageScreen() {
     } finally {
       setProcessingMemberId(null);
     }
-  };
+  }, [teamId, profile, fetchMyTeams, router, showAlert]);
 
-  const handleConfirmTransferCaptainAndLeave = async () => {
+  const handleConfirmTransferCaptainAndLeave = useCallback(async () => {
     if (!teamId || !profile || !transferCaptainToProfileId) return;
     const newCaptain = transferableCaptainCandidates.find((m) => m.profile_id === transferCaptainToProfileId);
     if (!newCaptain) {
@@ -405,7 +405,7 @@ export default function TeamManageScreen() {
     } finally {
       setProcessingMemberId(null);
     }
-  };
+  }, [teamId, profile, transferCaptainToProfileId, transferableCaptainCandidates, router, showAlert]);
 
   const handleShareInvite = async () => {
     if (!team) return;

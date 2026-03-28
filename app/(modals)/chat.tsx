@@ -174,14 +174,6 @@ export default function MatchChatScreen() {
     const isTemp = item.id.startsWith('temp-');
 
     // Show which team sent the message
-    const senderTeamName = header
-      ? item.sender_team_id === header.myTeamId
-        ? null // my team — no need to label
-        : item.sender_team_id === (header.myTeamId === header.teamAName ? header.teamBName : header.teamBName)
-          ? null
-          : null
-      : null;
-
     const senderLabel = isMine
       ? null
       : item.sender_full_name

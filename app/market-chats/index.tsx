@@ -38,7 +38,7 @@ export default function MarketInboxScreen() {
     try {
       const inbox = await fetchInbox();
       setChats(inbox);
-    } catch (error) {
+    } catch {
       showAlert('Error', 'No se pudieron cargar los chats.');
     } finally {
       setIsLoading(false);

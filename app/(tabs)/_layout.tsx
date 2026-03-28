@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { Tabs } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -43,6 +44,7 @@ export default function TabLayout() {
             <AppIcon family="material-community" name="home-variant-outline" size={focused ? 24 : 22} color={color} />
           ),
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="ranking"
@@ -52,6 +54,7 @@ export default function TabLayout() {
             <AppIcon family="material-community" name="trophy-outline" size={focused ? 24 : 22} color={color} />
           ),
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="matches"
@@ -61,6 +64,7 @@ export default function TabLayout() {
             <AppIcon family="material-community" name="soccer" size={focused ? 24 : 22} color={color} />
           ),
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="market"
@@ -70,6 +74,7 @@ export default function TabLayout() {
             <AppIcon family="ionicons" name="storefront-outline" size={focused ? 24 : 22} color={color} />
           ),
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
       <Tabs.Screen
         name="profile"
@@ -79,6 +84,7 @@ export default function TabLayout() {
             <AppIcon family="material-community" name="account-outline" size={focused ? 24 : 22} color={color} />
           ),
         }}
+        listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
     </Tabs>
   );

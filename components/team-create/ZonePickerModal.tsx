@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, TouchableWithoutFeedback, Modal, FlatList, ActivityIndicator } from 'react-native';
-import { AppIcon } from '@/components/ui/AppIcon';
 
 interface ZonePickerModalProps {
   visible: boolean;

@@ -23,14 +23,12 @@ interface Props {
 export function GuestJoinModal({ visible, onClose, onJoined }: Props) {
   const [code, setCode] = useState('');
   const [teamSide, setTeamSide] = useState<'A' | 'B' | null>(null);
-  const [preview, setPreview] = useState<{ teamAName: string; teamBName: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const { showAlert, AlertComponent } = useCustomAlert();
 
   function handleClose() {
     setCode('');
     setTeamSide(null);
-    setPreview(null);
     onClose();
   }
 
@@ -48,7 +46,6 @@ export function GuestJoinModal({ visible, onClose, onJoined }: Props) {
     setLoading(true);
     try {
       const result = await joinMatchAsGuest(trimmed, teamSide);
-      setPreview({ teamAName: result.teamAName, teamBName: result.teamBName });
       handleClose();
       onJoined(result.matchId, result.teamId);
     } catch (err) {

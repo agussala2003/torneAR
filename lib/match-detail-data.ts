@@ -188,7 +188,7 @@ export async function fetchDisputeState(
     .eq('match_id', matchId);
   if (error) throw error;
 
-  const rows = (data ?? []) as DisputeVoteRow[];
+  const rows = (data ?? []) as unknown as DisputeVoteRow[];
   const myRow = rows.find((r) => r.profile_id === profileId);
 
   return {

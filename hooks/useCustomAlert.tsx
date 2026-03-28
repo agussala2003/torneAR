@@ -1,15 +1,17 @@
 import React, { useState, useCallback } from 'react';
-import CustomAlert from '@/components/ui/CustomAlert';
+import CustomAlert, { AlertType } from '@/components/ui/CustomAlert';
 
 export function useCustomAlert() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<AlertType>('info');
   const [onCloseCallback, setOnCloseCallback] = useState<(() => void) | null>(null);
 
-  const showAlert = useCallback((title: string, message: string, onClose?: () => void) => {
+  const showAlert = useCallback((title: string, message: string, onClose?: () => void, type: AlertType = 'info') => {
     setAlertTitle(title);
     setAlertMessage(message);
+    setAlertType(type);
     setAlertVisible(true);
     setOnCloseCallback(() => onClose ?? null);
   }, []);
@@ -28,6 +30,7 @@ export function useCustomAlert() {
       title={alertTitle}
       message={alertMessage}
       onClose={hideAlert}
+      type={alertType}
     />
   );
 

@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -42,7 +43,10 @@ export const PitchSelector = ({ value, onChange }: PitchSelectorProps) => {
           <TouchableOpacity
             key={pos.id}
             activeOpacity={0.9}
-            onPress={() => onChange(pos.id)}
+            onPress={() => {
+              if (pos.id !== value) Haptics.selectionAsync();
+              onChange(pos.id);
+            }}
             // SOLUCIÓN: Usamos ${isLast ? '' : 'border-b'} en lugar de last:border-b-0
             className={`flex-1 justify-center items-center z-10 border-neutral-outline-variant/30 ${isLast ? '' : 'border-b'}`}
           >

@@ -1,10 +1,9 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { ScrollView, Text, View, TouchableOpacity } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
 import { GlobalHeader } from '@/components/GlobalHeader';
-import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { supabase } from '@/lib/supabase';
@@ -13,6 +12,7 @@ import type { RankingFiltersState, RankingMode, LeaderboardStat, RankingTeamEntr
 
 import { RankingFilterModal } from '@/components/ranking/RankingFilterModal';
 import { RankingTable } from '@/components/ranking/RankingTable';
+import { RankingRowSkeleton } from '@/components/ranking/RankingRowSkeleton';
 import { RivalSearchBar } from '@/components/ranking/RivalSearchBar';
 import { RivalTeamCard } from '@/components/ranking/RivalTeamCard';
 import { PlayerLeaderboard } from '@/components/ranking/PlayerLeaderboard';
@@ -99,7 +99,7 @@ export default function RankingScreen() {
     } finally {
       setLoading(false);
     }
-  }, [profile, activeTeamId, showAlert]);
+  }, [profile, activeTeamId, showAlert, filters, myTeams, userTeamIds]);
 
   useFocusEffect(useCallback(() => { loadInitialData(); }, [loadInitialData]));
 
@@ -165,7 +165,6 @@ export default function RankingScreen() {
     filters.rivalesIdeales ? { label: '🎯 Ideales', accent: true } : null,
   ].filter(Boolean) as { label: string; accent: boolean }[];
 
-  if (loading && rankingEntries.length === 0) return <GlobalLoader label="Cargando ranking..." />;
 
   return (
     <View className="flex-1 bg-surface-base">
@@ -232,8 +231,14 @@ export default function RankingScreen() {
         {/* MODO RANKING */}
         {mode === 'RANKING' && (
           <>
-            <RankingTable entries={rankingEntries} onTeamPress={(id: string) => router.push({ pathname: '/team-stats', params: { teamId: id, viewerTeamId: activeTeamId || '' } })} />
-            <PlayerLeaderboard entries={leaderboardEntries} activeStat={leaderboardStat} onStatChange={handleStatChange} loading={leaderboardLoading} />
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => <RankingRowSkeleton key={i} />)
+            ) : (
+              <>
+                <RankingTable entries={rankingEntries} onTeamPress={(id: string) => router.push({ pathname: '/team-stats', params: { teamId: id, viewerTeamId: activeTeamId || '' } })} />
+                <PlayerLeaderboard entries={leaderboardEntries} activeStat={leaderboardStat} onStatChange={handleStatChange} loading={leaderboardLoading} />
+              </>
+            )}
           </>
         )}
 
@@ -243,7 +248,9 @@ export default function RankingScreen() {
             <RivalSearchBar value={searchQuery} onChangeText={(q) => handleSearch(q, filters)} />
 
             {searchLoading ? (
-              <ActivityIndicator color="#53E076" className="mt-8" />
+              <View className="mt-2">
+                {Array.from({ length: 5 }).map((_, i) => <RankingRowSkeleton key={i} />)}
+              </View>
             ) : searchResults.length === 0 ? (
               <Text className="mt-8 text-center font-ui text-sm text-neutral-on-surface-variant">
                 {searchQuery ? 'No se encontraron equipos con ese nombre o filtros.' : 'Escribí el nombre de un equipo para buscar.'}

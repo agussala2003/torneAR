@@ -1,5 +1,6 @@
 import { Text, TouchableOpacity, View } from 'react-native';
 import { PlayerLeaderboardRow } from './PlayerLeaderboardRow';
+import { RankingRowSkeleton } from './RankingRowSkeleton';
 import type { PlayerLeaderboardEntry, LeaderboardStat } from './types';
 
 const STAT_TABS: { key: LeaderboardStat; label: string; valueLabel: string }[] = [
@@ -47,7 +48,7 @@ export function PlayerLeaderboard({ entries, activeStat, onStatChange, loading }
             </View>
 
             {loading ? (
-                <Text className="font-display text-base text-neutral-on-surface-variant text-center py-4">Cargando...</Text>
+                Array.from({ length: 5 }).map((_, i) => <RankingRowSkeleton key={i} />)
             ) : entries.length === 0 ? (
                 <Text className="font-display text-base text-neutral-on-surface-variant text-center py-4">Sin datos registrados.</Text>
             ) : (
