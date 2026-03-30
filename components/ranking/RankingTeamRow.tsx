@@ -1,4 +1,5 @@
 import { Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInRight } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
 import type { RankingTeamEntry } from './types';
@@ -6,18 +7,20 @@ import type { RankingTeamEntry } from './types';
 interface Props {
     entry: RankingTeamEntry;
     onPress: (teamId: string) => void;
+    index?: number;
 }
 
-export function RankingTeamRow({ entry, onPress }: Props) {
+export function RankingTeamRow({ entry, onPress, index = 0 }: Props) {
     const isTop3 = entry.rankPosition <= 3;
     const posColors = ['#FABD32', '#C0C0C0', '#CD7F32'] as const; // Oro, Plata, Bronce
     const posColor = isTop3 ? posColors[entry.rankPosition - 1] : '#869585';
 
     return (
+        <Animated.View entering={FadeInRight.delay(index * 50).springify()} style={{ marginBottom: 6 }}>
         <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => onPress(entry.teamId)}
-            className={`mb-1.5 flex-row items-center overflow-hidden rounded-xl px-3 py-3 ${entry.isMyTeam ? 'border border-brand-primary/20 bg-[#1e2a1e]' : 'bg-surface-container'
+            className={`flex-row items-center overflow-hidden rounded-xl px-3 py-3 ${entry.isMyTeam ? 'border border-brand-primary/20 bg-[#1e2a1e]' : 'bg-surface-container'
                 }`}
         >
             {/* Barra lateral de color (solo top 3 o mi equipo) */}
@@ -62,5 +65,6 @@ export function RankingTeamRow({ entry, onPress }: Props) {
 
             <AppIcon family="material-community" name="chevron-right" size={14} color="#869585" />
         </TouchableOpacity>
+        </Animated.View>
     );
 }

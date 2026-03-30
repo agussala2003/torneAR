@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import type { MatchCardEntry } from './types';
 import { MatchStatusBadge } from './MatchStatusBadge';
 import { TeamShield } from './TeamShield';
@@ -28,6 +29,7 @@ interface Props {
   onAcceptProposal?: (proposalId: string, matchId: string) => void;
   onRejectProposal?: (proposalId: string, matchId: string) => void;
   onLoadResult?: (matchId: string) => void;
+  index?: number;
 }
 
 export function MatchCard({
@@ -38,15 +40,17 @@ export function MatchCard({
   onAcceptProposal,
   onRejectProposal,
   onLoadResult,
+  index = 0,
 }: Props) {
   const isMyTeamA = entry.teamA.id === myTeamId;
   const isMyTeamB = entry.teamB.id === myTeamId;
 
   return (
+    <Animated.View entering={FadeInUp.delay(index * 60).springify()} style={{ marginBottom: 12 }}>
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => onPress(entry.id)}
-      className="mb-3 rounded-2xl bg-surface-container p-4"
+      className="rounded-2xl bg-surface-container p-4"
     >
       {/* Header */}
       <View className="mb-3 flex-row items-center gap-2">
@@ -111,5 +115,6 @@ export function MatchCard({
         onLoadResult={onLoadResult}
       />
     </TouchableOpacity>
+    </Animated.View>
   );
 }

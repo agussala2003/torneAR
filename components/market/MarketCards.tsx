@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ImageBackground } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -90,6 +91,7 @@ interface MarketTeamCardProps {
   complex?: string | null;
   isOwner: boolean;
   memberStatus?: 'own_team' | 'own_player';
+  index?: number;
    /** Called when the non-owner taps "Postularme". Not called for owners. */
   onPressAction?: () => void;
   /** Called when the user taps "Stats". */
@@ -99,7 +101,7 @@ interface MarketTeamCardProps {
 
 export function MarketTeamCard({
   postId, teamName, teamZone, matchZone, logoUrl, positionWanted, pitchType, description,
-  matchDate, matchTime, complex, isOwner, memberStatus, onPressAction, onPressStats, onDelete,
+  matchDate, matchTime, complex, isOwner, memberStatus, index = 0, onPressAction, onPressStats, onDelete,
 }: MarketTeamCardProps) {
   const isUrgent = isUrgentPost(matchDate);
   const cleanDescription = sanitizeMarketDescription(description);
@@ -110,7 +112,8 @@ export function MarketTeamCard({
   const shouldShowComplex = !!normalizedComplex && !/^no$/i.test(normalizedComplex);
 
   return (
-    <View className="rounded-xl overflow-hidden mb-4" style={{ backgroundColor: '#1C1C1C', opacity: memberStatus ? 0.5 : 1 }}>
+    <Animated.View entering={FadeInDown.delay(index * 60).springify()} style={{ marginBottom: 16 }}>
+    <View className="rounded-xl overflow-hidden" style={{ backgroundColor: '#1C1C1C', opacity: memberStatus ? 0.5 : 1 }}>
       {/* Image Header */}
       <ImageBackground
         source={CARD_IMAGES[imageIndexFromId(postId)]}
@@ -248,6 +251,7 @@ export function MarketTeamCard({
         </View>
       )}
     </View>
+    </Animated.View>
   );
 }
 
@@ -263,6 +267,7 @@ interface MarketPlayerCardProps {
   description?: string | null;
   isOwner: boolean;
   memberStatus?: 'own_team' | 'own_player';
+  index?: number;
    /** Called when the non-owner taps the contact button. Not called for owners. */
   onPressAction?: () => void;
   /** Called when the user taps "Stats". */
@@ -272,14 +277,15 @@ interface MarketPlayerCardProps {
 
 export function MarketPlayerCard({
   postId, playerName, avatarUrl, username, position, postType,
-  description, isOwner, memberStatus, onPressAction, onPressStats, onDelete,
+  description, isOwner, memberStatus, index = 0, onPressAction, onPressStats, onDelete,
 }: MarketPlayerCardProps) {
   const subtitle = postType === 'BUSCA_EQUIPO' ? 'Busca Equipo' : 'Busca Partido';
   const cleanDescription = sanitizeMarketDescription(description);
   const avatarImage = resolveAvatarUrl(avatarUrl);
 
   return (
-    <View className="rounded-xl overflow-hidden mb-4" style={{ backgroundColor: '#1C1C1C', opacity: memberStatus ? 0.5 : 1 }}>
+    <Animated.View entering={FadeInDown.delay(index * 60).springify()} style={{ marginBottom: 16 }}>
+    <View className="rounded-xl overflow-hidden" style={{ backgroundColor: '#1C1C1C', opacity: memberStatus ? 0.5 : 1 }}>
       {/* Image Header */}
       <ImageBackground
         source={CARD_IMAGES[imageIndexFromId(postId)]}
@@ -372,5 +378,6 @@ export function MarketPlayerCard({
         </View>
       )}
     </View>
+    </Animated.View>
   );
 }

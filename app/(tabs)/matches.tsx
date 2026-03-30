@@ -156,10 +156,11 @@ export default function MatchesScreen() {
                 title="Próximos"
                 count={viewData?.upcomingMatches.length}
               />
-              {viewData?.upcomingMatches.map((entry) => (
+              {viewData?.upcomingMatches.map((entry, index) => (
                 <MatchCard
                   key={entry.id}
                   entry={entry}
+                  index={index}
                   myTeamId={activeTeamId}
                   onPress={handleCardPress}
                   onProposePress={handleProposePress}
@@ -178,10 +179,11 @@ export default function MatchesScreen() {
                 title="Historial"
                 count={viewData?.historyMatches.length}
               />
-              {viewData?.historyMatches.map((entry) => (
+              {viewData?.historyMatches.map((entry, index) => (
                 <MatchCard
                   key={entry.id}
                   entry={entry}
+                  index={index}
                   myTeamId={activeTeamId}
                   onPress={handleCardPress}
                 />

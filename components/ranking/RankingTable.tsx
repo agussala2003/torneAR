@@ -43,8 +43,8 @@ export function RankingTable({ entries, onTeamPress, topLimit = 5 }: Props) {
                 <View className="w-5" />
             </View>
 
-            {topTeams.map((entry) => (
-                <RankingTeamRow key={entry.teamId} entry={entry} onPress={onTeamPress} />
+            {topTeams.map((entry, index) => (
+                <RankingTeamRow key={entry.teamId} entry={entry} onPress={onTeamPress} index={index} />
             ))}
 
             {isMyTeamOutsideTop && myTeam && (
@@ -56,7 +56,7 @@ export function RankingTable({ entries, onTeamPress, topLimit = 5 }: Props) {
                         </Text>
                         <View className="h-px flex-1 bg-surface-high" />
                     </View>
-                    <RankingTeamRow key={myTeam.teamId} entry={myTeam} onPress={onTeamPress} />
+                    <RankingTeamRow key={myTeam.teamId} entry={myTeam} onPress={onTeamPress} index={topTeams.length} />
                 </View>
             )}
         </View>

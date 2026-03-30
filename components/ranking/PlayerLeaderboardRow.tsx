@@ -1,4 +1,5 @@
 import { Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInRight } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -7,9 +8,10 @@ import type { PlayerLeaderboardEntry } from './types';
 interface Props {
     entry: PlayerLeaderboardEntry;
     statLabel: string;
+    index?: number;
 }
 
-export function PlayerLeaderboardRow({ entry, statLabel }: Props) {
+export function PlayerLeaderboardRow({ entry, statLabel, index = 0 }: Props) {
     const isTop3 = entry.rankPosition <= 3;
     const colors = ['#FABD32', '#C0C0C0', '#CD7F32'] as const;
     const posColor = isTop3 ? colors[entry.rankPosition - 1] : '#869585';
@@ -20,10 +22,11 @@ export function PlayerLeaderboardRow({ entry, statLabel }: Props) {
     ].filter(Boolean).join(' · ');
 
     return (
+        <Animated.View entering={FadeInRight.delay(index * 50).springify()} style={{ marginBottom: 6 }}>
         <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => router.push({ pathname: '/profile-stats', params: { profileId: entry.profileId } })}
-            className={`mb-1.5 flex-row items-center rounded-xl px-3 py-2.5 ${entry.isMyPlayer ? 'border border-brand-primary/20 bg-[#1e2a1e]' : 'bg-surface-container'}`}
+            className={`flex-row items-center rounded-xl px-3 py-2.5 ${entry.isMyPlayer ? 'border border-brand-primary/20 bg-[#1e2a1e]' : 'bg-surface-container'}`}
         >
             <Text style={{ color: entry.isMyPlayer && !isTop3 ? '#53E076' : posColor, width: 22 }} className="font-displayBlack text-sm">
                 {entry.rankPosition}
@@ -51,5 +54,6 @@ export function PlayerLeaderboardRow({ entry, statLabel }: Props) {
                 <Text className="mt-0.5 font-ui text-[9px] text-neutral-on-surface-variant">{statLabel}</Text>
             </View>
         </TouchableOpacity>
+        </Animated.View>
     );
 }

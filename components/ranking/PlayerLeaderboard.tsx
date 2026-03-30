@@ -53,8 +53,8 @@ export function PlayerLeaderboard({ entries, activeStat, onStatChange, loading }
                 <Text className="font-display text-base text-neutral-on-surface-variant text-center py-4">Sin datos registrados.</Text>
             ) : (
                 <View>
-                    {topPlayers.map(entry => (
-                        <PlayerLeaderboardRow key={entry.profileId} entry={entry} statLabel={activeTab.valueLabel} />
+                    {topPlayers.map((entry, index) => (
+                        <PlayerLeaderboardRow key={entry.profileId} entry={entry} statLabel={activeTab.valueLabel} index={index} />
                     ))}
 
                     {isMyPlayerOutsideTop && myPlayer && (
@@ -66,7 +66,7 @@ export function PlayerLeaderboard({ entries, activeStat, onStatChange, loading }
                                 </Text>
                                 <View className="h-px flex-1 bg-surface-high" />
                             </View>
-                            <PlayerLeaderboardRow entry={myPlayer} statLabel={activeTab.valueLabel} />
+                            <PlayerLeaderboardRow entry={myPlayer} statLabel={activeTab.valueLabel} index={topLimit} />
                         </View>
                     )}
                 </View>

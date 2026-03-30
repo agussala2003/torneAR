@@ -6,7 +6,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   // En SDK 53+, expo-notifications crashea si se inicializa dentro de Expo Go en Android.
   // Bypass automático si el usuario está probando en Expo Go:
   if (Constants.appOwnership === 'expo') {
-    console.log('Push notifications are not supported in Expo Go. Returning null token.');
     return null;
   }
 
@@ -46,11 +45,10 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       
       return token;
     } else {
-      console.log('Must use physical device for Push Notifications');
       return null;
     }
   } catch (error) {
-    console.log('Error initializing push notifications:', error);
+    console.error('Error initializing push notifications:', error);
     return null;
   }
 }
@@ -75,6 +73,6 @@ export async function sendPushNotification(expoPushToken: string, title: string,
       body: JSON.stringify(message),
     });
   } catch (error) {
-    console.log('Error sending push notification:', error);
+    console.error('Error sending push notification:', error);
   }
 }

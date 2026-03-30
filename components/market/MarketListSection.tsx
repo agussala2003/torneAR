@@ -46,7 +46,7 @@ export function MarketListSection({
     );
   }
 
-  const renderItem = ({ item }: { item: MarketTeamPost | MarketPlayerPost }) => {
+  const renderItem = ({ item, index }: { item: MarketTeamPost | MarketPlayerPost; index: number }) => {
     if (activeTab === 'TEAMS_LOOKING') {
       const post = item as MarketTeamPost;
       const isOwner = post.created_by === currentProfileId;
@@ -66,6 +66,7 @@ export function MarketListSection({
           complex={post.complex}
            isOwner={isOwner}
           memberStatus={memberStatus}
+          index={index}
           onPressAction={() => onContactTeam(post.team_id)}
           onPressStats={() => onViewTeamStats(post.team_id)}
           onDelete={() => onDeletePost(post.id, true)}
@@ -86,6 +87,7 @@ export function MarketListSection({
           description={post.description}
            isOwner={isOwner}
           memberStatus={memberStatus}
+          index={index}
           onPressAction={() => onContactPlayer(post.profile_id)}
           onPressStats={() => onViewPlayerStats(post.profile_id)}
           onDelete={() => onDeletePost(post.id, false)}
