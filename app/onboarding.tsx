@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { HeroButton } from '@/components/ui/HeroButton';
@@ -14,6 +15,7 @@ import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema
 import { saveOnboardingProfile } from '@/lib/onboarding-data';
 
 export default function OnboardingScreen() {
+  const router = useRouter();
   const { user, refreshProfile } = useAuth();
 
   const [step, setStep] = useState(1);
@@ -175,6 +177,20 @@ export default function OnboardingScreen() {
                   {selectedPosition === 'CUALQUIERA' && <AppIcon family="material-community" name="check-circle" size={14} color="#003914" />} Soy Flexible
                 </Text>
               </TouchableOpacity>
+            </View>
+
+            <View className="mb-6 flex-row flex-wrap items-center justify-center px-4 mt-8">
+              <Text className="font-ui text-xs text-neutral-on-surface-variant text-center">
+                Al comenzar aceptas los{' '}
+              </Text>
+              <TouchableOpacity onPress={() => router.push('/(modals)/terms' as any)}>
+                <Text className="font-uiBold text-xs text-brand-primary">Términos</Text>
+              </TouchableOpacity>
+              <Text className="font-ui text-xs text-neutral-on-surface-variant"> y la{' '}</Text>
+              <TouchableOpacity onPress={() => router.push('/(modals)/privacy' as any)}>
+                <Text className="font-uiBold text-xs text-brand-primary">Privacidad</Text>
+              </TouchableOpacity>
+              <Text className="font-ui text-xs text-neutral-on-surface-variant">.</Text>
             </View>
 
             <HeroButton

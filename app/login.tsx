@@ -134,6 +134,22 @@ export default function LoginScreen() {
           </View>
         </View>
 
+        {!isLogin && (
+          <View className="mb-6 flex-row flex-wrap items-center justify-center px-4">
+            <Text className="font-ui text-xs text-neutral-on-surface-variant text-center">
+              Al crear la cuenta aceptas los{' '}
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/(modals)/terms')}>
+              <Text className="font-uiBold text-xs text-brand-primary">Términos</Text>
+            </TouchableOpacity>
+            <Text className="font-ui text-xs text-neutral-on-surface-variant"> y la{' '}</Text>
+            <TouchableOpacity onPress={() => router.push('/(modals)/privacy')}>
+              <Text className="font-uiBold text-xs text-brand-primary">Privacidad</Text>
+            </TouchableOpacity>
+            <Text className="font-ui text-xs text-neutral-on-surface-variant">.</Text>
+          </View>
+        )}
+
         <HeroButton
           onPress={handleSubmit(onSubmit)}
           isLoading={loading}

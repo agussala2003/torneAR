@@ -28,6 +28,7 @@ interface Props {
   onProposePress?: (matchId: string) => void;
   onAcceptProposal?: (proposalId: string, matchId: string) => void;
   onRejectProposal?: (proposalId: string, matchId: string) => void;
+  onCancelProposal?: (proposalId: string, matchId: string) => void;
   onLoadResult?: (matchId: string) => void;
   index?: number;
 }
@@ -39,6 +40,7 @@ export function MatchCard({
   onProposePress,
   onAcceptProposal,
   onRejectProposal,
+  onCancelProposal,
   onLoadResult,
   index = 0,
 }: Props) {
@@ -112,6 +114,7 @@ export function MatchCard({
         onProposePress={onProposePress}
         onAcceptProposal={onAcceptProposal}
         onRejectProposal={onRejectProposal}
+        onCancelProposal={onCancelProposal}
         onLoadResult={onLoadResult}
       />
     </TouchableOpacity>

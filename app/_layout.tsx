@@ -12,6 +12,7 @@ import 'react-native-reanimated';
 import { AppIntroSplash } from '@/components/AppIntroSplash';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isProfileComplete } from '@/lib/auth-utils';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { UIProvider } from '../context/UIContext';
@@ -83,7 +84,7 @@ function RootNavigation() {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const { colorScheme, setColorScheme } = useColorScheme();
   const [fontsLoaded] = useFonts({
     Inter_500Medium,
     Inter_700Bold,
@@ -92,6 +93,20 @@ export default function RootLayout() {
     BarlowCondensed_800ExtraBold,
     Epilogue_700Bold,
   });
+
+  useEffect(() => {
+    async function loadTheme() {
+      try {
+        const savedTheme = await AsyncStorage.getItem('app-theme');
+        if (savedTheme) {
+          setColorScheme(savedTheme as any);
+        }
+      } catch {
+        // Ignored
+      }
+    }
+    void loadTheme();
+  }, [setColorScheme]);
 
   if (!fontsLoaded) {
     return null;

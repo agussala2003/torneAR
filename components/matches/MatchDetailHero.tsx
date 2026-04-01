@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Animated } from 'react-native';
 import { TeamShield } from '@/components/matches/TeamShield';
+import { LiveTimer } from '@/components/matches/LiveTimer';
 import type { MatchDetailViewData } from '@/components/matches/types';
 
 interface Props {
@@ -59,9 +60,15 @@ export function MatchDetailHero({ match, myTeamId }: Props) {
       const sA = match.myResult?.goalsScored ?? 0;
       const sB = match.opponentResult?.goalsScored ?? 0;
       return (
-        <View className="items-center">
+        <View className="items-center gap-1">
           <ScoreCenter scoreA={isMyTeamA ? sA : sB} scoreB={isMyTeamA ? sB : sA} />
           <LiveBadge />
+          {match.startedAt && (
+            <LiveTimer
+              startedAt={match.startedAt}
+              className="font-displayBlack text-lg text-danger-error/80"
+            />
+          )}
         </View>
       );
     }

@@ -10,7 +10,6 @@ export interface HomeTeamSnapshot {
   name: string;
   shieldUrl: string | null;
   eloRating: number;
-  inRanking: boolean;
   fairPlayScore: number;
   seasonWins: number;
   seasonDraws: number;

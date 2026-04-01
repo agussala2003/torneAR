@@ -114,7 +114,8 @@ export default function MatchDetailScreen() {
     if (!match?.activeProposal) return;
     try {
       await cancelProposal(match.activeProposal.id);
-      showAlert('Propuesta cancelada', 'Tu propuesta fue cancelada.', () => void loadData());
+      void loadData();  // immediate re-fetch — don't bury inside alert callback
+      showAlert('Propuesta cancelada', 'Tu propuesta fue cancelada.');
     } catch (err) {
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
@@ -337,6 +338,21 @@ export default function MatchDetailScreen() {
               match={match}
               onLoadResult={match.isResultLoader ? () => setShowResultModal(true) : undefined}
             />
+            {/* Finalizar Partido (early termination while EN_VIVO) */}
+            {(match.isResultLoader || match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN') && (
+              <TouchableOpacity
+                onPress={() => setShowResultModal(true)}
+                activeOpacity={0.8}
+                className="mt-4 rounded-2xl border border-danger-error/40 bg-danger-error/8 px-5 py-4"
+              >
+                <Text className="font-uiBold text-center text-sm text-danger-error">
+                  Finalizar Partido
+                </Text>
+                <Text className="font-ui mt-1 text-center text-[11px] text-danger-error/60">
+                  ¿Problemas en el partido? Cargá el resultado ahora.
+                </Text>
+              </TouchableOpacity>
+            )}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
               onWo={() => setShowWoModal(true)}

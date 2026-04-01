@@ -14,9 +14,9 @@ export type BadgeItem = {
   id: string;
   name: string;
   slug: string;
-  iconUrl: string | null;
-  description?: string | null;
-  earnedAt?: string | null;
+  iconUrl: string;
+  criteriaDescription: string;
+  earnedAt: string | null;
   isEarned: boolean;
 };
 

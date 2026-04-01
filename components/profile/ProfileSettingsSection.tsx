@@ -11,14 +11,16 @@ function Row({
   title,
   family = 'material-community',
   className,
+  onPress,
 }: {
   icon: string;
   title: string;
   family?: 'ionicons' | 'material-community' | 'material-icons';
   className?: string;
+  onPress?: () => void;
 }) {
   return (
-    <TouchableOpacity activeOpacity={0.85} className={`w-full flex-row items-center justify-between px-5 py-4 ${className ?? ''}`}>
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} className={`w-full flex-row items-center justify-between px-5 py-4 ${className ?? ''}`}>
       <View className="flex-row items-center gap-4">
         <AppIcon family={family} name={icon} size={18} color="#BCCBB9" />
         <Text className="font-ui text-sm text-neutral-on-surface">{title}</Text>
@@ -35,29 +37,24 @@ export function ProfileSettingsSection({ isSigningOut, onSignOut }: ProfileSetti
     <View className="mt-8">
       <Text className="font-display mb-4 px-1 text-sm uppercase tracking-wider text-neutral-on-surface-variant">Ajustes de Perfil</Text>
       <View className="overflow-hidden rounded-xl bg-surface-low">
-          <TouchableOpacity
-            key="edit-profile"
-            activeOpacity={0.85}
-            onPress={() => router.push('/profile-edit')}
-            className="w-full flex-row items-center justify-between px-5 py-4 rounded-t-xl border-b border-neutral-outline-variant/35"
-          >
-            <View className="flex-row items-center gap-4">
-              <AppIcon family="material-community" name="account-edit-outline" size={18} color="#BCCBB9" />
-              <Text className="font-ui text-sm text-neutral-on-surface">Editar Perfil</Text>
-            </View>
-            <AppIcon family="material-icons" name="chevron-right" size={18} color="#BCCBB9" />
-          </TouchableOpacity>
-        <Row
-          family="material-community"
-          icon="shield-lock-outline"
-          title="Seguridad y Privacidad"
-          className="border-b border-neutral-outline-variant/35"
-        />
+        <TouchableOpacity
+          key="edit-profile"
+          activeOpacity={0.85}
+          onPress={() => router.push('/profile-edit')}
+          className="w-full flex-row items-center justify-between px-5 py-4 rounded-t-xl border-b border-neutral-outline-variant/35"
+        >
+          <View className="flex-row items-center gap-4">
+            <AppIcon family="material-community" name="account-edit-outline" size={18} color="#BCCBB9" />
+            <Text className="font-ui text-sm text-neutral-on-surface">Editar Perfil</Text>
+          </View>
+          <AppIcon family="material-icons" name="chevron-right" size={18} color="#BCCBB9" />
+        </TouchableOpacity>
         <Row
           family="material-community"
           icon="cog-outline"
           title="Preferencias"
           className="border-b border-neutral-outline-variant/35"
+          onPress={() => router.push('/profile/settings' as any)}
         />
 
         <TouchableOpacity

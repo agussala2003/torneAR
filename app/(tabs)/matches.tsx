@@ -7,7 +7,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useTeamStore } from '@/stores/teamStore';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { fetchMatchesViewData } from '@/lib/matches-data';
-import { acceptProposal, rejectProposal } from '@/lib/match-actions';
+import { acceptProposal, rejectProposal, cancelProposal } from '@/lib/match-actions';
 import { MatchCard } from '@/components/matches/MatchCard';
 import { LiveMatchBanner } from '@/components/matches/LiveMatchBanner';
 import { MatchSectionHeader } from '@/components/matches/MatchSectionHeader';
@@ -33,7 +33,13 @@ export default function MatchesScreen() {
       const data = await fetchMatchesViewData(activeTeamId);
       setViewData(data);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'No se pudieron cargar los partidos.';
+      console.error('[matches] fetchMatchesViewData error:', err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : 'No se pudieron cargar los partidos.';
       showAlert('Error', msg);
     } finally {
       setLoading(false);
@@ -70,6 +76,19 @@ export default function MatchesScreen() {
       showAlert('Propuesta rechazada', 'Se notificará al equipo rival.', () => void loadData());
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'No se pudo rechazar la propuesta.';
+      showAlert('Error', msg);
+    }
+  }
+
+  async function handleCancelProposal(proposalId: string, _matchId: string) {
+    try {
+      await cancelProposal(proposalId);
+      showAlert('Propuesta cancelada', 'Tu propuesta fue cancelada.', () => void loadData());
+    } catch (err) {
+      const msg = err instanceof Error ? err.message
+        : typeof err === 'object' && err !== null && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'No se pudo cancelar la propuesta.';
       showAlert('Error', msg);
     }
   }
@@ -166,6 +185,7 @@ export default function MatchesScreen() {
                   onProposePress={handleProposePress}
                   onAcceptProposal={(pId, mId) => void handleAcceptProposal(pId, mId)}
                   onRejectProposal={(pId, mId) => void handleRejectProposal(pId, mId)}
+                  onCancelProposal={(pId, mId) => void handleCancelProposal(pId, mId)}
                   onLoadResult={handleLoadResult}
                 />
               ))}

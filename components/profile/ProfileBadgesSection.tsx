@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { BadgeItem } from './types';
 import { AppIcon } from '@/components/ui/AppIcon';
@@ -7,31 +7,17 @@ type ProfileBadgesSectionProps = {
   badges: BadgeItem[];
 };
 
+function getHowToUnlock(badge: BadgeItem): string {
+  if (badge.criteriaDescription && badge.criteriaDescription.trim().length > 0) {
+    return badge.criteriaDescription;
+  }
+  return 'Participá en más partidos y completá desafíos para desbloquear esta insignia.';
+}
+
 export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
   const earnedBadges = badges.filter((b) => b.isEarned);
   const lockedBadges = badges.filter((b) => !b.isEarned);
   const [selectedBadge, setSelectedBadge] = useState<BadgeItem | null>(null);
-
-  const unlockHints = useMemo(
-    () => ({
-      goleador: 'Anota varios goles en partidos oficiales para desbloquearla.',
-      mvp: 'Consigue votos MVP repetidamente y destaca en tu equipo.',
-      capitan: 'Lidera tu equipo y participa activamente en desafios/partidos.',
-      invicto: 'Mantene una racha de victorias sin derrotas.',
-      debut: 'Juga tu primer partido oficial en TorneAR.',
-      'fair-play': 'Recibi buenas valoraciones y evita tarjetas/sanciones.',
-    }),
-    []
-  );
-
-  const getHowToUnlock = (badge: BadgeItem): string => {
-    if (badge.description && badge.description.trim().length > 0) {
-      return badge.description;
-    }
-
-    const key = badge.slug.toLowerCase();
-    return unlockHints[key as keyof typeof unlockHints] ?? 'Participa en mas partidos y completa desafios para desbloquear esta insignia.';
-  };
 
   return (
     <View className="mt-8">

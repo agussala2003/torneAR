@@ -7,6 +7,7 @@ import type {
   TeamRecentMatch,
   TeamMemberStat,
   FormResult,
+  TeamBadgeItem,
 } from '@/components/team-stats/types';
 
 type TeamRole = Database['public']['Enums']['team_role'];
@@ -21,7 +22,6 @@ type TeamRow = {
   shield_url: string | null;
   elo_rating: number;
   fair_play_score: number;
-  in_ranking: boolean;
   season_wins: number;
   season_losses: number;
   season_draws: number;
@@ -101,7 +101,7 @@ export async function fetchTeamStatsViewData(
     supabase
       .from('teams')
       .select(
-        'id, name, zone, category, preferred_format, shield_url, elo_rating, fair_play_score, in_ranking, season_wins, season_losses, season_draws, season_goals_for, season_goals_against',
+        'id, name, zone, category, preferred_format, shield_url, elo_rating, fair_play_score, season_wins, season_losses, season_draws, season_goals_for, season_goals_against',
       )
       .eq('id', teamId)
       .single(),
@@ -146,7 +146,6 @@ export async function fetchTeamStatsViewData(
     shieldUrl: team.shield_url,
     prRating: team.elo_rating,
     fairPlayScore: Number(team.fair_play_score),
-    inRanking: team.in_ranking,
   };
 
   // Season record
@@ -274,5 +273,26 @@ export async function fetchTeamStatsViewData(
     ? memberRows.some((m) => m.profile_id === currentProfileId)
     : false;
 
-  return { header, season, form, recentMatches, members, isOwnTeam };
+  return { header, season, form, recentMatches, members, isOwnTeam, badges: [] };
+}
+
+export async function fetchTeamBadges(teamId: string): Promise<TeamBadgeItem[]> {
+  const { data, error } = await supabase.rpc(
+    'get_team_badges' as Parameters<typeof supabase.rpc>[0],
+    { p_team_id: teamId },
+  );
+  if (error) throw error;
+  return ((data ?? []) as Array<{
+    id: string; slug: string; name: string;
+    criteria_description: string; icon_url: string;
+    entity_type: string; is_earned: boolean;
+  }>).map((r) => ({
+    id: r.id,
+    slug: r.slug,
+    name: r.name,
+    criteriaDescription: r.criteria_description,
+    iconUrl: r.icon_url,
+    entityType: r.entity_type,
+    isEarned: r.is_earned,
+  }));
 }

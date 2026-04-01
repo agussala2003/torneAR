@@ -16,17 +16,11 @@ type TeamMemberJoinedRow = {
   } | null;
 };
 
-type ProfileBadgeJoinedRow = {
-  earned_at: string;
-  badges: {
-    id: string;
-    name: string;
-    slug: string;
-    icon_url: string | null;
-  } | null;
+type BadgeRpcRow = {
+  id: string; slug: string; name: string;
+  criteria_description: string; icon_url: string;
+  entity_type: string; is_earned: boolean;
 };
-
-type AllBadgesRow = Database['public']['Tables']['badges']['Row'];
 
 function toStats(row: PlayerStatsRow | null): ProfileStats {
   return {
@@ -51,34 +45,20 @@ function toTeams(rows: TeamMemberJoinedRow[] | null): TeamItem[] {
     }));
 }
 
-function toBadges(earnedRows: ProfileBadgeJoinedRow[] | null, allBadges: AllBadgesRow[] | null): BadgeItem[] {
-  const allBadgesArray = allBadges ?? [];
-  const earnedBadgesMap = new Map<string, ProfileBadgeJoinedRow>();
-
-  if (earnedRows) {
-    earnedRows
-      .filter((row) => !!row.badges)
-      .forEach((row) => {
-        earnedBadgesMap.set(row.badges!.id, row);
-      });
-  }
-
-  return allBadgesArray.map((badge) => {
-    const earnedRow = earnedBadgesMap.get(badge.id);
-    return {
-      id: badge.id,
-      name: badge.name,
-      slug: badge.slug,
-      iconUrl: badge.icon_url,
-      description: badge.description,
-      earnedAt: earnedRow?.earned_at ?? null,
-      isEarned: !!earnedRow,
-    };
-  });
+function mapBadgesFromRpc(data: BadgeRpcRow[] | null): BadgeItem[] {
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    iconUrl: r.icon_url,
+    criteriaDescription: r.criteria_description,
+    earnedAt: null,
+    isEarned: r.is_earned,
+  }));
 }
 
 export async function fetchProfileViewData(profile: ProfileRow): Promise<ProfileViewData> {
-  const [statsRes, teamsRes, badgesRes, allBadgesRes] = await Promise.all([
+  const [statsRes, teamsRes, badgesRpcRes] = await Promise.all([
     supabase
       .from('v_player_stats')
       .select('*')
@@ -88,15 +68,10 @@ export async function fetchProfileViewData(profile: ProfileRow): Promise<Profile
       .from('team_members')
       .select('role, teams(id, name, elo_rating, shield_url)')
       .eq('profile_id', profile.id),
-    supabase
-      .from('profile_badges')
-      .select('earned_at, badges(id, name, slug, icon_url)')
-      .eq('profile_id', profile.id)
-      .order('earned_at', { ascending: false }),
-    supabase
-      .from('badges')
-      .select('*')
-      .order('name', { ascending: true }),
+    supabase.rpc(
+      'get_player_badges' as Parameters<typeof supabase.rpc>[0],
+      { p_profile_id: profile.id },
+    ),
   ]);
 
   if (statsRes.error) {
@@ -107,21 +82,14 @@ export async function fetchProfileViewData(profile: ProfileRow): Promise<Profile
     console.error('Profile teams query failed', teamsRes.error);
   }
 
-  if (badgesRes.error) {
-    console.error('Profile badges query failed', badgesRes.error);
-  }
-
-  if (allBadgesRes.error) {
-    console.error('All badges query failed', allBadgesRes.error);
+  if (badgesRpcRes.error) {
+    console.error('Profile badges RPC failed', badgesRpcRes.error);
   }
 
   return {
     profile,
     stats: toStats(statsRes.error ? null : statsRes.data),
     teams: toTeams((teamsRes.error ? null : (teamsRes.data as TeamMemberJoinedRow[] | null)) ?? null),
-    badges: toBadges(
-      (badgesRes.error ? null : (badgesRes.data as ProfileBadgeJoinedRow[] | null)) ?? null,
-      (allBadgesRes.error ? null : (allBadgesRes.data as AllBadgesRow[] | null)) ?? null
-    ),
+    badges: mapBadgesFromRpc(badgesRpcRes.error ? null : (badgesRpcRes.data as unknown as BadgeRpcRow[] | null)),
   };
 }

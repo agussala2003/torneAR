@@ -49,11 +49,6 @@ export function TeamHeader({ header }: TeamHeaderProps) {
         <Text className="font-uiBold rounded bg-info-secondary/15 px-2 py-1 text-[10px] uppercase tracking-wide text-info-secondary">
           {getTeamFormatLabel(header.format)}
         </Text>
-        {header.inRanking && (
-          <Text className="font-uiBold rounded bg-warning-tertiary/15 px-2 py-1 text-[10px] uppercase tracking-wide text-warning-tertiary">
-            En ranking
-          </Text>
-        )}
       </View>
 
       <View className="mt-4 flex-row gap-4">

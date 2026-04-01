@@ -25,9 +25,10 @@ type ParticipantRaw = {
   } | null;
 };
 
-type BadgeRaw = {
-  earned_at: string;
-  badges: { id: string; name: string; slug: string; icon_url: string | null } | null;
+type BadgeRpcRow = {
+  id: string; slug: string; name: string;
+  criteria_description: string; icon_url: string;
+  entity_type: string; is_earned: boolean;
 };
 
 type TeamRaw = {
@@ -46,7 +47,7 @@ function ratio(v: number, d: number): string {
 }
 
 export async function fetchProfileStatsViewData(profileId: string): Promise<ProfileStatsViewData> {
-  const [profileRes, statsRes, participantsRes, badgesRes, teamsRes] = await Promise.all([
+  const [profileRes, statsRes, participantsRes, badgesRpcRes, teamsRes] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', profileId).single(),
     supabase
       .from('v_player_stats')
@@ -67,11 +68,10 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
       `)
       .eq('profile_id', profileId)
       .limit(30),
-    supabase
-      .from('profile_badges')
-      .select('earned_at, badges(id, name, slug, icon_url)')
-      .eq('profile_id', profileId)
-      .order('earned_at', { ascending: false }),
+    supabase.rpc(
+      'get_player_badges' as Parameters<typeof supabase.rpc>[0],
+      { p_profile_id: profileId },
+    ),
     supabase
       .from('team_members')
       .select('role, teams(id, name, elo_rating, shield_url)')
@@ -138,15 +138,15 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
     })
     .slice(0, 10);
 
-  const badges: EarnedBadge[] = ((badgesRes.data as BadgeRaw[]) ?? [])
-    .filter((row) => !!row.badges)
-    .map((row) => ({
-      id: row.badges!.id,
-      name: row.badges!.name,
-      slug: row.badges!.slug,
-      iconUrl: row.badges!.icon_url,
-      earnedAt: row.earned_at,
-    }));
+  const badges: EarnedBadge[] = ((badgesRpcRes.data ?? []) as BadgeRpcRow[]).map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    iconUrl: r.icon_url,
+    criteriaDescription: r.criteria_description,
+    earnedAt: '',   // RPC doesn't track earned_at; kept for type compat
+    isEarned: r.is_earned,
+  }));
 
   const teams: TeamEntry[] = ((teamsRes.data as TeamRaw[]) ?? [])
     .filter((row) => !!row.teams)

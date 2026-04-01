@@ -71,8 +71,11 @@ export default function RankingScreen() {
         setAvailableZones(zonesRes.data.map(z => z.name));
       }
 
+      // Compute teamIds here to avoid a stale-closure / unstable-array dep
+      const teamIds = myTeams.map(t => t.id);
+
       let elo = null;
-      let initialFilters = { ...filters };
+      let initialFilters: RankingFiltersState = { zone: null, category: null, format: null, rivalesIdeales: false };
       if (activeTeamId) {
         const { data: team } = await supabase.from('teams').select('elo_rating, zone, category, preferred_format').eq('id', activeTeamId).single();
         if (team) {
@@ -85,7 +88,7 @@ export default function RankingScreen() {
 
       const activeTeamName = myTeams.find(t => t.id === activeTeamId)?.name ?? null;
       const [ranking, players] = await Promise.all([
-        fetchRankingWithFilters(initialFilters, userTeamIds, elo),
+        fetchRankingWithFilters(initialFilters, teamIds, elo),
         fetchPlayerLeaderboard('goals', initialFilters.zone, seasonRes.data?.id || null, {
           profileId: profile.id, fullName: profile.full_name, avatarUrl: profile.avatar_url ?? null,
           teamId: activeTeamId ?? null, teamName: activeTeamName,
@@ -99,7 +102,7 @@ export default function RankingScreen() {
     } finally {
       setLoading(false);
     }
-  }, [profile, activeTeamId, showAlert, filters, myTeams, userTeamIds]);
+  }, [profile, activeTeamId, showAlert, myTeams]);
 
   useFocusEffect(useCallback(() => { loadInitialData(); }, [loadInitialData]));
 

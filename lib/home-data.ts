@@ -26,7 +26,6 @@ type TeamMemberRow = {
     season_wins: number;
     season_draws: number;
     season_losses: number;
-    in_ranking: boolean;
   } | null;
 };
 
@@ -61,7 +60,7 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
   const { data: memberData, error: memberError } = await supabase
     .from('team_members')
     .select(
-      'team_id, role, teams(id, name, elo_rating, shield_url, fair_play_score, season_wins, season_draws, season_losses, in_ranking)',
+      'team_id, role, teams(id, name, elo_rating, shield_url, fair_play_score, season_wins, season_draws, season_losses)',
     )
     .eq('profile_id', profileId);
 
@@ -222,7 +221,6 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
       ? getSupabaseStorageUrl('shields', r.teams!.shield_url)
       : null,
     eloRating: r.teams!.elo_rating,
-    inRanking: r.teams!.in_ranking ?? false,
     fairPlayScore: r.teams!.fair_play_score ?? 100,
     seasonWins: r.teams!.season_wins ?? 0,
     seasonDraws: r.teams!.season_draws ?? 0,

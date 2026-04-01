@@ -7,6 +7,7 @@ interface Props {
   onProposePress?: (matchId: string) => void;
   onAcceptProposal?: (proposalId: string, matchId: string) => void;
   onRejectProposal?: (proposalId: string, matchId: string) => void;
+  onCancelProposal?: (proposalId: string, matchId: string) => void;
   onLoadResult?: (matchId: string) => void;
 }
 
@@ -16,6 +17,7 @@ export function MatchCardFooter({
   onProposePress,
   onAcceptProposal,
   onRejectProposal,
+  onCancelProposal,
   onLoadResult,
 }: Props) {
   const { id, status, activeProposal } = entry;
@@ -36,10 +38,16 @@ export function MatchCardFooter({
     const isFromMe = activeProposal.fromTeamId === myTeamId;
     if (isFromMe) {
       return (
-        <View className="mt-3 items-center rounded-xl bg-info-secondary/10 py-2.5">
+        <View className="mt-3 flex-row items-center justify-between rounded-xl bg-info-secondary/10 px-4 py-2.5">
           <Text className="font-uiBold text-[12px] text-info-secondary/70">
             Propuesta enviada · esperando respuesta
           </Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => onCancelProposal?.(activeProposal.id, id)}
+          >
+            <Text className="font-uiBold text-[11px] text-danger-error">Cancelar</Text>
+          </TouchableOpacity>
         </View>
       );
     }

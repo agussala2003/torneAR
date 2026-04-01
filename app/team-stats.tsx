@@ -7,12 +7,13 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
-import { fetchTeamStatsViewData } from '@/lib/team-stats-api';
-import type { TeamStatsViewData, H2HMatch } from '@/components/team-stats/types';
+import { fetchTeamStatsViewData, fetchTeamBadges } from '@/lib/team-stats-api';
+import type { TeamStatsViewData, H2HMatch, TeamBadgeItem } from '@/components/team-stats/types';
 import { TeamHeader } from '@/components/team-stats/TeamHeader';
 import { TeamFormAndSeason } from '@/components/team-stats/TeamFormAndSeason';
 import { TeamRecentMatches } from '@/components/team-stats/TeamRecentMatches';
 import { TeamMembersSection } from '@/components/team-stats/TeamMembersSection';
+import { TeamBadgesSection } from '@/components/team-stats/TeamBadgesSection';
 import { fetchTeamH2H } from '@/lib/team-h2h-data';
 import { TeamH2HSection } from '@/components/team-stats/TeamH2HSection';
 import { ChallengeButton } from '@/components/ranking/ChallengeButton';
@@ -28,6 +29,7 @@ export default function TeamStatsScreen() {
   const { showAlert, AlertComponent } = useCustomAlert();
   const [h2hMatches, setH2hMatches] = useState<H2HMatch[]>([]);
   const [alreadyChallenged, setAlreadyChallenged] = useState(false);
+  const [teamBadges, setTeamBadges] = useState<TeamBadgeItem[]>([]);
 
   const isRival = Boolean(viewerTeamId && viewerTeamId !== teamId);
 
@@ -40,6 +42,9 @@ export default function TeamStatsScreen() {
       setLoading(true);
       const data = await fetchTeamStatsViewData(teamId, profile?.id ?? null);
       setViewData(data);
+
+      const badges = await fetchTeamBadges(teamId).catch(() => []);
+      setTeamBadges(badges);
 
       if (isRival && viewerTeamId) {
         const [h2h, challenged] = await Promise.all([
@@ -115,6 +120,8 @@ export default function TeamStatsScreen() {
 
         {/* Plantilla primero */}
         <TeamMembersSection members={viewData.members} />
+
+        <TeamBadgesSection badges={teamBadges} />
 
         {/* Botones de desafío al final, después de ver la plantilla */}
         {isRival && profile && viewerTeamId && (

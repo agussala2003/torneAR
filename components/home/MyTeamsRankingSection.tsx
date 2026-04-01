@@ -40,19 +40,10 @@ function TeamRankingCard({ team, onPress }: TeamCardProps) {
 
       {/* ELO rating */}
       <View className="mb-2 items-center rounded-xl bg-surface-high py-2">
-        {team.inRanking ? (
-          <>
-            <Text className="font-displayBlack text-xl text-brand-primary">{team.eloRating}</Text>
-            <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-on-surface-variant">
-              Rating
-            </Text>
-          </>
-        ) : (
-          <>
-            <Text className="font-uiBold text-sm text-neutral-outline">Calibrando</Text>
-            <Text className="font-ui text-[10px] text-neutral-outline">{team.eloRating} pts</Text>
-          </>
-        )}
+        <Text className="font-displayBlack text-xl text-brand-primary">{team.eloRating}</Text>
+        <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-on-surface-variant">
+          Rating
+        </Text>
       </View>
 
       {/* W/D/L */}
@@ -112,18 +103,14 @@ export function MyTeamsRankingSection({ teams, onTeamPress, onSeeRanking }: Prop
               </Text>
             </View>
             <View className="items-end">
-              {teams[0].inRanking ? (
-                <>
-                  <Text className="font-displayBlack text-2xl text-brand-primary">
-                    {teams[0].eloRating}
-                  </Text>
-                  <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-on-surface-variant">
-                    Rating
-                  </Text>
-                </>
-              ) : (
-                <Text className="font-uiBold text-sm text-neutral-outline">Calibrando</Text>
-              )}
+              <>
+                <Text className="font-displayBlack text-2xl text-brand-primary">
+                  {teams[0].eloRating}
+                </Text>
+                <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-on-surface-variant">
+                  Rating
+                </Text>
+              </>
               <View className="mt-1 flex-row items-center gap-1">
                 <AppIcon family="material-community" name="hand-peace" size={11} color="#53E076" />
                 <Text className="font-uiBold text-[11px] text-brand-primary">

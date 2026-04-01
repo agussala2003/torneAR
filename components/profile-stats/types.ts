@@ -27,8 +27,10 @@ export type EarnedBadge = {
   id: string;
   name: string;
   slug: string;
-  iconUrl: string | null;
+  iconUrl: string;
+  criteriaDescription: string;
   earnedAt: string;
+  isEarned: boolean;
 };
 
 export type TeamEntry = {

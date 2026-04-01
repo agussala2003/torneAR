@@ -86,6 +86,12 @@ export default function TabLayout() {
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
       />
+      <Tabs.Screen
+        name="profile/settings"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

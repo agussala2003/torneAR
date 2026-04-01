@@ -24,6 +24,17 @@ export async function fetchActiveZones(): Promise<ZoneEntry[]> {
   return (data ?? []).map((z) => ({ id: z.id as string, name: z.name as string }));
 }
 
+export async function fetchVenuesByZoneName(zoneName: string): Promise<VenueEntry[]> {
+  const { data: zoneRow } = await supabase
+    .from('zones')
+    .select('id')
+    .eq('name', zoneName)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (!zoneRow) return [];
+  return fetchVenuesByZone(zoneRow.id as string);
+}
+
 export async function fetchVenuesByZone(zoneId: string): Promise<VenueEntry[]> {
   const { data, error } = await supabase
     .from('venues')

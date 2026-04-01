@@ -1,30 +1,33 @@
 import { useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
-import type { EarnedBadge } from './types';
+import type { TeamBadgeItem } from './types';
 
 type Props = {
-  badges: EarnedBadge[];
+  badges: TeamBadgeItem[];
 };
 
-export function BadgesSection({ badges }: Props) {
-  const [selected, setSelected] = useState<EarnedBadge | null>(null);
+export function TeamBadgesSection({ badges }: Props) {
+  const [selected, setSelected] = useState<TeamBadgeItem | null>(null);
   const earned = badges.filter((b) => b.isEarned);
   const locked = badges.filter((b) => !b.isEarned);
 
   return (
     <View className="mt-8">
-      <View className="mb-3 flex-row items-center justify-between px-1">
+      <View className="mb-4 flex-row items-center justify-between px-1">
         <Text className="font-display text-sm uppercase tracking-wider text-neutral-on-surface-variant">
-          Insignias · {earned.length}/{badges.length}
+          Insignias del Equipo
+        </Text>
+        <Text
+          className="font-uiBold text-[10px] uppercase text-neutral-on-surface-variant"
+          style={{ fontVariant: ['tabular-nums'] }}>
+          {earned.length} de {badges.length}
         </Text>
       </View>
 
       {badges.length === 0 ? (
-        <View className="rounded-xl bg-surface-low px-4 py-5">
-          <Text className="font-ui text-sm text-neutral-on-surface-variant">
-            Todavía no hay insignias disponibles.
-          </Text>
+        <View className="rounded-xl border border-dashed border-neutral-outline/15 bg-surface-high px-4 py-3">
+          <Text className="text-xs text-neutral-on-surface-variant">Sin insignias disponibles.</Text>
         </View>
       ) : (
         <ScrollView

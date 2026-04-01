@@ -13,7 +13,6 @@ export type TeamStatsHeader = {
   shieldUrl: string | null;
   prRating: number;
   fairPlayScore: number;
-  inRanking: boolean;
 };
 
 export type TeamSeasonRecord = {
@@ -52,6 +51,16 @@ export type TeamMemberStat = {
   presencePercent: string;
 };
 
+export type TeamBadgeItem = {
+  id: string;
+  slug: string;
+  name: string;
+  criteriaDescription: string;
+  iconUrl: string;
+  entityType: string;
+  isEarned: boolean;
+};
+
 export type TeamStatsViewData = {
   header: TeamStatsHeader;
   season: TeamSeasonRecord;
@@ -59,6 +68,7 @@ export type TeamStatsViewData = {
   recentMatches: TeamRecentMatch[];
   members: TeamMemberStat[];
   isOwnTeam: boolean;
+  badges: TeamBadgeItem[];
 };
 
 export interface H2HMatch {

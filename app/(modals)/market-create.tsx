@@ -15,6 +15,7 @@ import { useTeamStore } from '@/stores/teamStore';
 
 import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
 import { TEAM_FORMAT_OPTIONS, TeamFormat } from '@/lib/team-options';
+import { fetchVenuesByZoneName, VenueEntry } from '@/lib/venue-data';
 
 type PostType = 'BUSCA_EQUIPO' | 'BUSCA_PARTIDO';
 
@@ -42,6 +43,9 @@ export default function MarketCreateModal() {
   const [zone, setZone] = useState('');
   const [showZonePicker, setShowZonePicker] = useState(false);
   const [complex, setComplex] = useState('');
+  const [venues, setVenues] = useState<VenueEntry[]>([]);
+  const [selectedVenue, setSelectedVenue] = useState<VenueEntry | null>(null);
+  const [loadingVenues, setLoadingVenues] = useState(false);
   const [pitchType, setPitchType] = useState<TeamFormat | null>(null);
 
   // Específicos de Jugador
@@ -62,6 +66,28 @@ export default function MarketCreateModal() {
       void fetchMyTeams(profile.id);
     }
   }, [profile?.id, fetchMyTeams]);
+
+  // Fetch venues when zone changes
+  useEffect(() => {
+    if (!zone) {
+      setVenues([]);
+      setSelectedVenue(null);
+      setComplex('');
+      return;
+    }
+    setLoadingVenues(true);
+    setSelectedVenue(null);
+    setComplex('');
+    fetchVenuesByZoneName(zone)
+      .then(setVenues)
+      .catch(() => setVenues([]))
+      .finally(() => setLoadingVenues(false));
+  }, [zone]);
+
+  // Keep `complex` string in sync with the selected venue (used by createTeamPost)
+  useEffect(() => {
+    if (selectedVenue) setComplex(selectedVenue.name);
+  }, [selectedVenue]);
 
   const formatDate = (date: Date): string => {
     const dd = String(date.getDate()).padStart(2, '0');
@@ -165,30 +191,54 @@ export default function MarketCreateModal() {
 
               <View className="mb-4">
                 <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Día</Text>
-                <TouchableOpacity
-                  onPress={() => setShowDatePicker(true)}
-                  activeOpacity={0.7}
-                  className="bg-surface-high p-3 rounded-lg"
-                >
-                  <Text className={`font-ui ${matchDate ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
-                    {matchDate ? formatDate(matchDate) : 'Seleccionar fecha'}
-                  </Text>
-                </TouchableOpacity>
+                <View className="flex-row items-center bg-surface-high rounded-lg overflow-hidden">
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(true)}
+                    activeOpacity={0.7}
+                    className="flex-1 p-3"
+                  >
+                    <Text className={`font-ui ${matchDate ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
+                      {matchDate ? formatDate(matchDate) : 'Seleccionar fecha'}
+                    </Text>
+                  </TouchableOpacity>
+                  {matchDate && (
+                    <TouchableOpacity
+                      onPress={() => setMatchDate(null)}
+                      activeOpacity={0.7}
+                      className="px-3 py-3"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <AppIcon family="material-icons" name="close" size={16} color="#88998D" />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               <View className="mb-4">
                 <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Hora</Text>
-                <TouchableOpacity
-                  onPress={() => setShowTimePicker(true)}
-                  activeOpacity={0.7}
-                  className="bg-surface-high p-3 rounded-lg"
-                >
-                  <Text className={`font-ui ${matchTime ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
-                    {matchTime
-                      ? `${matchTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })} hs`
-                      : 'Seleccionar hora'}
-                  </Text>
-                </TouchableOpacity>
+                <View className="flex-row items-center bg-surface-high rounded-lg overflow-hidden">
+                  <TouchableOpacity
+                    onPress={() => setShowTimePicker(true)}
+                    activeOpacity={0.7}
+                    className="flex-1 p-3"
+                  >
+                    <Text className={`font-ui ${matchTime ? 'text-neutral-on-surface' : 'text-[#88998D]'}`}>
+                      {matchTime
+                        ? `${matchTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })} hs`
+                        : 'Seleccionar hora'}
+                    </Text>
+                  </TouchableOpacity>
+                  {matchTime && (
+                    <TouchableOpacity
+                      onPress={() => setMatchTime(null)}
+                      activeOpacity={0.7}
+                      className="px-3 py-3"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <AppIcon family="material-icons" name="close" size={16} color="#88998D" />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               <View>
@@ -207,13 +257,48 @@ export default function MarketCreateModal() {
 
               <View className="mt-4">
                 <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Complejo (opcional)</Text>
-                <TextInput
-                  value={complex}
-                  onChangeText={setComplex}
-                  placeholder="Ej: Complejo El Potrero"
-                  placeholderTextColor="#88998D"
-                  className="bg-surface-high p-3 rounded-lg text-neutral-on-surface font-ui"
-                />
+                {zone ? (
+                  loadingVenues ? (
+                    <ActivityIndicator size="small" color="#53E076" style={{ alignSelf: 'flex-start', marginTop: 4 }} />
+                  ) : venues.length === 0 ? (
+                    <View className="bg-surface-high p-3 rounded-lg">
+                      <Text className="font-ui text-sm text-[#88998D]">Sin complejos registrados en esta zona</Text>
+                    </View>
+                  ) : (
+                    <View className="gap-2">
+                      {venues.map((v) => (
+                        <TouchableOpacity
+                          key={v.id}
+                          onPress={() => setSelectedVenue(selectedVenue?.id === v.id ? null : v)}
+                          activeOpacity={0.8}
+                          className={`rounded-xl p-3 ${selectedVenue?.id === v.id ? 'border border-brand-primary/40 bg-brand-primary/10' : 'bg-surface-high'}`}
+                        >
+                          <View className="flex-row items-center gap-3">
+                            <View className={`h-5 w-5 items-center justify-center rounded-full border-2 ${selectedVenue?.id === v.id ? 'border-brand-primary' : 'border-neutral-outline'}`}>
+                              {selectedVenue?.id === v.id && (
+                                <View className="h-2.5 w-2.5 rounded-full bg-brand-primary" />
+                              )}
+                            </View>
+                            <View className="flex-1">
+                              <Text className="font-uiBold text-sm text-neutral-on-surface">{v.name}</Text>
+                              {v.address && (
+                                <Text className="font-ui text-xs text-neutral-on-surface-variant">{v.address}</Text>
+                              )}
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )
+                ) : (
+                  <TextInput
+                    value={complex}
+                    onChangeText={setComplex}
+                    placeholder="Ej: Complejo El Potrero"
+                    placeholderTextColor="#88998D"
+                    className="bg-surface-high p-3 rounded-lg text-neutral-on-surface font-ui"
+                  />
+                )}
               </View>
 
               <View className="mt-4">
@@ -321,9 +406,9 @@ export default function MarketCreateModal() {
           display="default"
           minimumDate={new Date()}
           locale="es-AR"
-          onChange={(_, date) => {
+          onChange={(event, date) => {
             setShowDatePicker(false);
-            if (date) setMatchDate(date);
+            if (event.type !== 'dismissed' && date) setMatchDate(date);
           }}
         />
       )}
@@ -333,9 +418,9 @@ export default function MarketCreateModal() {
           value={matchTime ?? new Date()}
           mode="time"
           display="default"
-          onChange={(_, date) => {
+          onChange={(event, date) => {
             setShowTimePicker(false);
-            if (date) setMatchTime(date);
+            if (event.type !== 'dismissed' && date) setMatchTime(date);
           }}
         />
       )}
