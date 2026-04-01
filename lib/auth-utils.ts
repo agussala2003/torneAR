@@ -1,3 +1,4 @@
+// tornear/lib/auth-utils.ts
 import { Database } from '@/types/supabase';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -9,6 +10,9 @@ export function isProfileComplete(profile: Profile | null): boolean {
     profile.username?.trim() &&
     profile.full_name?.trim() &&
     profile.preferred_position?.trim() &&
-    profile.zone?.trim()
+    profile.zone?.trim() &&
+    profile.date_of_birth &&
+    profile.gender &&
+    profile.strong_foot,
   );
 }
