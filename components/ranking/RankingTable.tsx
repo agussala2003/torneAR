@@ -39,6 +39,7 @@ export function RankingTable({ entries, onTeamPress, topLimit = 5 }: Props) {
                 <Text className="w-7 font-uiBold text-xs uppercase text-neutral-on-surface-variant">#</Text>
                 <View className="w-10" />
                 <Text className="flex-1 font-uiBold text-xs uppercase text-neutral-on-surface-variant">Equipo</Text>
+                <Text className="mr-4 font-uiBold text-xs uppercase text-neutral-on-surface-variant">EF%</Text>
                 <Text className="font-uiBold text-xs uppercase text-neutral-on-surface-variant">Rating</Text>
                 <View className="w-5" />
             </View>
