@@ -15,6 +15,11 @@ export function RankingTeamRow({ entry, onPress, index = 0 }: Props) {
     const posColors = ['#FABD32', '#C0C0C0', '#CD7F32'] as const; // Oro, Plata, Bronce
     const posColor = isTop3 ? posColors[entry.rankPosition - 1] : '#869585';
 
+    // % Efectividad on-the-fly (seguro si no jugó partidos).
+    const winRate = entry.matchesPlayed > 0
+        ? Math.round((entry.seasonWins / entry.matchesPlayed) * 100)
+        : 0;
+
     return (
         <Animated.View entering={FadeInRight.delay(index * 50).springify()} style={{ marginBottom: 6 }}>
         <TouchableOpacity
@@ -53,6 +58,14 @@ export function RankingTeamRow({ entry, onPress, index = 0 }: Props) {
                 <Text className="font-ui text-[10px] text-neutral-on-surface-variant">
                     {entry.seasonWins}V · {entry.seasonLosses}D · {entry.seasonDraws}E
                 </Text>
+            </View>
+
+            {/* Efectividad */}
+            <View className="mr-4 items-end">
+                <Text className={`font-displayBlack text-[15px] leading-none ${entry.isMyTeam ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
+                    {winRate}%
+                </Text>
+                <Text className="mt-1 font-ui text-[10px] text-neutral-on-surface-variant">Efec.</Text>
             </View>
 
             {/* Rating */}

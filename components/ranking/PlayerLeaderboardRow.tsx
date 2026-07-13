@@ -8,10 +8,11 @@ import type { PlayerLeaderboardEntry } from './types';
 interface Props {
     entry: PlayerLeaderboardEntry;
     statLabel: string;
+    isPercent?: boolean;
     index?: number;
 }
 
-export function PlayerLeaderboardRow({ entry, statLabel, index = 0 }: Props) {
+export function PlayerLeaderboardRow({ entry, statLabel, isPercent = false, index = 0 }: Props) {
     const isTop3 = entry.rankPosition <= 3;
     const colors = ['#FABD32', '#C0C0C0', '#CD7F32'] as const;
     const posColor = isTop3 ? colors[entry.rankPosition - 1] : '#869585';
@@ -50,7 +51,9 @@ export function PlayerLeaderboardRow({ entry, statLabel, index = 0 }: Props) {
             </View>
 
             <View className="items-end">
-                <Text className="font-displayBlack text-xl leading-none text-brand-primary">{entry.value}</Text>
+                <Text className="font-displayBlack text-xl leading-none text-brand-primary">
+                    {entry.value}{isPercent ? '%' : ''}
+                </Text>
                 <Text className="mt-0.5 font-ui text-[9px] text-neutral-on-surface-variant">{statLabel}</Text>
             </View>
         </TouchableOpacity>
