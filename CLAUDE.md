@@ -25,9 +25,9 @@ npx tsc --noEmit
 
 Branching, CI/CD and Supabase environments are documented in
 [`docs/WORKFLOW.md`](docs/WORKFLOW.md). In short:
-- `main` = Producción, `develop` = Staging, features en `feature/<nombre>`.
+- `main` = Producción, `develop` = integración; features en `feature/<nombre>`.
 - Los PRs hacia `main`/`develop` corren CI (`.github/workflows/ci.yml`): `tsc`, `eslint` y Vitest.
-- Las migraciones se aplican primero a Staging y luego a Producción (nunca cambios de schema a mano).
+- ⚠️ Single-project (Free Tier): `main` y `develop` **comparten la base de Producción**. No hay Staging; validá cambios de schema en local (`supabase start`) antes de `db push`. Detalle en `docs/WORKFLOW.md`.
 
 ## Architecture
 

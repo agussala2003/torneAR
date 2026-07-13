@@ -101,61 +101,87 @@ Para que un PR **no se pueda mergear si CI falla**, activar en
 
 ---
 
-## 3. Estrategia de Supabase Branching (Entornos de DB)
+## 3. Estrategia de Supabase — Single Project (Free Tier)
 
-El objetivo: que `develop` nunca toque la base de datos de producción.
+**Decisión operativa:** por estar en el **plan gratuito** de Supabase (sin
+Branching nativo) y por decisión de proyecto, **NO usamos un proyecto de Staging
+separado**. Tanto `main` como `develop` apuntan al **mismo y único proyecto de
+Supabase: `yusfykqimalghmmhlfdn` (`tornear-db`) — el de Producción.**
 
-### Entornos
+| Entorno | Proyecto Supabase | Rama git |
+|---------|-------------------|----------|
+| **Producción** | `yusfykqimalghmmhlfdn` (`tornear-db`) | `main` **y** `develop` (comparten DB) |
 
-| Entorno | Proyecto Supabase | Rama git | Uso |
-|---------|-------------------|----------|-----|
-| **Producción** | `yusfykqimalghmmhlfdn` (`tornear-db`) | `main` | Datos reales de usuarios. |
-| **Staging** | *proyecto separado a crear* (`tornear-staging`) | `develop` | Pruebas de integración con datos de prueba. |
-| **Preview** (opcional) | Rama efímera de Supabase por PR | `feature/*` | Solo con Supabase Branching nativo (plan Pro). |
+> ⚠️ **`develop` NO tiene una base de datos aislada.** Cualquier migración,
+> RPC, trigger, edge function, seed o test con escritura que se ejecute "desde
+> develop" impacta **directamente los datos reales de producción**. No existe
+> una red de contención a nivel de base de datos entre `develop` y `main`.
+
+El aislamiento de entornos queda entonces **solo a nivel de código** (ramas + CI).
+La base es compartida, así que el cuidado con los datos es **manual y disciplinado**.
+
+### ⚠️ Best practices obligatorias (base compartida con Producción)
+
+Como no hay Staging, estas reglas son la única protección de los datos reales:
+
+1. **Probá primero en local, no contra el proyecto compartido.** Para cambios de
+   schema o lógica riesgosa, levantá una base local y validá ahí:
+   ```bash
+   supabase start          # Postgres + stack local (Docker)
+   supabase db reset       # aplica TODAS las migraciones sobre la DB LOCAL
+   # ... probás ...
+   supabase stop
+   ```
+   El `supabase db reset` es **destructivo**: solo se corre contra la base
+   **local**, nunca contra el proyecto compartido.
+
+2. **Tests SQL contra el proyecto real: siempre en transacción abortada.**
+   Envolvé cualquier prueba que inserte/actualice en `BEGIN; ... ROLLBACK;`
+   (o `savepoint`), como en `supabase/tests/*.sql`. Nunca dejes datos de prueba
+   persistidos. Si insertás algo para probar, **borralo en el mismo paso**.
+
+3. **Migraciones = forward-only y directas a Producción.** No hay "ensayo" en
+   otra base: cuando corrés `supabase db push`, va a prod. Revisá cada migración
+   con cuidado extra, hacela idempotente (`IF NOT EXISTS`, `OR REPLACE`) y evitá
+   operaciones destructivas (`DROP`, `DELETE` masivos, `TRUNCATE`).
+
+4. **Nunca corras seeds ni `db reset` contra el proyecto compartido.** Esos
+   comandos son solo para la base local.
+
+5. **`.env` apunta al mismo proyecto en ambas ramas.** No hay credenciales de
+   Staging; `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_KEY` son las de
+   producción tanto trabajando en `develop` como en `main`. Tenelo presente: la
+   app en modo dev lee/escribe datos reales.
+
+6. **Ventana de bajo tráfico para cambios sensibles.** Al aplicar migraciones o
+   probar flujos con escritura, preferí horarios de poco uso y avisá al equipo.
+
+### Flujo de migraciones (single project)
+
+```bash
+# Una sola vez: linkear el CLI al proyecto de producción
+supabase link --project-ref yusfykqimalghmmhlfdn
+
+# Tras validar en LOCAL, aplicar migraciones y funciones al proyecto (= prod)
+supabase db push
+supabase functions deploy
+```
 
 Las migraciones (`supabase/migrations/`) y edge functions (`supabase/functions/`)
-son la **única fuente de verdad**: el mismo set de migraciones se aplica a Staging
-primero y a Producción después. Nunca se modifica el schema de un entorno a mano
+siguen siendo la **única fuente de verdad**; nunca se modifica el schema a mano
 por fuera de una migración versionada.
 
-### Opción recomendada: dos proyectos (Staging + Prod)
+### Secretos
 
-Simple, sin costo de plan Pro, control total.
+El proyecto tiene sus secretos de Vault y variables de edge functions. El valor
+real (ej. `push_dispatch_secret`) se carga a mano en el Vault del dashboard y
+**nunca** se versiona en git (los archivos de migración usan placeholders).
 
-1. **Crear el proyecto de Staging** una sola vez (desde el dashboard de Supabase
-   o `supabase projects create tornear-staging`). Guardar su `project-ref`.
-2. **Aplicar migraciones a Staging** (trabajando desde `develop`):
-   ```bash
-   supabase link --project-ref <STAGING_REF>
-   supabase db push            # aplica las migraciones pendientes
-   supabase functions deploy   # despliega las edge functions
-   ```
-3. **Probar en Staging.** La app en modo dev apunta a Staging vía `.env`
-   (`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_KEY` del proyecto Staging).
-4. **Promover a Producción** (al mergear `develop → main`):
-   ```bash
-   supabase link --project-ref yusfykqimalghmmhlfdn
-   supabase db push
-   supabase functions deploy
-   ```
+### Camino a futuro
 
-> **Regla de oro:** una migración se aplica a Producción **solo después** de
-> haberse validado en Staging. Las migraciones son *forward-only* (no se editan
-> las ya aplicadas; los cambios van en una migración nueva).
-
-### Opción avanzada: Supabase Branching nativo (plan Pro)
-
-Si se habilita el plan Pro + integración GitHub, Supabase puede crear una **rama
-de base de datos efímera por cada Pull Request**, con su propio schema derivado de
-las migraciones. Al mergear, se descarta. Ideal para previews aislados por feature,
-pero requiere Pro y conectar el repo en el dashboard de Supabase (*Branching*).
-
-### Secretos por entorno
-
-Cada proyecto (Staging / Prod) tiene sus **propios** secretos de Vault y variables
-de edge functions. Ejemplo: el `push_dispatch_secret` debe cargarse por separado en
-el Vault de cada entorno. **Nunca** se versiona el valor real en git (los archivos
-de migración usan placeholders).
+Cuando el proyecto justifique el plan Pro, migrar a **dos proyectos
+(Staging + Prod)** o a **Supabase Branching nativo** para recuperar el
+aislamiento de datos por entorno. Hasta entonces, rige la disciplina de arriba.
 
 ---
 
@@ -164,12 +190,15 @@ de migración usan placeholders).
 **Nueva feature:**
 1. `git checkout develop && git pull`
 2. `git checkout -b feature/<nombre>`
-3. Si hay cambios de schema → nueva migración en `supabase/migrations/` + `supabase db push` a Staging.
+3. Si hay cambios de schema → nueva migración en `supabase/migrations/`, validada
+   **en local** (`supabase start` + `supabase db reset`). ⚠️ Recordá: no hay
+   Staging; aplicar al proyecto compartido = aplicar a Producción.
 4. Commit + `git push -u origin feature/<nombre>` + PR hacia `develop`.
 5. CI verde + review → merge.
 
-**Release a producción:**
+**Release a producción (base compartida):**
 1. PR `develop → main`.
 2. CI verde + review → merge.
-3. `supabase link --project-ref yusfykqimalghmmhlfdn && supabase db push && supabase functions deploy`.
+3. `supabase link --project-ref yusfykqimalghmmhlfdn && supabase db push && supabase functions deploy`
+   (impacta la base real — hacerlo con cuidado, en ventana de bajo tráfico).
 4. Build de release (EAS).
