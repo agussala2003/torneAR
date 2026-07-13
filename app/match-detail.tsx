@@ -17,6 +17,7 @@ import {
   submitMatchResult,
   doCheckin,
   requestCancellation,
+  respondToCancellationRequest,
   claimWo,
   submitDisputeVote,
   resolveMatchDispute,
@@ -31,6 +32,7 @@ import { ResultSection } from '@/components/matches/ResultSection';
 import { ProposalModal } from '@/components/matches/ProposalModal';
 import { ResultModal } from '@/components/matches/ResultModal';
 import { CancellationModal } from '@/components/matches/CancellationModal';
+import { CancellationRequestSection } from '@/components/matches/CancellationRequestSection';
 import { WoModal } from '@/components/matches/WoModal';
 import { DisputeSection } from '@/components/matches/DisputeSection';
 import type { MatchDetailViewData, MatchProposalFormData } from '@/components/matches/types';
@@ -190,6 +192,24 @@ export default function MatchDetailScreen() {
     return diff < 24 * 60 * 60 * 1000;
   }
 
+  async function handleRespondToCancellation(accept: boolean) {
+    if (!match?.cancellationRequest) return;
+    try {
+      await respondToCancellationRequest(
+        match.cancellationRequest.id,
+        accept,
+        match.cancellationRequest.requestedByTeamId,
+      );
+      showAlert(
+        accept ? 'Cancelación aceptada' : 'Solicitud rechazada',
+        accept ? 'El partido fue cancelado.' : 'El partido sigue en pie.',
+        () => void loadData(),
+      );
+    } catch (err) {
+      showAlert('Error', getGenericSupabaseErrorMessage(err));
+    }
+  }
+
   if (loading) return <GlobalLoader label="Cargando partido..." />;
 
   if (!match) {
@@ -208,6 +228,8 @@ export default function MatchDetailScreen() {
   const isMyTeamA = match.teamA.id === myTeamId;
   const myCheckinAt = isMyTeamA ? match.checkinTeamAAt : match.checkinTeamBAt;
   const myTeamParticipants = match.participants.filter((p) => p.teamId === myTeamId);
+  const opponentTeam = isMyTeamA ? match.teamB : match.teamA;
+  const hasPendingCancellation = match.cancellationRequest?.status === 'PENDIENTE';
 
   function renderStatusBadge() {
     const colors: Record<string, string> = {
@@ -310,9 +332,19 @@ export default function MatchDetailScreen() {
                 </TouchableOpacity>
               </View>
             )}
+            {hasPendingCancellation && match.cancellationRequest && (
+              <CancellationRequestSection
+                request={match.cancellationRequest}
+                myTeamId={myTeamId}
+                myRole={match.myRole}
+                opponentName={opponentTeam.name}
+                onAccept={() => void handleRespondToCancellation(true)}
+                onReject={() => void handleRespondToCancellation(false)}
+              />
+            )}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
-              onCancel={() => setShowCancellationModal(true)}
+              onCancel={hasPendingCancellation ? undefined : () => setShowCancellationModal(true)}
             />
           </>
         )}
@@ -322,10 +354,20 @@ export default function MatchDetailScreen() {
           <>
             <MatchDetailsSection match={match} />
             <CheckinSection match={match} onCheckin={() => void handleCheckin()} />
+            {hasPendingCancellation && match.cancellationRequest && (
+              <CancellationRequestSection
+                request={match.cancellationRequest}
+                myTeamId={myTeamId}
+                myRole={match.myRole}
+                opponentName={opponentTeam.name}
+                onAccept={() => void handleRespondToCancellation(true)}
+                onReject={() => void handleRespondToCancellation(false)}
+              />
+            )}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
               onWo={myCheckinAt !== null ? () => setShowWoModal(true) : undefined}
-              onCancel={() => setShowCancellationModal(true)}
+              onCancel={hasPendingCancellation ? undefined : () => setShowCancellationModal(true)}
             />
           </>
         )}
@@ -448,10 +490,10 @@ export default function MatchDetailScreen() {
         onClose={() => setShowCancellationModal(false)}
         isLateWarning={isLateForCancellation()}
         onSubmit={async (data) => {
-          await requestCancellation(match.id, myTeamId, data);
+          await requestCancellation(match.id, myTeamId, data, opponentTeam.id);
           showAlert(
             'Solicitud enviada',
-            'Tu solicitud de cancelación fue enviada.',
+            `Le pedimos a ${opponentTeam.name} que confirme la cancelación. El partido sigue en pie hasta que responda.`,
             () => void loadData(),
           );
         }}

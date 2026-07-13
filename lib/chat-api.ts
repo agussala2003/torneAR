@@ -103,30 +103,29 @@ export async function getOrCreateMarketChat(
 export async function fetchInbox(): Promise<MarketConversation[]> {
   const profileId = await getProfileId();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('get_market_inbox', { p_profile_id: profileId });
+  const { data, error } = await supabase.rpc('get_market_inbox', { p_profile_id: profileId });
   if (error) throw error;
 
-  return ((data ?? []) as Record<string, unknown>[]).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    type: row.type as string,
-    player_id: row.player_id as string,
-    team_id: row.team_id as string,
-    created_at: row.created_at as string,
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    type: row.type,
+    player_id: row.player_id,
+    team_id: row.team_id,
+    created_at: row.created_at,
     player: row.player_full_name
-      ? { full_name: row.player_full_name as string, avatar_url: (row.player_avatar as string | null) ?? null }
+      ? { full_name: row.player_full_name, avatar_url: row.player_avatar ?? null }
       : undefined,
     team: row.team_name
-      ? { name: row.team_name as string, shield_url: (row.team_shield as string | null) ?? null }
+      ? { name: row.team_name, shield_url: row.team_shield ?? null }
       : undefined,
-    last_msg_content: (row.last_msg_content as string | null) ?? null,
-    last_msg_at: (row.last_msg_at as string | null) ?? null,
-    last_msg_sender: (row.last_msg_sender as string | null) ?? null,
-    last_read_at: (row.last_read_at as string | null) ?? null,
+    last_msg_content: row.last_msg_content ?? null,
+    last_msg_at: row.last_msg_at ?? null,
+    last_msg_sender: row.last_msg_sender ?? null,
+    last_read_at: row.last_read_at ?? null,
     unread: computeUnread(
-      row.last_msg_at as string | null,
-      row.last_msg_sender as string | null,
-      row.last_read_at as string | null,
+      row.last_msg_at,
+      row.last_msg_sender,
+      row.last_read_at,
       profileId,
     ),
   }));
@@ -155,8 +154,7 @@ export async function fetchMessages(
 
   const { data, error } = await supabase
     .from('messages')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .select('*, sender_profile:profiles!sender_profile_id(full_name)' as any)
+    .select('*, sender_profile:profiles!sender_profile_id(full_name)')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
 
@@ -179,8 +177,7 @@ export async function fetchMessages(
 export async function markConversationAsRead(conversationId: string): Promise<void> {
   const profileId = await getProfileId();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase as any)
+  const { error } = await supabase
     .from('conversation_reads')
     .upsert(
       { profile_id: profileId, conversation_id: conversationId, last_read_at: new Date().toISOString() },
@@ -193,13 +190,12 @@ export async function markConversationAsRead(conversationId: string): Promise<vo
 export async function fetchUnreadChatCount(): Promise<number> {
   const profileId = await getProfileId();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc('get_unread_market_chat_count', {
+  const { data, error } = await supabase.rpc('get_unread_market_chat_count', {
     p_profile_id: profileId,
   });
 
   if (error) throw error;
-  return (data as number) ?? 0;
+  return data ?? 0;
 }
 
 /**
@@ -217,16 +213,14 @@ export async function sendMessage(
 
   const { data, error } = await supabase
     .from('messages')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
       conversation_id: conversationId,
       sender_profile_id: profileId,
       sender_team_id: senderTeamId || null,
       content,
       message_type: messageType,
-    } as any)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .select('*, sender_profile:profiles!sender_profile_id(full_name)' as any)
+    })
+    .select('*, sender_profile:profiles!sender_profile_id(full_name)')
     .single();
 
   if (error) throw error;

@@ -6,8 +6,11 @@ import { useTeamStore } from '@/stores/teamStore';
 import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
-import { supabase } from '@/lib/supabase';
-import { fetchRankingWithFilters, searchRivalTeams, fetchPlayerLeaderboard } from '@/lib/ranking-data';
+import {
+  fetchRankingWithFilters, searchRivalTeams, fetchPlayerLeaderboard,
+  fetchActiveSeason, fetchActiveTeamRankingInfo,
+} from '@/lib/ranking-data';
+import { fetchActiveZoneNames } from '@/lib/zones-data';
 import type { RankingFiltersState, RankingMode, LeaderboardStat, RankingTeamEntry, RivalTeamEntry, PlayerLeaderboardEntry } from '@/components/ranking/types';
 
 import { RankingFilterModal } from '@/components/ranking/RankingFilterModal';
@@ -61,15 +64,13 @@ export default function RankingScreen() {
       setLoading(true);
 
       // Cargamos la temporada activa y las zonas activas en paralelo
-      const [seasonRes, zonesRes] = await Promise.all([
-        supabase.from('seasons').select('id, name').eq('is_active', true).maybeSingle(),
-        supabase.from('zones').select('name').eq('is_active', true).order('name')
+      const [activeSeasonData, zones] = await Promise.all([
+        fetchActiveSeason(),
+        fetchActiveZoneNames(),
       ]);
 
-      setActiveSeason(seasonRes.data);
-      if (zonesRes.data) {
-        setAvailableZones(zonesRes.data.map(z => z.name));
-      }
+      setActiveSeason(activeSeasonData);
+      setAvailableZones(zones);
 
       // Compute teamIds here to avoid a stale-closure / unstable-array dep
       const teamIds = myTeams.map(t => t.id);
@@ -77,11 +78,11 @@ export default function RankingScreen() {
       let elo = null;
       let initialFilters: RankingFiltersState = { zone: null, category: null, format: null, rivalesIdeales: false };
       if (activeTeamId) {
-        const { data: team } = await supabase.from('teams').select('elo_rating, zone, category, preferred_format').eq('id', activeTeamId).single();
+        const team = await fetchActiveTeamRankingInfo(activeTeamId);
         if (team) {
-          elo = team.elo_rating;
+          elo = team.eloRating;
           setActiveTeamElo(elo);
-          initialFilters = { zone: team.zone, category: team.category as any, format: team.preferred_format as any, rivalesIdeales: false };
+          initialFilters = { zone: team.zone, category: team.category, format: team.format, rivalesIdeales: false };
           setFilters(initialFilters);
         }
       }
@@ -89,7 +90,7 @@ export default function RankingScreen() {
       const activeTeamName = myTeams.find(t => t.id === activeTeamId)?.name ?? null;
       const [ranking, players] = await Promise.all([
         fetchRankingWithFilters(initialFilters, teamIds, elo),
-        fetchPlayerLeaderboard('goals', initialFilters.zone, seasonRes.data?.id || null, {
+        fetchPlayerLeaderboard('goals', initialFilters.zone, activeSeasonData?.id || null, {
           profileId: profile.id, fullName: profile.full_name, avatarUrl: profile.avatar_url ?? null,
           teamId: activeTeamId ?? null, teamName: activeTeamName,
         })

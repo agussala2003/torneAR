@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, TouchableWithoutFeedback, ActivityIndicator, StyleSheet } from 'react-native';
-import { supabase } from '@/lib/supabase';
+import { fetchActiveZoneNames } from '@/lib/zones-data';
 
 interface ZonePickerDialogProps {
   visible: boolean;
@@ -19,10 +19,9 @@ export function ZonePickerDialog({ visible, onClose, selectedZone, onSelect }: Z
     async function fetchZones() {
       if (!visible) return;
       setLoadingZones(true);
-      const { data, error } = await supabase.from('zones').select('name').eq('is_active', true);
-      if (!error && data) {
-        setZones(data.map((z) => z.name));
-      } else {
+      try {
+        setZones(await fetchActiveZoneNames());
+      } catch {
         setZones(['Buenos Aires Centro', 'GBA Norte', 'GBA Sur', 'GBA Oeste']);
       }
       setLoadingZones(false);

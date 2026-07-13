@@ -97,11 +97,16 @@ interface MarketTeamCardProps {
   /** Called when the user taps "Stats". */
   onPressStats?: () => void;
   onDelete: () => void;
+  /** Cantidad de postulaciones recibidas — sólo relevante para isOwner. */
+  applicationCount?: number;
+  /** Called when the owner taps "Postulaciones". Not called for non-owners. */
+  onViewApplications?: () => void;
 }
 
 export function MarketTeamCard({
   postId, teamName, teamZone, matchZone, logoUrl, positionWanted, pitchType, description,
   matchDate, matchTime, complex, isOwner, memberStatus, index = 0, onPressAction, onPressStats, onDelete,
+  applicationCount, onViewApplications,
 }: MarketTeamCardProps) {
   const isUrgent = isUrgentPost(matchDate);
   const cleanDescription = sanitizeMarketDescription(description);
@@ -210,14 +215,27 @@ export function MarketTeamCard({
 
       {/* Action buttons */}
       {isOwner ? (
-        <TouchableOpacity
-          onPress={onDelete}
-          activeOpacity={0.8}
-          className="py-3 items-center"
-          style={{ backgroundColor: 'rgba(255,84,73,0.18)', borderTopWidth: 1, borderTopColor: 'rgba(255,84,73,0.35)' }}
-        >
-          <Text className="text-[#FF8A80] font-uiBold text-[11px] tracking-widest uppercase">Cancelar Mi Publicación</Text>
-        </TouchableOpacity>
+        <View className="flex-row items-center">
+          <TouchableOpacity
+            onPress={onViewApplications}
+            activeOpacity={0.8}
+            className="flex-1 py-3 items-center"
+            style={{ backgroundColor: 'rgba(140,205,255,0.12)', borderTopWidth: 1, borderTopColor: 'rgba(140,205,255,0.3)' }}
+          >
+            <Text className="text-info-secondary font-uiBold text-[11px] tracking-widest uppercase">
+              Postulaciones{applicationCount ? ` (${applicationCount})` : ''}
+            </Text>
+          </TouchableOpacity>
+          <View style={{ width: 1, height: '100%', backgroundColor: 'rgba(0,0,0,0.1)' }} />
+          <TouchableOpacity
+            onPress={onDelete}
+            activeOpacity={0.8}
+            className="flex-1 py-3 items-center"
+            style={{ backgroundColor: 'rgba(255,84,73,0.18)', borderTopWidth: 1, borderTopColor: 'rgba(255,84,73,0.35)' }}
+          >
+            <Text className="text-[#FF8A80] font-uiBold text-[11px] tracking-widest uppercase">Cancelar</Text>
+          </TouchableOpacity>
+        </View>
       ) : memberStatus ? (
         <View
           className="py-3 items-center"
@@ -273,11 +291,16 @@ interface MarketPlayerCardProps {
   /** Called when the user taps "Stats". */
   onPressStats?: () => void;
   onDelete: () => void;
+  /** Cantidad de postulaciones recibidas — sólo relevante para isOwner. */
+  applicationCount?: number;
+  /** Called when the owner taps "Postulaciones". Not called for non-owners. */
+  onViewApplications?: () => void;
 }
 
 export function MarketPlayerCard({
   postId, playerName, avatarUrl, username, position, postType,
   description, isOwner, memberStatus, index = 0, onPressAction, onPressStats, onDelete,
+  applicationCount, onViewApplications,
 }: MarketPlayerCardProps) {
   const subtitle = postType === 'BUSCA_EQUIPO' ? 'Busca Equipo' : 'Busca Partido';
   const cleanDescription = sanitizeMarketDescription(description);
@@ -337,14 +360,27 @@ export function MarketPlayerCard({
 
       {/* Action buttons — onPressAction only called for non-owners */}
       {isOwner ? (
-        <TouchableOpacity
-          onPress={onDelete}
-          activeOpacity={0.8}
-          className="py-3 items-center mt-3"
-          style={{ backgroundColor: 'rgba(255,84,73,0.18)', borderTopWidth: 1, borderTopColor: 'rgba(255,84,73,0.35)' }}
-        >
-          <Text className="text-[#FF8A80] font-uiBold text-[11px] tracking-widest uppercase">Cancelar Mi Publicación</Text>
-        </TouchableOpacity>
+        <View className="flex-row items-center mt-3">
+          <TouchableOpacity
+            onPress={onViewApplications}
+            activeOpacity={0.8}
+            className="flex-1 py-3 items-center"
+            style={{ backgroundColor: 'rgba(140,205,255,0.12)', borderTopWidth: 1, borderTopColor: 'rgba(140,205,255,0.3)' }}
+          >
+            <Text className="text-info-secondary font-uiBold text-[11px] tracking-widest uppercase">
+              Postulaciones{applicationCount ? ` (${applicationCount})` : ''}
+            </Text>
+          </TouchableOpacity>
+          <View style={{ width: 1, height: '100%', backgroundColor: 'rgba(0,0,0,0.1)' }} />
+          <TouchableOpacity
+            onPress={onDelete}
+            activeOpacity={0.8}
+            className="flex-1 py-3 items-center"
+            style={{ backgroundColor: 'rgba(255,84,73,0.18)', borderTopWidth: 1, borderTopColor: 'rgba(255,84,73,0.35)' }}
+          >
+            <Text className="text-[#FF8A80] font-uiBold text-[11px] tracking-widest uppercase">Cancelar</Text>
+          </TouchableOpacity>
+        </View>
       ) : memberStatus ? (
         <View
           className="py-3 items-center mt-3"

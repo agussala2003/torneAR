@@ -1,5 +1,9 @@
 import { supabase } from './supabase';
 import { CreateTeamPostInput, CreatePlayerPostInput } from './schemas/marketSchema';
+import type { Database } from '@/types/supabase';
+
+type PlayerPosition = Database['public']['Enums']['player_position'];
+type MarketPostType = Database['public']['Enums']['market_post_type'];
 
 export interface ManagedTeam {
   id: string;
@@ -78,11 +82,11 @@ export async function fetchTeamPosts(positionFilter?: string, zoneFilter?: strin
     .order('created_at', { ascending: false });
 
   if (positionFilter && positionFilter !== 'CUALQUIERA') {
-    query = query.eq('position_wanted', positionFilter as any);
+    query = query.eq('position_wanted', positionFilter as PlayerPosition);
   }
 
   if (zoneFilter && zoneFilter !== 'CUALQUIERA') {
-    query = query.eq('zone', zoneFilter as any);
+    query = query.eq('zone', zoneFilter);
   }
 
   const { data, error } = await query;
@@ -109,11 +113,11 @@ export async function fetchPlayerPosts(positionFilter?: string, typeFilter?: str
     .order('created_at', { ascending: false });
 
   if (positionFilter && positionFilter !== 'CUALQUIERA') {
-    query = query.eq('position', positionFilter as any);
+    query = query.eq('position', positionFilter as PlayerPosition);
   }
 
   if (typeFilter) {
-    query = query.eq('post_type', typeFilter as any);
+    query = query.eq('post_type', typeFilter as MarketPostType);
   }
 
   // Note: market_player_posts has no zone column — zone filtering applies to team posts only.

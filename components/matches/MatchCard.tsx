@@ -57,6 +57,13 @@ export function MatchCard({
       {/* Header */}
       <View className="mb-3 flex-row items-center gap-2">
         <MatchStatusBadge status={entry.status} />
+        {entry.hasPendingCancellation && (
+          <View className="flex-row items-center rounded bg-warning-tertiary/20 px-2 py-0.5">
+            <Text className="font-displayBlack text-[9px] uppercase tracking-wide text-warning-tertiary">
+              Cancelación pendiente
+            </Text>
+          </View>
+        )}
         <Text className="font-uiBold text-[11px] text-neutral-on-surface-variant">
           {MATCH_TYPE_LABEL[entry.matchType] ?? entry.matchType}
           {entry.format ? ` · ${FORMAT_SHORT[entry.format] ?? entry.format}` : ''}

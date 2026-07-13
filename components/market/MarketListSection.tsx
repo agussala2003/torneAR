@@ -13,12 +13,14 @@ interface MarketListSectionProps {
   activeTab: TabType;
   currentProfileId: string;
   onRefresh: () => void;
-   onContactTeam: (teamId: string) => void;
-  onContactPlayer: (playerProfileId: string) => void;
+   onContactTeam: (teamId: string, postId: string) => void;
+  onContactPlayer: (playerProfileId: string, postId: string) => void;
   onViewTeamStats: (teamId: string) => void;
   onViewPlayerStats: (profileId: string) => void;
   onDeletePost: (postId: string, isTeamPost: boolean) => void;
+  onViewApplications: (postId: string, postType: 'TEAM' | 'PLAYER') => void;
   memberStatusMap?: Record<string, 'own_team' | 'own_player'>;
+  applicationCounts?: Record<string, number>;
 }
 
 export function MarketListSection({
@@ -33,7 +35,9 @@ export function MarketListSection({
   onViewTeamStats,
   onViewPlayerStats,
   onDeletePost,
+  onViewApplications,
   memberStatusMap,
+  applicationCounts,
 }: MarketListSectionProps) {
   if (isLoading) {
     return (
@@ -67,9 +71,11 @@ export function MarketListSection({
            isOwner={isOwner}
           memberStatus={memberStatus}
           index={index}
-          onPressAction={() => onContactTeam(post.team_id)}
+          onPressAction={() => onContactTeam(post.team_id, post.id)}
           onPressStats={() => onViewTeamStats(post.team_id)}
           onDelete={() => onDeletePost(post.id, true)}
+          applicationCount={applicationCounts?.[post.id]}
+          onViewApplications={() => onViewApplications(post.id, 'TEAM')}
         />
       );
     } else {
@@ -88,9 +94,11 @@ export function MarketListSection({
            isOwner={isOwner}
           memberStatus={memberStatus}
           index={index}
-          onPressAction={() => onContactPlayer(post.profile_id)}
+          onPressAction={() => onContactPlayer(post.profile_id, post.id)}
           onPressStats={() => onViewPlayerStats(post.profile_id)}
           onDelete={() => onDeletePost(post.id, false)}
+          applicationCount={applicationCounts?.[post.id]}
+          onViewApplications={() => onViewApplications(post.id, 'PLAYER')}
         />
       );
     }

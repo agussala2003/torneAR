@@ -61,6 +61,12 @@ export type TeamBadgeItem = {
   isEarned: boolean;
 };
 
+export type TeamEloPoint = {
+  matchId: string;
+  createdAt: string;
+  elo: number;
+};
+
 export type TeamStatsViewData = {
   header: TeamStatsHeader;
   season: TeamSeasonRecord;
@@ -69,6 +75,7 @@ export type TeamStatsViewData = {
   members: TeamMemberStat[];
   isOwnTeam: boolean;
   badges: TeamBadgeItem[];
+  eloHistory: TeamEloPoint[];
 };
 
 export interface H2HMatch {

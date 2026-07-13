@@ -43,7 +43,7 @@ export async function fetchMatchesViewData(teamId: string): Promise<MatchesViewD
   const { data, error } = await supabase.rpc('get_my_matches', { p_team_id: teamId });
   if (error) {
     // PostgREST PGRST116 means "0 rows returned" — treat as empty result, not a true error
-    if ((error as any).code === 'PGRST116') {
+    if (error.code === 'PGRST116') {
       return { liveMatch: null, upcomingMatches: [], historyMatches: [], myTeamId: teamId };
     }
     throw error;

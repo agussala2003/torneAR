@@ -5,11 +5,11 @@ import {
   Modal,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
 import type { WoClaimFormData, WoClaimEntry } from '@/components/matches/types';
 
 type WoReason = WoClaimEntry['reason'];
@@ -44,11 +44,12 @@ export function WoModal({ visible, onClose, onSubmit }: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoMimeType, setPhotoMimeType] = useState('image/jpeg');
   const [loading, setLoading] = useState(false);
+  const { showAlert, AlertComponent } = useCustomAlert();
 
   async function handlePickImage() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para adjuntar evidencia.');
+      showAlert('Permiso requerido', 'Necesitamos acceso a tu galería para adjuntar evidencia.', undefined, 'warning');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -67,7 +68,7 @@ export function WoModal({ visible, onClose, onSubmit }: Props) {
   async function handleTakePhoto() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu cámara para tomar evidencia.');
+      showAlert('Permiso requerido', 'Necesitamos acceso a tu cámara para tomar evidencia.', undefined, 'warning');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -82,17 +83,9 @@ export function WoModal({ visible, onClose, onSubmit }: Props) {
     }
   }
 
-  function handlePhotoPress() {
-    Alert.alert('Agregar evidencia', 'Elegí una opción', [
-      { text: 'Galería', onPress: () => void handlePickImage() },
-      { text: 'Cámara', onPress: () => void handleTakePhoto() },
-      { text: 'Cancelar', style: 'cancel' },
-    ]);
-  }
-
   async function handleSubmit() {
     if (!photoBase64) {
-      Alert.alert('Foto requerida', 'Debés adjuntar una foto como evidencia para reclamar un WO.');
+      showAlert('Foto requerida', 'Debés adjuntar una foto como evidencia para reclamar un WO.', undefined, 'warning');
       return;
     }
     setLoading(true);
@@ -178,10 +171,8 @@ export function WoModal({ visible, onClose, onSubmit }: Props) {
             <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
               Evidencia fotográfica *
             </Text>
-            <TouchableOpacity
-              onPress={handlePhotoPress}
-              activeOpacity={0.8}
-              className={`mb-4 overflow-hidden rounded-xl border-2 border-dashed ${
+            <View
+              className={`overflow-hidden rounded-xl border-2 border-dashed ${
                 photoUri
                   ? 'border-brand-primary'
                   : 'border-neutral-outline/40 bg-surface-high'
@@ -197,23 +188,29 @@ export function WoModal({ visible, onClose, onSubmit }: Props) {
                 <View className="items-center justify-center py-8">
                   <AppIcon family="material-community" name="camera-plus" size={32} color="#869585" />
                   <Text className="font-ui mt-2 text-sm text-neutral-outline">
-                    Toca para agregar foto
-                  </Text>
-                  <Text className="font-ui mt-1 text-xs text-neutral-outline">
-                    Galería o cámara
+                    Agregá tu evidencia
                   </Text>
                 </View>
               )}
-            </TouchableOpacity>
-            {photoUri && (
+            </View>
+            <View className="mb-4 mt-2 flex-row gap-2">
               <TouchableOpacity
-                onPress={handlePhotoPress}
+                onPress={() => void handlePickImage()}
                 activeOpacity={0.8}
-                className="mb-4 -mt-2 items-center"
+                className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-surface-high py-2.5"
               >
-                <Text className="font-ui text-xs text-neutral-outline">Cambiar foto</Text>
+                <AppIcon family="material-community" name="image-outline" size={18} color="#BCCBB9" />
+                <Text className="font-uiBold text-sm text-neutral-on-surface">Galería</Text>
               </TouchableOpacity>
-            )}
+              <TouchableOpacity
+                onPress={() => void handleTakePhoto()}
+                activeOpacity={0.8}
+                className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-surface-high py-2.5"
+              >
+                <AppIcon family="material-community" name="camera-outline" size={18} color="#BCCBB9" />
+                <Text className="font-uiBold text-sm text-neutral-on-surface">Cámara</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Submit */}
             <TouchableOpacity
@@ -228,6 +225,7 @@ export function WoModal({ visible, onClose, onSubmit }: Props) {
             </TouchableOpacity>
           </ScrollView>
         </View>
+        {AlertComponent}
       </View>
     </Modal>
   );

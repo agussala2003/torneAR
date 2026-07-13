@@ -16,6 +16,11 @@ import { useTeamStore } from '@/stores/teamStore';
 import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
 import { TEAM_FORMAT_OPTIONS, TeamFormat } from '@/lib/team-options';
 import { fetchVenuesByZoneName, VenueEntry } from '@/lib/venue-data';
+import {
+  createTeamPostSchema,
+  createPlayerPostSchema,
+  MARKET_DESCRIPTION_MAX_LENGTH,
+} from '@/lib/schemas/marketSchema';
 
 type PostType = 'BUSCA_EQUIPO' | 'BUSCA_PARTIDO';
 
@@ -119,7 +124,8 @@ export default function MarketCreateModal() {
           hideLoader();
           return;
         }
-        await createTeamPost({
+
+        const teamPostPayload = {
           teamId: selectedTeamId,
           positionWanted: position as any,
           pitchType: pitchType ?? undefined,
@@ -128,15 +134,33 @@ export default function MarketCreateModal() {
           zone,
           complex,
           description,
-        });
+        };
+        const validation = createTeamPostSchema.safeParse(teamPostPayload);
+        if (!validation.success) {
+          showAlert('Error de validación', validation.error.issues[0].message);
+          setIsSubmitting(false);
+          hideLoader();
+          return;
+        }
+
+        await createTeamPost(teamPostPayload);
         showAlert('¡Éxito!', 'La publicación del equipo ha sido creada.');
         router.back();
       } else {
-        await createPlayerPost({
+        const playerPostPayload = {
           postType: playerPostType,
           position: position as any,
-          description
-        });
+          description,
+        };
+        const validation = createPlayerPostSchema.safeParse(playerPostPayload);
+        if (!validation.success) {
+          showAlert('Error de validación', validation.error.issues[0].message);
+          setIsSubmitting(false);
+          hideLoader();
+          return;
+        }
+
+        await createPlayerPost(playerPostPayload);
         showAlert('¡Éxito!', 'Has publicado tu búsqueda correctamente.');
         router.back();
       }
@@ -371,12 +395,18 @@ export default function MarketCreateModal() {
         </View>
 
         <View className="mb-8">
-          <Text className="text-neutral-on-surface font-uiBold mb-2">Descripción (Opcional)</Text>
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-neutral-on-surface font-uiBold">Descripción (Opcional)</Text>
+            <Text className="text-neutral-on-surface-variant font-ui text-xs">
+              {description.length}/{MARKET_DESCRIPTION_MAX_LENGTH}
+            </Text>
+          </View>
           <TextInput
             value={description}
             onChangeText={setDescription}
             multiline
             numberOfLines={4}
+            maxLength={MARKET_DESCRIPTION_MAX_LENGTH}
             placeholder={creationType === 'TEAM' ? "Ej: Buscamos arquero con experiencia para torneo los sábados..." : "Ej: Juego de 5, tengo disponibilidad por la noche..."}
             placeholderTextColor="#88998D"
             className="bg-surface-low p-4 rounded-xl text-neutral-on-surface font-ui min-h-[100px]"

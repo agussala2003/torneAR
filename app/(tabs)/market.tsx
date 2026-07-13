@@ -15,6 +15,7 @@ import { togglePostStatus } from '@/lib/market-api';
 import { filterPostsByDay } from '@/lib/market-utils';
 import { MarketViewData, TabType } from '@/components/market/types';
 import { getOrCreateMarketChat } from '@/lib/chat-api';
+import { applyToTeamPost, applyToPlayerPost, fetchApplicationCounts } from '@/lib/market-applications-api';
 
 export default function MarketScreen() {
   const { profile } = useAuth();
@@ -34,6 +35,7 @@ export default function MarketScreen() {
 
   const [activeCaptainTeamId, setActiveCaptainTeamId] = useState<string | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<{ id: string; isTeamPost: boolean } | null>(null);
+  const [applicationCounts, setApplicationCounts] = useState<Record<string, number>>({});
 
   const loadMarketData = useCallback(async (showFullLoader = true) => {
     if (!profile) {
@@ -49,6 +51,15 @@ export default function MarketScreen() {
       if (data.managedTeams.length > 0) {
         setActiveCaptainTeamId((current) => current ?? data.managedTeams[0].id);
       }
+
+      const ownTeamPostIds = data.teamPosts.filter((p) => p.created_by === profile.id).map((p) => p.id);
+      const ownPlayerPostIds = data.playerPosts.filter((p) => p.profile_id === profile.id).map((p) => p.id);
+      Promise.all([
+        fetchApplicationCounts(ownTeamPostIds, 'TEAM'),
+        fetchApplicationCounts(ownPlayerPostIds, 'PLAYER'),
+      ])
+        .then(([teamCounts, playerCounts]) => setApplicationCounts({ ...teamCounts, ...playerCounts }))
+        .catch(() => {}); // no crítico — el botón simplemente no muestra el número
     } catch {
       showAlert('Error', 'No se pudo cargar la informacion del mercado.');
     } finally {
@@ -89,11 +100,12 @@ export default function MarketScreen() {
     });
   };
 
-  const handleContactTeam = async (teamId: string) => {
+  const handleContactTeam = async (teamId: string, postId: string) => {
     if (!profile) return;
     showLoader('Abriendo chat...');
     try {
       const chat = await getOrCreateMarketChat(profile.id, teamId);
+      void applyToTeamPost(postId, teamId);
       router.push(`/market-chats/${chat.id}` as any);
     } catch {
       showAlert('Error', 'No se pudo abrir el chat. Intenta de nuevo.');
@@ -102,7 +114,7 @@ export default function MarketScreen() {
     }
   };
 
-  const handleContactPlayer = async (playerProfileId: string) => {
+  const handleContactPlayer = async (playerProfileId: string, postId: string) => {
     if (!profile || !viewData) return;
 
     if (viewData.managedTeams.length === 0) {
@@ -115,6 +127,7 @@ export default function MarketScreen() {
     showLoader('Abriendo chat...');
     try {
       const chat = await getOrCreateMarketChat(playerProfileId, teamId);
+      void applyToPlayerPost(postId, teamId, playerProfileId);
       router.push(`/market-chats/${chat.id}` as any);
     } catch {
       showAlert('Error', 'No se pudo abrir el chat. Intenta de nuevo.');
@@ -135,6 +148,13 @@ export default function MarketScreen() {
       pathname: '/profile-stats',
       params: { profileId: playerProfileId }
     });
+  };
+
+  const handleViewApplications = (postId: string, postType: 'TEAM' | 'PLAYER') => {
+    router.push({
+      pathname: '/market-applications',
+      params: { postId, postType },
+    } as any);
   };
 
   const handleDeletePost = (postId: string, isTeamPost: boolean) => {
@@ -231,7 +251,9 @@ export default function MarketScreen() {
           onViewTeamStats={handleViewTeamStats}
           onViewPlayerStats={handleViewPlayerStats}
           onDeletePost={handleDeletePost}
+          onViewApplications={handleViewApplications}
           memberStatusMap={memberStatusMap}
+          applicationCounts={applicationCounts}
         />
       </View>
 

@@ -1,5 +1,33 @@
 import { supabase, supabaseRpc } from '@/lib/supabase';
 import type { MatchResultFormData, CancellationFormData, WoClaimFormData } from '@/components/matches/types';
+import type { Database } from '@/types/supabase';
+
+type NotificationType = Database['public']['Enums']['notification_type'];
+
+// Notifica a CAPITAN/SUBCAPITAN de un equipo. Silencioso: nunca bloquea el flujo principal.
+async function notifyTeamLeaders(
+  teamId: string,
+  type: NotificationType,
+  title: string,
+  body: string,
+  data: Record<string, string>,
+) {
+  try {
+    const { data: members } = await supabase
+      .from('team_members')
+      .select('profile_id')
+      .eq('team_id', teamId)
+      .in('role', ['CAPITAN', 'SUBCAPITAN']);
+
+    if (!members || members.length === 0) return;
+
+    await supabase.from('notifications').insert(
+      members.map((m) => ({ profile_id: m.profile_id, type, title, body, data })),
+    );
+  } catch {
+    // Silenciamos errores de notificación para no bloquear el flujo principal
+  }
+}
 
 // ─── Proposal ────────────────────────────────────────────────────────────────
 
@@ -122,13 +150,15 @@ export async function submitMatchResult(
 }
 
 // ─── Cancellation ─────────────────────────────────────────────────────────────
-// SECURITY DEFINER RPC because cancellation_requests has no INSERT policy.
-// Immediately cancels the match.
+// SECURITY DEFINER RPC. Doble consentimiento: crea la solicitud en PENDIENTE,
+// el partido NO se cancela hasta que el equipo rival responda (ver
+// respondToCancellationRequest más abajo).
 
 export async function requestCancellation(
   matchId: string,
   teamId: string,
   data: CancellationFormData,
+  opponentTeamId: string,
 ): Promise<void> {
   const { error } = await supabaseRpc('request_match_cancellation', {
     p_match_id: matchId,
@@ -137,6 +167,41 @@ export async function requestCancellation(
     p_notes: data.notes ?? null,
   });
   if (error) throw error;
+
+  void notifyTeamLeaders(
+    opponentTeamId,
+    'CANCELACION_SOLICITADA',
+    '⚠️ Solicitud de cancelación',
+    'El equipo rival solicitó cancelar el partido. Revisá los detalles y respondé.',
+    { matchId },
+  );
+}
+
+// El equipo rival acepta o rechaza. Si acepta, el partido pasa a CANCELADO
+// (y si la cancelación es tardía, ahí recién se aplica la penalización de
+// Fair Play — no al pedirla). Si rechaza, el partido sigue en pie.
+export async function respondToCancellationRequest(
+  requestId: string,
+  accept: boolean,
+  requestedByTeamId: string,
+): Promise<string> {
+  const { data, error } = await supabaseRpc('respond_to_cancellation_request', {
+    p_request_id: requestId,
+    p_accept: accept,
+  });
+  if (error) throw error;
+
+  void notifyTeamLeaders(
+    requestedByTeamId,
+    accept ? 'PARTIDO_CANCELADO' : 'CANCELACION_RECHAZADA',
+    accept ? '✅ Cancelación aceptada' : '❌ Cancelación rechazada',
+    accept
+      ? 'El equipo rival aceptó cancelar el partido.'
+      : 'El equipo rival rechazó tu solicitud de cancelación. El partido sigue en pie.',
+    { requestId },
+  );
+
+  return data as string;
 }
 
 // ─── Guest join ───────────────────────────────────────────────────────────────

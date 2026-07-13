@@ -2,12 +2,10 @@ import { useState } from 'react';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { Image, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useAuth } from '@/context/AuthContext';
-import { decode } from 'base64-arraybuffer';
 import { ProfileRow } from './types';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
-import { supabase } from '@/lib/supabase';
+import { uploadProfileAvatar } from '@/lib/profile-edit-data';
 import CustomAlert from '@/components/ui/CustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 
@@ -71,54 +69,12 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
     try {
       setUploading(true);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error('No hay sesion activa para subir avatar.');
-      }
-
-      const folderOwnerId = profile.auth_user_id || user.id;
-
-      if (folderOwnerId !== user.id) {
-        throw new Error('El perfil no corresponde al usuario autenticado.');
-      }
-
-      // React Native + Supabase: usar base64/ArrayBuffer (Blob falla en algunos dispositivos)
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      const fileData = decode(base64);
-
-      // Generar nombre único
-      const fileExt = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
-      const fileName = `avatar-${Date.now()}.${fileExt}`;
-      // Debe empezar con auth.uid() para cumplir la policy de storage
-      const filePath = `${folderOwnerId}/${fileName}`;
-
-      // Subir a Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, fileData, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: mimeType,
-        });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Actualizar profile con la URL del avatar
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: filePath })
-        .eq('id', profile.id);
-
-      if (updateError) {
-        throw updateError;
-      }
+      const filePath = await uploadProfileAvatar(
+        profile.id,
+        profile.auth_user_id,
+        imageUri,
+        mimeType,
+      );
 
       await refreshProfile();
 

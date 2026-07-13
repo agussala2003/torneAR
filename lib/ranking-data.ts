@@ -1,12 +1,32 @@
 import { supabase } from '@/lib/supabase';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import type { Database } from '@/types/supabase';
 import type {
     RankingFiltersState, RankingTeamEntry, RivalTeamEntry,
-    PlayerLeaderboardEntry, RankingViewData, LeaderboardStat
+    PlayerLeaderboardEntry, LeaderboardStat
 } from '@/components/ranking/types';
 
+// Fila devuelta por get_team_ranking / search_teams. rank_position sólo lo trae
+// get_team_ranking; in_ranking sólo search_teams — ambos opcionales acá.
+type RankingRpcRow = {
+    rank_position?: number;
+    team_id: string;
+    team_name: string;
+    shield_url: string | null;
+    zone: string;
+    category: Database['public']['Enums']['team_category'];
+    preferred_format: Database['public']['Enums']['team_format'];
+    elo_rating: number;
+    fair_play_score: number;
+    season_wins: number;
+    season_losses: number;
+    season_draws: number;
+    matches_played: number;
+    in_ranking?: boolean;
+};
+
 // Helper para mapear fila de DB a objeto TS
-function mapToRankingTeamEntry(row: any, userTeamIds: string[]): RankingTeamEntry {
+function mapToRankingTeamEntry(row: RankingRpcRow, userTeamIds: string[]): RankingTeamEntry {
     return {
         rankPosition: Number(row.rank_position),
         teamId: row.team_id,
@@ -38,7 +58,7 @@ export async function fetchRankingWithFilters(
     });
     if (error) throw error;
 
-    const rows = (data || []) as any[];
+    const rows = data ?? [];
 
     // Filtrar ELO en el cliente si "Rivales Ideales" está activo
     const filtered = filters.rivalesIdeales && activeTeamElo !== null
@@ -68,10 +88,46 @@ export async function searchRivalTeams(
     });
     if (error) throw error;
 
-    return (data || []).map((row: any) => {
+    return (data ?? []).map((row) => {
         const entry = mapToRankingTeamEntry(row, userTeamIds);
-        return { ...entry, inRanking: row.in_ranking };
+        return { ...entry, inRanking: row.in_ranking ?? false };
     });
+}
+
+// ── Bootstrap del ranking (temporada activa, zonas, datos del equipo activo) ──
+
+export interface ActiveTeamRankingInfo {
+    eloRating: number;
+    zone: string | null;
+    category: Database['public']['Enums']['team_category'];
+    format: Database['public']['Enums']['team_format'];
+}
+
+// Temporada activa (o null si no hay ninguna).
+export async function fetchActiveSeason(): Promise<{ id: string; name: string } | null> {
+    const { data, error } = await supabase
+        .from('seasons')
+        .select('id, name')
+        .eq('is_active', true)
+        .maybeSingle();
+    if (error) throw error;
+    return data;
+}
+
+// ELO + datos de filtro semilla del equipo activo (o null si no existe).
+export async function fetchActiveTeamRankingInfo(teamId: string): Promise<ActiveTeamRankingInfo | null> {
+    const { data, error } = await supabase
+        .from('teams')
+        .select('elo_rating, zone, category, preferred_format')
+        .eq('id', teamId)
+        .single();
+    if (error || !data) return null;
+    return {
+        eloRating: data.elo_rating,
+        zone: data.zone,
+        category: data.category,
+        format: data.preferred_format,
+    };
 }
 
 interface FallbackPlayer {
@@ -96,7 +152,7 @@ export async function fetchPlayerLeaderboard(
     });
     if (error) throw error;
 
-    const entries: PlayerLeaderboardEntry[] = (data || []).map((row: any) => ({
+    const entries: PlayerLeaderboardEntry[] = (data ?? []).map((row) => ({
         rankPosition: Number(row.rank_position),
         profileId: row.profile_id,
         fullName: row.full_name,

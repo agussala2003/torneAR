@@ -10,6 +10,7 @@ import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchTeamStatsViewData, fetchTeamBadges } from '@/lib/team-stats-api';
 import type { TeamStatsViewData, H2HMatch, TeamBadgeItem } from '@/components/team-stats/types';
 import { TeamHeader } from '@/components/team-stats/TeamHeader';
+import { TeamEloChart } from '@/components/team-stats/TeamEloChart';
 import { TeamFormAndSeason } from '@/components/team-stats/TeamFormAndSeason';
 import { TeamRecentMatches } from '@/components/team-stats/TeamRecentMatches';
 import { TeamMembersSection } from '@/components/team-stats/TeamMembersSection';
@@ -107,6 +108,7 @@ export default function TeamStatsScreen() {
         </View>
 
         <TeamHeader header={viewData.header} />
+        <TeamEloChart history={viewData.eloHistory} currentElo={viewData.header.prRating} />
         <TeamFormAndSeason form={viewData.form} season={viewData.season} />
         <TeamRecentMatches matches={viewData.recentMatches} />
 

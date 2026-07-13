@@ -8,6 +8,7 @@ import type {
   TeamMemberStat,
   FormResult,
   TeamBadgeItem,
+  TeamEloPoint,
 } from '@/components/team-stats/types';
 
 type TeamRole = Database['public']['Enums']['team_role'];
@@ -55,6 +56,8 @@ type MemberRaw = {
 type EloHistoryRaw = {
   match_id: string;
   delta: number;
+  elo_after: number;
+  created_at: string;
 };
 
 function percent(n: number, d: number): string {
@@ -123,7 +126,7 @@ export async function fetchTeamStatsViewData(
       .eq('team_id', teamId),
     supabase
       .from('elo_history')
-      .select('match_id, delta')
+      .select('match_id, delta, elo_after, created_at')
       .eq('team_id', teamId)
       .order('created_at', { ascending: false })
       .limit(10),
@@ -162,6 +165,12 @@ export async function fetchTeamStatsViewData(
 
   // Build elo delta map for quick lookup
   const eloDeltaMap = new Map<string, number>(eloHistory.map((e) => [e.match_id, e.delta]));
+
+  // eloHistory llega ordenado desc (más reciente primero) — se invierte para
+  // graficar en orden cronológico (más viejo primero).
+  const eloHistoryChronological: TeamEloPoint[] = [...eloHistory]
+    .reverse()
+    .map((e) => ({ matchId: e.match_id, createdAt: e.created_at, elo: e.elo_after }));
 
   // Recent matches (sorted already by scheduled_at desc)
   const recentMatches: TeamRecentMatch[] = matches.map((match) => {
@@ -273,7 +282,16 @@ export async function fetchTeamStatsViewData(
     ? memberRows.some((m) => m.profile_id === currentProfileId)
     : false;
 
-  return { header, season, form, recentMatches, members, isOwnTeam, badges: [] };
+  return {
+    header,
+    season,
+    form,
+    recentMatches,
+    members,
+    isOwnTeam,
+    badges: [],
+    eloHistory: eloHistoryChronological,
+  };
 }
 
 export async function fetchTeamBadges(teamId: string): Promise<TeamBadgeItem[]> {
