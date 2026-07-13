@@ -210,6 +210,9 @@ export interface WoClaimFormData {
     photoBase64: string;
     photoMimeType: string;
     notes: string | null;
+    // G6: goleadores y MVP del 3-0 (opcionales).
+    scorers?: { profileId: string; goals: number }[];
+    mvpProfileId?: string | null;
 }
 
 export interface CancellationFormData {

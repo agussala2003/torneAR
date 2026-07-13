@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { ScorerMvpPicker } from '@/components/matches/ScorerMvpPicker';
 import type { MatchResultFormData, MatchParticipantEntry } from '@/components/matches/types';
 
 interface Props {
@@ -117,70 +118,14 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
               <Stepper label="Goles rival" value={goalsAgainst} onChange={setGoalsAgainst} />
             </View>
 
-            {/* Scorers */}
-            {myParticipants.length > 0 && (
-              <>
-                <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-                  Goleadores (opcional)
-                </Text>
-                <View className="mb-4 gap-2">
-                  {myParticipants.map((p) => (
-                    <View
-                      key={p.profileId}
-                      className="flex-row items-center justify-between rounded-xl bg-surface-high px-4 py-2"
-                    >
-                      <Text className="font-ui flex-1 text-sm text-neutral-on-surface">
-                        {p.fullName}
-                      </Text>
-                      <View className="flex-row items-center gap-3">
-                        <TouchableOpacity
-                          onPress={() => setScorerGoals(p.profileId, (scorers[p.profileId] ?? 0) - 1)}
-                          activeOpacity={0.7}
-                          className="h-7 w-7 items-center justify-center rounded-full bg-surface-container"
-                        >
-                          <AppIcon family="material-community" name="minus" size={14} color="#BCCBB9" />
-                        </TouchableOpacity>
-                        <Text className="font-uiBold w-5 text-center text-sm text-neutral-on-surface">
-                          {scorers[p.profileId] ?? 0}
-                        </Text>
-                        <TouchableOpacity
-                          onPress={() => setScorerGoals(p.profileId, (scorers[p.profileId] ?? 0) + 1)}
-                          activeOpacity={0.7}
-                          className="h-7 w-7 items-center justify-center rounded-full bg-brand-primary"
-                        >
-                          <AppIcon family="material-community" name="plus" size={14} color="#003914" />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-
-                {/* MVP selector */}
-                <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-                  MVP (opcional)
-                </Text>
-                <View className="mb-4 flex-row flex-wrap gap-2">
-                  {myParticipants.map((p) => (
-                    <TouchableOpacity
-                      key={p.profileId}
-                      onPress={() => setMvpId(mvpId === p.profileId ? null : p.profileId)}
-                      activeOpacity={0.8}
-                      className={`rounded-xl px-3 py-2 ${
-                        mvpId === p.profileId ? 'bg-warning-tertiary/20' : 'bg-surface-high'
-                      }`}
-                    >
-                      <Text
-                        className={`font-ui text-sm ${
-                          mvpId === p.profileId ? 'text-warning-tertiary' : 'text-neutral-on-surface-variant'
-                        }`}
-                      >
-                        {mvpId === p.profileId ? '⭐ ' : ''}{p.fullName}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
+            {/* Scorers + MVP (componente compartido) */}
+            <ScorerMvpPicker
+              participants={myParticipants}
+              scorers={scorers}
+              onScorerGoalsChange={setScorerGoals}
+              mvpId={mvpId}
+              onMvpChange={setMvpId}
+            />
 
             {/* Submit */}
             <TouchableOpacity

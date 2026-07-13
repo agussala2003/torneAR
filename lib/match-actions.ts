@@ -252,25 +252,15 @@ export async function resolveMatchDispute(matchId: string): Promise<DisputeResol
 }
 
 // ─── WO Claim ─────────────────────────────────────────────────────────────────
-// RLS policy allows CAPITAN/SUBCAPITAN to insert.
-// Photo is uploaded to wo-evidence bucket first, then the claim is inserted.
+// La foto se sube al bucket wo-evidence y luego se llama a la RPC claim_wo
+// (SECURITY DEFINER), que valida autorización + pertenencia de goleadores/MVP
+// server-side e inserta el reclamo. claimed_by se deriva de auth.uid() en la RPC.
 
 export async function claimWo(
   matchId: string,
   teamId: string,
   data: WoClaimFormData,
 ): Promise<void> {
-  const { data: session } = await supabase.auth.getUser();
-  if (!session.user) throw new Error('No autenticado');
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('auth_user_id', session.user.id)
-    .single();
-  if (profileError) throw profileError;
-  if (!profile) throw new Error('Perfil no encontrado');
-
   // Upload evidence photo
   let photoUrl = '';
   if (data.photoBase64) {
@@ -290,13 +280,15 @@ export async function claimWo(
     photoUrl = uploadData?.path ?? fileName;
   }
 
-  const { error } = await supabase.from('wo_claims').insert({
-    match_id: matchId,
-    claimed_by: profile.id,
-    claiming_team_id: teamId,
-    reason: data.reason,
-    photo_url: photoUrl,
-    status: 'PENDIENTE_REVISION',
+  const scorers = (data.scorers ?? []).map((s) => ({ profile_id: s.profileId, goals: s.goals }));
+
+  const { error } = await supabaseRpc('claim_wo', {
+    p_match_id: matchId,
+    p_team_id: teamId,
+    p_reason: data.reason,
+    p_photo_url: photoUrl,
+    p_scorers: scorers,
+    p_mvp_id: data.mvpProfileId ?? null,
   });
   if (error) throw error;
 }
