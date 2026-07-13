@@ -501,6 +501,7 @@ export default function MatchDetailScreen() {
       <WoModal
         visible={showWoModal}
         onClose={() => setShowWoModal(false)}
+        myParticipants={myTeamParticipants}
         onSubmit={async (data) => {
           await claimWo(match.id, myTeamId, data);
           showAlert('Reclamo enviado', 'Tu reclamo WO fue enviado a revisión.', () => void loadData());
