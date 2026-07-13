@@ -1,33 +1,46 @@
 name: TorneAR CI
 
+# Se ejecuta en cada Pull Request hacia main (Producción) y develop (Staging),
+# y también al pushear directo a esas ramas. Si cualquier paso falla, el check
+# queda en rojo y (con branch protection activada) bloquea el merge del PR.
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+# Cancela corridas anteriores del mismo PR/rama para no gastar minutos de más.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  quality:
+    name: Type check · Lint · Tests
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      # npm ci = install reproducible desde package-lock.json (falla si está desincronizado).
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Type Check (TypeScript)
-      run: npx tsc --noEmit
+      # 1) TypeScript en modo estricto, sin emitir. Falla ante cualquier error de tipos.
+      - name: Type Check (tsc)
+        run: npx tsc --noEmit
 
-    - name: Run Linter
-      run: npm run lint
+      # 2) ESLint (config de Expo). Falla ante errores de lint.
+      - name: Lint (eslint)
+        run: npm run lint
 
-    - name: Run Tests
-      run: npm test
+      # 3) Suite de tests (Vitest, una sola corrida). Falla si algún test no pasa.
+      - name: Tests (vitest)
+        run: npm test

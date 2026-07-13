@@ -21,6 +21,14 @@ TypeScript type-checking (no emit):
 npx tsc --noEmit
 ```
 
+## Development Workflow
+
+Branching, CI/CD and Supabase environments are documented in
+[`docs/WORKFLOW.md`](docs/WORKFLOW.md). In short:
+- `main` = Producción, `develop` = Staging, features en `feature/<nombre>`.
+- Los PRs hacia `main`/`develop` corren CI (`.github/workflows/ci.yml`): `tsc`, `eslint` y Vitest.
+- Las migraciones se aplican primero a Staging y luego a Producción (nunca cambios de schema a mano).
+
 ## Architecture
 
 ### Tech Stack
