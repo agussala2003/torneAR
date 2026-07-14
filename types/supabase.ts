@@ -1217,6 +1217,7 @@ export type Database = {
           full_name: string
           gender: string | null
           id: string
+          is_admin: boolean
           preferred_position: Database["public"]["Enums"]["player_position"]
           strong_foot: string | null
           updated_at: string
@@ -1233,6 +1234,7 @@ export type Database = {
           full_name: string
           gender?: string | null
           id?: string
+          is_admin?: boolean
           preferred_position?: Database["public"]["Enums"]["player_position"]
           strong_foot?: string | null
           updated_at?: string
@@ -1249,6 +1251,7 @@ export type Database = {
           full_name?: string
           gender?: string | null
           id?: string
+          is_admin?: boolean
           preferred_position?: Database["public"]["Enums"]["player_position"]
           strong_foot?: string | null
           updated_at?: string

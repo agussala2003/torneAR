@@ -94,6 +94,18 @@ export default function ProfileScreen() {
           onOpenRequests={() => router.push('/team-requests')}
           onTeamPress={(teamId) => router.push({ pathname: '/team-manage', params: { teamId } })}
         />
+        {profile.is_admin && (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => router.push('/admin/wo-review' as never)}
+            className="mt-3 flex-row items-center justify-center gap-2 rounded-xl bg-surface-low py-3"
+          >
+            <AppIcon family="material-community" name="shield-account" size={16} color="#FABD32" />
+            <Text className="font-display text-xs uppercase tracking-wider text-warning-tertiary">
+              Panel de administración
+            </Text>
+          </TouchableOpacity>
+        )}
         <ProfileSettingsSection isSigningOut={isSigningOut} onSignOut={handleSignOut} />
       </ScrollView>
 
