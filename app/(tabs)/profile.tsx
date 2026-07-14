@@ -97,7 +97,7 @@ export default function ProfileScreen() {
         {profile.is_admin && (
           <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => router.push('/admin/wo-review' as never)}
+            onPress={() => router.push('/admin' as never)}
             className="mt-3 flex-row items-center justify-center gap-2 rounded-xl bg-surface-low py-3"
           >
             <AppIcon family="material-community" name="shield-account" size={16} color="#FABD32" />

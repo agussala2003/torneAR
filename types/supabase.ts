@@ -2001,7 +2001,6 @@ export type Database = {
         }
         Returns: string
       }
-      close_season: { Args: { p_season_id: string }; Returns: undefined }
       confirm_match_proposal: {
         Args: { p_match_id: string; p_proposal_id: string }
         Returns: undefined
@@ -2040,6 +2039,7 @@ export type Database = {
         | { Args: { table_name: string }; Returns: string }
       enablelongtransactions: { Args: never; Returns: string }
       enqueue_match_reminders: { Args: never; Returns: undefined }
+      enqueue_season_expiry_reminder: { Args: never; Returns: undefined }
       equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
       geometry: { Args: { "": string }; Returns: unknown }
       geometry_above: {
@@ -2418,7 +2418,6 @@ export type Database = {
           zone: string
         }[]
       }
-      season_reset_elo: { Args: never; Returns: undefined }
       send_challenge: {
         Args: {
           p_from_team_id: string
@@ -3012,6 +3011,10 @@ export type Database = {
         Args: { p_match_id: string; p_voted_team_id: string }
         Returns: undefined
       }
+      transition_season: {
+        Args: { p_ends_at: string; p_new_name: string; p_starts_at: string }
+        Returns: string
+      }
       unlockrows: { Args: { "": string }; Returns: number }
       updategeometrysrid: {
         Args: {
@@ -3063,6 +3066,8 @@ export type Database = {
         | "CANCELACION_RECHAZADA"
         | "POSTULACION_RECIBIDA"
         | "POSTULACION_RESPONDIDA"
+        | "TEMPORADA_VENCIDA"
+        | "TEMPORADA_INICIADA"
       player_position:
         | "CUALQUIERA"
         | "ARQUERO"
@@ -3251,6 +3256,8 @@ export const Constants = {
         "CANCELACION_RECHAZADA",
         "POSTULACION_RECIBIDA",
         "POSTULACION_RESPONDIDA",
+        "TEMPORADA_VENCIDA",
+        "TEMPORADA_INICIADA",
       ],
       player_position: [
         "CUALQUIERA",
