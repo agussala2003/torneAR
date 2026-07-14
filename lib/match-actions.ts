@@ -252,7 +252,7 @@ export async function resolveMatchDispute(matchId: string): Promise<DisputeResol
 }
 
 // ─── WO Claim ─────────────────────────────────────────────────────────────────
-// La foto se sube al bucket wo-evidence y luego se llama a la RPC claim_wo
+// La foto se sube al bucket wo_evidences y luego se llama a la RPC claim_wo
 // (SECURITY DEFINER), que valida autorización + pertenencia de goleadores/MVP
 // server-side e inserta el reclamo. claimed_by se deriva de auth.uid() en la RPC.
 
@@ -271,7 +271,7 @@ export async function claimWo(
       bytes[i] = binaryStr.charCodeAt(i);
     }
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('wo-evidence')
+      .from('wo_evidences')
       .upload(fileName, bytes.buffer, {
         contentType: data.photoMimeType,
         upsert: true,

@@ -276,7 +276,7 @@ describe('requestCancellation / joinMatchAsGuest / submitDisputeVote / resolveMa
 describe('claimWo', () => {
   it('sube la foto y luego llama a la RPC claim_wo mapeando goleadores y MVP', async () => {
     supabaseMock.storage.from.mockReturnValue(
-      createStorageMock({ data: { path: 'm1/teamA_123.jpg' }, error: null }).from('wo-evidence'),
+      createStorageMock({ data: { path: 'm1/teamA_123.jpg' }, error: null }).from('wo_evidences'),
     );
     supabaseRpcMock.mockResolvedValueOnce({ data: 'claim-1', error: null });
 
@@ -292,7 +292,7 @@ describe('claimWo', () => {
       mvpProfileId: 'p1',
     });
 
-    expect(supabaseMock.storage.from).toHaveBeenCalledWith('wo-evidence');
+    expect(supabaseMock.storage.from).toHaveBeenCalledWith('wo_evidences');
     expect(supabaseRpcMock).toHaveBeenCalledWith('claim_wo', {
       p_match_id: 'm1',
       p_team_id: 'teamA',
@@ -308,7 +308,7 @@ describe('claimWo', () => {
 
   it('envía scorers vacío y mvp null cuando no se cargan goleadores', async () => {
     supabaseMock.storage.from.mockReturnValue(
-      createStorageMock({ data: { path: 'm1/teamA_123.jpg' }, error: null }).from('wo-evidence'),
+      createStorageMock({ data: { path: 'm1/teamA_123.jpg' }, error: null }).from('wo_evidences'),
     );
     supabaseRpcMock.mockResolvedValueOnce({ data: 'claim-2', error: null });
 
