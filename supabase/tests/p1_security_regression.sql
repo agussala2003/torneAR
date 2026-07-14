@@ -1,113 +1,126 @@
 -- ============================================================
 -- P1 SECURITY REGRESSION — 10 bugs críticos de marzo 2026
+-- (refactor 2026-07-14: formato auto-verificante + escenario propio)
 -- ============================================================
--- Qué es esto: prueba de humo de los 7 casos de "intento no autorizado" de
--- los 10 bugs críticos de la auditoría de marzo 2026 (docs/auditoria.md),
--- arreglados el 28 de marzo y re-verificados el 8 de julio de 2026.
+-- Prueba de humo de los casos de "intento no autorizado" de los bugs
+-- críticos de la auditoría de marzo 2026 (docs/auditoria.md), arreglados el
+-- 28-mar y re-verificados el 8-jul-2026.
 --
--- Cada bloque es un BEGIN...ROLLBACK independiente y AUTOCONTENIDO — nunca
--- hay un COMMIT, así que correr esto contra el proyecto real es seguro:
--- no modifica ningún dato. Se puede pegar bloque por bloque (recomendado
--- para leer el resultado de cada uno) o los 7 seguidos.
+-- Todo corre en un único BEGIN...ROLLBACK que arma su propio escenario
+-- (membresías, desafío, partido, propuesta y venue). Sólo referencia los
+-- perfiles del seed del repo (supabase/seed.sql — mismos IDs en local y en
+-- el proyecto real):
+--   capitán Leones : 33333333-3333-3333-3333-000000000001 (auth aaaaaaaa-...-0001)
+--   capitán Tigres : 33333333-3333-3333-3333-000000000004 (auth aaaaaaaa-...-0004)
+--   capitán Rayos  : 33333333-3333-3333-3333-000000000007 (auth aaaaaaaa-...-0007)
+--   sin equipo     : ef88b757-4d4e-48b1-b300-51da1cb2e678 (auth 8e7bd5df-...)
 --
--- Cómo leer el resultado:
---   - Bloques 1 a 5 y 7 esperan que la llamada al RPC lance una excepción
---     (RAISE EXCEPTION). Si en cambio devuelve un resultado normal sin
---     error, ALGUNO DE LOS 10 BUGS DE MARZO VOLVIÓ A ABRIRSE.
---   - El bloque 6 espera que el UPDATE afecte 0 filas (RLS lo filtra en
---     silencio, no lanza excepción). Si `filas_afectadas` > 0, el bug #6
---     volvió a abrirse.
---
--- Los ítems 8/9/10 de marzo (motor ELO, Fair Play Score, resolución de
--- disputas) no tienen forma de "intento no autorizado" — ya se verificaron
--- en la auditoría por presencia de las migraciones/triggers correspondientes
--- y no se repiten acá.
---
--- IDs usados: equipos/perfiles/challenges/proposals reales de seed. Si estos
--- datos cambian o se borran, hay que actualizar los UUID de cada bloque.
---
--- Última corrida: 8 jul 2026 — los 7 casos dieron el resultado esperado.
+-- Auto-verificante: EXCEPTION "Pn FALLÓ:" si algún bug de marzo reabrió.
+-- Última corrida: 14 jul 2026 — los 7 casos OK (local y proyecto real).
 -- ============================================================
 
--- ─── 1. send_challenge — invocado por un JUGADOR (no admin) ──────────────────
--- Esperado: EXCEPTION "No autorizado: solo el capitán o subcapitán..."
 BEGIN;
-SELECT set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000002"}', true);
-SELECT public.send_challenge(
-  '22222222-2222-2222-2222-222222222221'::uuid,
-  '22222222-2222-2222-2222-222222222222'::uuid,
-  'AMISTOSO'
-) AS resultado_no_deberia_llegar;
-ROLLBACK;
+DO $$
+DECLARE
+  c_leones CONSTANT uuid := '22222222-2222-2222-2222-222222222221';
+  c_tigres CONSTANT uuid := '22222222-2222-2222-2222-222222222222';
+  c_rayos  CONSTANT uuid := '22222222-2222-2222-2222-222222222223';
+  v_ch    uuid;
+  v_match uuid;
+  v_prop  uuid;
+  v_venue uuid;
+  v_rows  integer;
+BEGIN
+  -- Setup: el capitán de Rayos entra como JUGADOR raso de Leones.
+  INSERT INTO team_members (team_id, profile_id, role)
+  VALUES (c_leones, '33333333-3333-3333-3333-000000000007', 'JUGADOR');
 
--- ─── 2. accept_challenge — invocado por alguien ajeno al to_team_id ──────────
--- Esperado: EXCEPTION "No autorizado: solo el capitán o subcapitán del equipo receptor..."
-BEGIN;
-SELECT set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000004"}', true);
-SELECT public.accept_challenge('f786f93c-897f-4d10-8fea-796a8093f1ba'::uuid) AS resultado_no_deberia_llegar;
-ROLLBACK;
+  -- ── 1. send_challenge invocado por un JUGADOR (no admin) ──────────────────
+  PERFORM set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000007"}', true);
+  BEGIN
+    PERFORM public.send_challenge(c_leones, c_tigres, 'AMISTOSO');
+    RAISE EXCEPTION 'P1-1 FALLÓ: un JUGADOR pudo enviar un desafío en nombre del equipo';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE '%No autorizado%' THEN RAISE; END IF;
+  END;
 
--- ─── 3. confirm_match_proposal — invocado por el propio equipo proponente ───
--- Esperado: EXCEPTION "No autorizado: solo el equipo receptor puede confirmar..."
-BEGIN;
-SELECT set_config('request.jwt.claims', '{"sub":"ca544826-7fdc-468f-a951-b64cc542f97a"}', true);
-SELECT public.confirm_match_proposal(
-  'da04c988-db5e-49de-8801-e8906859ce60'::uuid,
-  'e8bcc055-6bc3-45a2-9ffb-67aceab8bd9f'::uuid
-) AS resultado_no_deberia_llegar;
-ROLLBACK;
+  -- ── 2. accept_challenge invocado por alguien ajeno al equipo receptor ─────
+  INSERT INTO challenges (from_team_id, to_team_id, created_by, status)
+  VALUES (c_leones, c_rayos, '33333333-3333-3333-3333-000000000001', 'ENVIADA')
+  RETURNING id INTO v_ch;
 
--- ─── 4. checkin_team — invocado por alguien que no pertenece a ningún equipo del partido ───
--- Esperado: EXCEPTION "No autorizado: no sos miembro del equipo..."
-BEGIN;
-SELECT set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001"}', true);
-SELECT public.checkin_team(
-  '3c448c8b-cd4f-4874-af1d-ae611a90ee70'::uuid,
-  'a83f0915-8f9c-4207-b0ce-bf66d6e9666d'::uuid,
-  NULL, NULL
-) AS resultado_no_deberia_llegar;
-ROLLBACK;
+  PERFORM set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000004"}', true);
+  BEGIN
+    PERFORM public.accept_challenge(v_ch);
+    RAISE EXCEPTION 'P1-2 FALLÓ: un ajeno al equipo receptor aceptó el desafío';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE '%No autorizado%' THEN RAISE; END IF;
+  END;
 
--- ─── 5. request_match_cancellation — invocado por un JUGADOR (no admin) ─────
--- Esperado: EXCEPTION "No autorizado: solo el capitán o subcapitán puede cancelar..."
-BEGIN;
-SELECT set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000002"}', true);
-SELECT public.request_match_cancellation(
-  '44444444-4444-4444-4444-000000000001'::uuid,
-  '22222222-2222-2222-2222-222222222221'::uuid,
-  'MUTUO_ACUERDO',
-  NULL
-) AS resultado_no_deberia_llegar;
-ROLLBACK;
+  -- ── 3. confirm_match_proposal invocado por el propio equipo proponente ────
+  INSERT INTO matches (team_a_id, team_b_id, match_type, status, scheduled_at)
+  VALUES (c_leones, c_tigres, 'AMISTOSO', 'PENDIENTE', now() + interval '7 days')
+  RETURNING id INTO v_match;
+  INSERT INTO match_proposals (match_id, proposed_by, from_team_id, format, match_type, scheduled_at, duration_minutes)
+  VALUES (v_match, '33333333-3333-3333-3333-000000000001', c_leones, 'FUTBOL_5', 'AMISTOSO', now() + interval '7 days', 60)
+  RETURNING id INTO v_prop;
 
--- ─── 6. UPDATE directo a challenges (bypass del RPC) por usuario ajeno ──────
--- No pasa por ningún RPC SECURITY DEFINER, así que hace falta bajar al rol
--- `authenticated` para que la RLS se aplique de verdad (el rol admin de este
--- script tiene BYPASSRLS). Esperado: filas_afectadas = 0.
-BEGIN;
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000007"}', true);
-WITH updated AS (
-  UPDATE public.challenges SET status = 'ACEPTADA'
-  WHERE id = 'f786f93c-897f-4d10-8fea-796a8093f1ba'::uuid
-  RETURNING id
-)
-SELECT count(*) AS filas_afectadas FROM updated;
-ROLLBACK;
+  PERFORM set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001"}', true);
+  BEGIN
+    PERFORM public.confirm_match_proposal(v_prop, v_match);
+    RAISE EXCEPTION 'P1-3 FALLÓ: el equipo proponente confirmó su propia propuesta';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE '%No autorizado%' THEN RAISE; END IF;
+  END;
 
--- ─── 7. checkin_team — geofence obligatorio cuando el venue tiene coords ────
--- Se le asigna temporalmente un venue con coordenadas a un match real, sólo
--- dentro de esta transacción (el ROLLBACK final lo revierte). Un miembro
--- legítimo (CAPITAN) intenta el check-in sin mandar GPS.
--- Esperado: EXCEPTION "El check-in requiere tu ubicación GPS..."
-BEGIN;
-UPDATE public.matches
-SET venue_id = '2911414c-94d3-440a-8921-a54169f493bb'::uuid
-WHERE id = '44444444-4444-4444-4444-000000000001'::uuid;
-SELECT set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001"}', true);
-SELECT public.checkin_team(
-  '44444444-4444-4444-4444-000000000001'::uuid,
-  '22222222-2222-2222-2222-222222222221'::uuid,
-  NULL, NULL
-) AS resultado_no_deberia_llegar;
+  -- ── 4. checkin_team invocado por alguien sin equipo en el partido ─────────
+  UPDATE matches SET status = 'CONFIRMADO' WHERE id = v_match;
+  PERFORM set_config('request.jwt.claims', '{"sub":"8e7bd5df-5201-4622-8f6b-b94725c18da8"}', true);
+  BEGIN
+    PERFORM public.checkin_team(v_match, c_leones, NULL, NULL);
+    RAISE EXCEPTION 'P1-4 FALLÓ: un no-miembro hizo check-in por el equipo';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE '%No autorizado%' THEN RAISE; END IF;
+  END;
+
+  -- ── 5. request_match_cancellation invocado por un JUGADOR (no admin) ──────
+  PERFORM set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000007"}', true);
+  BEGIN
+    PERFORM public.request_match_cancellation(v_match, c_leones, 'MUTUO_ACUERDO', NULL);
+    RAISE EXCEPTION 'P1-5 FALLÓ: un JUGADOR pudo solicitar la cancelación del partido';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE '%No autorizado%' THEN RAISE; END IF;
+  END;
+
+  -- ── 6. UPDATE directo a challenges por un usuario ajeno (bypass del RPC) ──
+  PERFORM set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000004"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+  UPDATE public.challenges SET status = 'ACEPTADA' WHERE id = v_ch;
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+  PERFORM set_config('role', 'none', true);
+  IF v_rows <> 0 THEN
+    RAISE EXCEPTION 'P1-6 FALLÓ: RLS dejó pasar el UPDATE directo de un ajeno (% filas)', v_rows;
+  END IF;
+
+  -- ── 7. checkin_team — geofence obligatorio cuando el venue tiene coords ───
+  INSERT INTO venues (name, lat, lng)
+  VALUES ('__TEST P1 Venue', -34.6037, -58.3816) RETURNING id INTO v_venue;
+  UPDATE matches SET venue_id = v_venue WHERE id = v_match;
+
+  PERFORM set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001"}', true);
+  BEGIN
+    PERFORM public.checkin_team(v_match, c_leones, NULL, NULL);
+    RAISE EXCEPTION 'P1-7 FALLÓ: check-in sin GPS aceptado con venue georreferenciado';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM NOT LIKE '%GPS%' AND SQLERRM NOT LIKE '%ubicación%' THEN RAISE; END IF;
+  END;
+
+  RAISE NOTICE 'P1 OK: los 7 intentos no autorizados siguen bloqueados.';
+END $$;
 ROLLBACK;

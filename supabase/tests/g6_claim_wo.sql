@@ -1,89 +1,104 @@
 -- ============================================================
 -- G6 — RPC claim_wo: validación de goleadores + MVP en el WO
+-- (refactor 2026-07-14: formato auto-verificante + escenario propio)
 -- ============================================================
--- Prueba la RPC public.claim_wo (migración 20260711_g6_wo_scorers_mvp.sql).
+-- Prueba la RPC public.claim_wo (20260713201810_g6_wo_scorers_mvp.sql).
 --
--- Todo el script corre en un BEGIN...ROLLBACK: arma un escenario controlado
--- (capitán de team_a como participante con check-in) y ejercita 6 casos con
--- manejo de excepción por caso. NO persiste datos (rollback final).
+-- Todo corre en un BEGIN...ROLLBACK que crea su propio partido y participante
+-- con check-in. Sólo referencia los perfiles del seed del repo
+-- (supabase/seed.sql — mismos IDs en local y en el proyecto real):
+--   capitán Leones (reclama) : 33333333-3333-3333-3333-000000000001 (auth aaaaaaaa-...-0001)
+--   rival (Tigres)           : 33333333-3333-3333-3333-000000000004
+--   outsider                 : auth 8e7bd5df-5201-4622-8f6b-b94725c18da8
 --
--- Cómo leer: cada fila del resultado tiene passed = true si el caso se comportó
--- como se espera (el happy path devuelve un id; los 5 casos negativos lanzan
--- excepción). Si alguna fila da passed = false, esa validación se rompió.
---
--- IDs de seed usados (si el seed cambia, actualizar):
---   match           : 44444444-4444-4444-4444-000000000001
---   team_a (gana)    : 22222222-2222-2222-2222-222222222221
---   capitán team_a   : 33333333-3333-3333-3333-000000000001  (auth aaaaaaaa-0000-0000-0000-000000000001)
---   rival (team_b)   : 33333333-3333-3333-3333-000000000004
---   outsider (auth)  : 183b0933-deb5-468b-9f8e-dcb96d345155
---
--- Última corrida: 11 jul 2026 — los 6 casos dieron passed = true.
+-- Auto-verificante: EXCEPTION "G6-n FALLÓ:" si alguna validación se rompió.
+-- Última corrida: 14 jul 2026 — los 6 casos OK (local y proyecto real).
 -- ============================================================
 
-begin;
-create temp table _r(name text, passed boolean) on commit drop;
-do $$
-declare v_id uuid;
-begin
-  -- Setup: capitán A como participante de team_a con check-in
-  perform set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001"}', true);
-  update match_participants set did_checkin=true
-    where match_id='44444444-4444-4444-4444-000000000001'
-      and profile_id='33333333-3333-3333-3333-000000000001'
-      and team_id='22222222-2222-2222-2222-222222222221';
-  if not found then
-    insert into match_participants (id, match_id, profile_id, team_id, is_guest, did_checkin, is_result_loader)
-    values (gen_random_uuid(),'44444444-4444-4444-4444-000000000001','33333333-3333-3333-3333-000000000001','22222222-2222-2222-2222-222222222221', false, true, false);
-  end if;
+BEGIN;
+DO $$
+DECLARE
+  c_leones CONSTANT uuid := '22222222-2222-2222-2222-222222222221';
+  c_tigres CONSTANT uuid := '22222222-2222-2222-2222-222222222222';
+  c_cap    CONSTANT uuid := '33333333-3333-3333-3333-000000000001';
+  c_rival  CONSTANT uuid := '33333333-3333-3333-3333-000000000004';
+  v_match uuid;
+  v_id    uuid;
+BEGIN
+  -- Setup: partido CONFIRMADO + capitán de Leones con check-in.
+  INSERT INTO matches (team_a_id, team_b_id, match_type, status, scheduled_at)
+  VALUES (c_leones, c_tigres, 'RANKING', 'CONFIRMADO', now() - interval '1 hour')
+  RETURNING id INTO v_match;
+  INSERT INTO match_participants (match_id, profile_id, team_id, did_checkin)
+  VALUES (v_match, c_cap, c_leones, true);
 
-  -- 1. Happy path (capitán, 3 goles del propio equipo, MVP propio)
-  begin
-    v_id := claim_wo('44444444-4444-4444-4444-000000000001','22222222-2222-2222-2222-222222222221',
-      'NO_PRESENTACION','evidencia/e.jpg',
-      '[{"profile_id":"33333333-3333-3333-3333-000000000001","goals":3}]'::jsonb,
-      '33333333-3333-3333-3333-000000000001');
-    insert into _r values ('1_happy_path_succeeds', v_id is not null);
-  exception when others then insert into _r values ('1_happy_path_succeeds', false); end;
+  PERFORM set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001"}', true);
 
-  -- 2. Rechaza suma de goles > 3
-  begin
-    perform claim_wo('44444444-4444-4444-4444-000000000001','22222222-2222-2222-2222-222222222221',
-      'NO_PRESENTACION','p.jpg','[{"profile_id":"33333333-3333-3333-3333-000000000001","goals":4}]'::jsonb, null);
-    insert into _r values ('2_rejects_over_3_goals', false);
-  exception when others then insert into _r values ('2_rejects_over_3_goals', true); end;
+  -- ── 1. Happy path: capitán, 3 goles propios, MVP propio ───────────────────
+  v_id := claim_wo(v_match, c_leones, 'NO_PRESENTACION', 'evidencia/e.jpg',
+    jsonb_build_array(jsonb_build_object('profile_id', c_cap, 'goals', 3)), c_cap);
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'G6-1 FALLÓ: el happy path no devolvió el id del reclamo';
+  END IF;
+  -- Se elimina para no chocar con el UNIQUE(match_id) en los casos siguientes.
+  DELETE FROM wo_claims WHERE id = v_id;
 
-  -- 3. Rechaza goleador rival (no participante de team_a)
-  begin
-    perform claim_wo('44444444-4444-4444-4444-000000000001','22222222-2222-2222-2222-222222222221',
-      'NO_PRESENTACION','p.jpg','[{"profile_id":"33333333-3333-3333-3333-000000000004","goals":1}]'::jsonb, null);
-    insert into _r values ('3_rejects_rival_scorer', false);
-  exception when others then insert into _r values ('3_rejects_rival_scorer', true); end;
+  -- ── 2. Rechaza suma de goles > 3 ──────────────────────────────────────────
+  BEGIN
+    PERFORM claim_wo(v_match, c_leones, 'NO_PRESENTACION', 'p.jpg',
+      jsonb_build_array(jsonb_build_object('profile_id', c_cap, 'goals', 4)), NULL);
+    RAISE EXCEPTION 'G6-2 FALLÓ: aceptó goles que superan el 3-0 del WO';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM LIKE '%FALLÓ%' THEN RAISE; END IF;
+  END;
 
-  -- 4. Rechaza emisor no autorizado (outsider: ni capitán ni check-in)
-  perform set_config('request.jwt.claims', '{"sub":"183b0933-deb5-468b-9f8e-dcb96d345155"}', true);
-  begin
-    perform claim_wo('44444444-4444-4444-4444-000000000001','22222222-2222-2222-2222-222222222221',
-      'NO_PRESENTACION','p.jpg','[]'::jsonb, null);
-    insert into _r values ('4_rejects_unauthorized_sender', false);
-  exception when others then insert into _r values ('4_rejects_unauthorized_sender', true); end;
+  -- ── 3. Rechaza goleador rival (no participante del equipo reclamante) ─────
+  BEGIN
+    PERFORM claim_wo(v_match, c_leones, 'NO_PRESENTACION', 'p.jpg',
+      jsonb_build_array(jsonb_build_object('profile_id', c_rival, 'goals', 1)), NULL);
+    RAISE EXCEPTION 'G6-3 FALLÓ: aceptó un goleador que no pertenece al equipo';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM LIKE '%FALLÓ%' THEN RAISE; END IF;
+  END;
 
-  -- 5. Rechaza MVP ajeno (de vuelta como capitán)
-  perform set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001"}', true);
-  begin
-    perform claim_wo('44444444-4444-4444-4444-000000000001','22222222-2222-2222-2222-222222222221',
-      'NO_PRESENTACION','p.jpg','[{"profile_id":"33333333-3333-3333-3333-000000000001","goals":1}]'::jsonb,
-      '33333333-3333-3333-3333-000000000004');
-    insert into _r values ('5_rejects_mvp_not_in_team', false);
-  exception when others then insert into _r values ('5_rejects_mvp_not_in_team', true); end;
+  -- ── 4. Rechaza emisor no autorizado (ni rol de equipo ni check-in) ────────
+  PERFORM set_config('request.jwt.claims', '{"sub":"8e7bd5df-5201-4622-8f6b-b94725c18da8"}', true);
+  BEGIN
+    PERFORM claim_wo(v_match, c_leones, 'NO_PRESENTACION', 'p.jpg', '[]'::jsonb, NULL);
+    RAISE EXCEPTION 'G6-4 FALLÓ: un outsider pudo reclamar el WO';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM LIKE '%FALLÓ%' THEN RAISE; END IF;
+  END;
+  PERFORM set_config('request.jwt.claims', '{"sub":"aaaaaaaa-0000-0000-0000-000000000001"}', true);
 
-  -- 6. Rechaza > 3 goleadores
-  begin
-    perform claim_wo('44444444-4444-4444-4444-000000000001','22222222-2222-2222-2222-222222222221',
-      'NO_PRESENTACION','p.jpg',
-      '[{"profile_id":"33333333-3333-3333-3333-000000000001","goals":1},{"profile_id":"33333333-3333-3333-3333-000000000001","goals":1},{"profile_id":"33333333-3333-3333-3333-000000000001","goals":1},{"profile_id":"33333333-3333-3333-3333-000000000001","goals":1}]'::jsonb, null);
-    insert into _r values ('6_rejects_over_3_scorers', false);
-  exception when others then insert into _r values ('6_rejects_over_3_scorers', true); end;
-end $$;
-select name, passed from _r order by name;
-rollback;
+  -- ── 5. Rechaza MVP ajeno al equipo reclamante ─────────────────────────────
+  BEGIN
+    PERFORM claim_wo(v_match, c_leones, 'NO_PRESENTACION', 'p.jpg',
+      jsonb_build_array(jsonb_build_object('profile_id', c_cap, 'goals', 1)), c_rival);
+    RAISE EXCEPTION 'G6-5 FALLÓ: aceptó un MVP que no pertenece al equipo';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM LIKE '%FALLÓ%' THEN RAISE; END IF;
+  END;
+
+  -- ── 6. Rechaza más de 3 goleadores ────────────────────────────────────────
+  BEGIN
+    PERFORM claim_wo(v_match, c_leones, 'NO_PRESENTACION', 'p.jpg',
+      jsonb_build_array(
+        jsonb_build_object('profile_id', c_cap, 'goals', 1),
+        jsonb_build_object('profile_id', c_cap, 'goals', 1),
+        jsonb_build_object('profile_id', c_cap, 'goals', 1),
+        jsonb_build_object('profile_id', c_cap, 'goals', 1)
+      ), NULL);
+    RAISE EXCEPTION 'G6-6 FALLÓ: aceptó más de 3 goleadores';
+  EXCEPTION
+    WHEN raise_exception THEN
+      IF SQLERRM LIKE '%FALLÓ%' THEN RAISE; END IF;
+  END;
+
+  RAISE NOTICE 'G6 OK: claim_wo valida goleadores, MVP y autorización.';
+END $$;
+ROLLBACK;
