@@ -1,0 +1,15 @@
+# Suites SQL que corren en CI (job db-tests de .github/workflows/ci.yml).
+#
+# Requisito para entrar en esta lista: la suite debe ser AUTO-VERIFICANTE —
+# cada bloque corre en BEGIN...ROLLBACK y lanza EXCEPTION "Xn FALLÓ: ..." si
+# hay regresión. Éxito = el archivo entero corre sin error (psql ON_ERROR_STOP).
+#
+# Quedan FUERA (por ahora) las suites legacy que incluyen statements cuyo
+# resultado esperado es un error crudo (c1_c2, p1) o que son informativas sin
+# aserciones (g4, g6, wo_admin) — adaptarlas al formato auto-verificante antes
+# de sumarlas.
+hotfix_security_rls.sql
+elo_engine_unification.sql
+leaderboard_wo.sql
+season_lifecycle.sql
+rls_performance_regression.sql
