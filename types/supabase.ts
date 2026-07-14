@@ -925,6 +925,7 @@ export type Database = {
           location_lat: number | null
           location_lng: number | null
           match_type: Database["public"]["Enums"]["match_type"]
+          reminder_24h_sent_at: string | null
           scheduled_at: string | null
           season_id: string | null
           signal_amount: number | null
@@ -950,6 +951,7 @@ export type Database = {
           location_lat?: number | null
           location_lng?: number | null
           match_type?: Database["public"]["Enums"]["match_type"]
+          reminder_24h_sent_at?: string | null
           scheduled_at?: string | null
           season_id?: string | null
           signal_amount?: number | null
@@ -975,6 +977,7 @@ export type Database = {
           location_lat?: number | null
           location_lng?: number | null
           match_type?: Database["public"]["Enums"]["match_type"]
+          reminder_24h_sent_at?: string | null
           scheduled_at?: string | null
           season_id?: string | null
           signal_amount?: number | null
@@ -1123,6 +1126,7 @@ export type Database = {
           id: string
           is_read: boolean
           profile_id: string
+          pushed_at: string | null
           title: string
           type: Database["public"]["Enums"]["notification_type"]
         }
@@ -1133,6 +1137,7 @@ export type Database = {
           id?: string
           is_read?: boolean
           profile_id: string
+          pushed_at?: string | null
           title: string
           type: Database["public"]["Enums"]["notification_type"]
         }
@@ -1143,6 +1148,7 @@ export type Database = {
           id?: string
           is_read?: boolean
           profile_id?: string
+          pushed_at?: string | null
           title?: string
           type?: Database["public"]["Enums"]["notification_type"]
         }
@@ -1611,9 +1617,12 @@ export type Database = {
           created_at: string
           id: string
           match_id: string
+          mvp_id: string | null
           photo_url: string
           reason: string | null
           resolved_at: string | null
+          resolved_by: string | null
+          scorers: Json
           status: Database["public"]["Enums"]["wo_status"]
         }
         Insert: {
@@ -1623,9 +1632,12 @@ export type Database = {
           created_at?: string
           id?: string
           match_id: string
+          mvp_id?: string | null
           photo_url: string
           reason?: string | null
           resolved_at?: string | null
+          resolved_by?: string | null
+          scorers?: Json
           status?: Database["public"]["Enums"]["wo_status"]
         }
         Update: {
@@ -1635,9 +1647,12 @@ export type Database = {
           created_at?: string
           id?: string
           match_id?: string
+          mvp_id?: string | null
           photo_url?: string
           reason?: string | null
           resolved_at?: string | null
+          resolved_by?: string | null
+          scorers?: Json
           status?: Database["public"]["Enums"]["wo_status"]
         }
         Relationships: [
@@ -1675,6 +1690,34 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "matches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wo_claims_mvp_id_fkey"
+            columns: ["mvp_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wo_claims_mvp_id_fkey"
+            columns: ["mvp_id"]
+            isOneToOne: false
+            referencedRelation: "v_player_stats"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "wo_claims_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wo_claims_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "v_player_stats"
+            referencedColumns: ["profile_id"]
           },
         ]
       }
@@ -1927,6 +1970,13 @@ export type Database = {
             }
             Returns: string
           }
+      apply_match_outcome: {
+        Args: {
+          p_at?: string
+          p_match: Database["public"]["Tables"]["matches"]["Row"]
+        }
+        Returns: undefined
+      }
       calculate_elo_delta: {
         Args: { loser_elo: number; winner_elo: number }
         Returns: number
@@ -1939,6 +1989,17 @@ export type Database = {
           p_team_id: string
         }
         Returns: undefined
+      }
+      claim_wo: {
+        Args: {
+          p_match_id: string
+          p_mvp_id?: string
+          p_photo_url: string
+          p_reason: string
+          p_scorers?: Json
+          p_team_id: string
+        }
+        Returns: string
       }
       close_season: { Args: { p_season_id: string }; Returns: undefined }
       confirm_match_proposal: {
@@ -1978,6 +2039,7 @@ export type Database = {
         | { Args: { schema_name: string; table_name: string }; Returns: string }
         | { Args: { table_name: string }; Returns: string }
       enablelongtransactions: { Args: never; Returns: string }
+      enqueue_match_reminders: { Args: never; Returns: undefined }
       equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
       geometry: { Args: { "": string }; Returns: unknown }
       geometry_above: {
@@ -2150,6 +2212,23 @@ export type Database = {
           zone_id: string
         }[]
       }
+      get_pending_wo_claims: {
+        Args: never
+        Returns: {
+          claim_id: string
+          claiming_team_id: string
+          claiming_team_name: string
+          created_at: string
+          match_id: string
+          mvp_id: string
+          mvp_name: string
+          opponent_team_name: string
+          photo_url: string
+          reason: string
+          scheduled_at: string
+          scorers: Json
+        }[]
+      }
       get_player_badges: {
         Args: { p_profile_id: string }
         Returns: {
@@ -2306,6 +2385,10 @@ export type Database = {
       }
       resolve_match: { Args: { p_match_id: string }; Returns: undefined }
       resolve_match_dispute: { Args: { p_match_id: string }; Returns: Json }
+      resolve_wo_claim: {
+        Args: { p_admin_notes?: string; p_approve: boolean; p_claim_id: string }
+        Returns: undefined
+      }
       respond_to_cancellation_request: {
         Args: { p_accept: boolean; p_request_id: string }
         Returns: string
@@ -2939,6 +3022,10 @@ export type Database = {
           table_name: string
         }
         Returns: string
+      }
+      verify_push_webhook_secret: {
+        Args: { p_candidate: string }
+        Returns: boolean
       }
     }
     Enums: {

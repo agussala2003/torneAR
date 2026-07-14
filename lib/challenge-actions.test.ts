@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder } from './test-utils/supabase-mock';
 
-const { supabaseMock, supabaseRpcMock } = vi.hoisted(() => ({
+const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: { from: vi.fn(), rpc: vi.fn() },
-  supabaseRpcMock: vi.fn(),
 }));
+// El DAL usa supabase.rpc() tipado; el alias conserva legible el resto del archivo.
+const supabaseRpcMock = supabaseMock.rpc;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: supabaseMock,
-  supabaseRpc: supabaseRpcMock,
 }));
 
 vi.mock('@/lib/supabase-storage', () => ({

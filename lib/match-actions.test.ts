@@ -1,18 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder, createStorageMock } from './test-utils/supabase-mock';
 
-const { supabaseMock, supabaseRpcMock } = vi.hoisted(() => ({
+const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: {
     from: vi.fn(),
+    rpc: vi.fn(),
     auth: { getUser: vi.fn() },
     storage: { from: vi.fn() },
   },
-  supabaseRpcMock: vi.fn(),
 }));
+// El DAL usa supabase.rpc() tipado; el alias conserva legible el resto del archivo.
+const supabaseRpcMock = supabaseMock.rpc;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: supabaseMock,
-  supabaseRpc: supabaseRpcMock,
 }));
 
 import {
@@ -114,14 +115,14 @@ describe('acceptProposal / rejectProposal / cancelProposal', () => {
 });
 
 describe('doCheckin', () => {
-  it('manda p_lat/p_lng null explícitos cuando no hay coords (nunca se omiten las claves)', async () => {
+  it('omite p_lat/p_lng cuando no hay coords (args opcionales: DEFAULT NULL server-side)', async () => {
     supabaseRpcMock.mockResolvedValueOnce({ data: null, error: null });
     await doCheckin('m1', 'teamA');
     expect(supabaseRpcMock).toHaveBeenCalledWith('checkin_team', {
       p_match_id: 'm1',
       p_team_id: 'teamA',
-      p_lat: null,
-      p_lng: null,
+      p_lat: undefined,
+      p_lng: undefined,
     });
   });
 
@@ -306,7 +307,7 @@ describe('claimWo', () => {
     });
   });
 
-  it('envía scorers vacío y mvp null cuando no se cargan goleadores', async () => {
+  it('envía scorers vacío y omite el mvp cuando no se cargan goleadores', async () => {
     supabaseMock.storage.from.mockReturnValue(
       createStorageMock({ data: { path: 'm1/teamA_123.jpg' }, error: null }).from('wo_evidences'),
     );
@@ -321,7 +322,7 @@ describe('claimWo', () => {
 
     expect(supabaseRpcMock).toHaveBeenCalledWith(
       'claim_wo',
-      expect.objectContaining({ p_scorers: [], p_mvp_id: null }),
+      expect.objectContaining({ p_scorers: [], p_mvp_id: undefined }),
     );
   });
 
