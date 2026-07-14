@@ -44,3 +44,59 @@ jobs:
       # 3) Suite de tests (Vitest, una sola corrida). Falla si algún test no pasa.
       - name: Tests (vitest)
         run: npm test
+
+  # ─── Tests de base de datos ─────────────────────────────────────────────────
+  # Ejecuta las suites SQL auto-verificantes de supabase/tests/ (listadas en
+  # ci-manifest.txt) contra la base del proyecto. Es SEGURO: cada suite corre
+  # íntegramente en BEGIN...ROLLBACK y jamás persiste datos; si una regresión
+  # reaparece, el bloque lanza EXCEPTION y el job queda en rojo.
+  #
+  # Configuración (una sola vez): crear el secret SUPABASE_DB_URL en
+  # Settings → Secrets and variables → Actions, con la connection string del
+  # Session Pooler (Dashboard → Connect → Session pooler URI). Si el secret no
+  # está definido (p. ej. en forks), el job se omite con un warning en lugar
+  # de fallar.
+  #
+  # Nota de diseño: la receta "supabase start + supabase test db" (stack local
+  # efímero + pgTAP) queda como evolución futura — requiere (a) llevar el
+  # schema base de docs/schema.sql a una migración baseline, (b) un seed.sql
+  # con los datos que las suites asumen y (c) convertir las suites a pgTAP.
+  # Hasta entonces, el pooler + ROLLBACK da la misma señal sin Docker.
+  db-tests:
+    name: Database tests (SQL · RLS · dominio)
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verificar configuración del secret
+        id: guard
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::SUPABASE_DB_URL no está configurado — se omiten los tests de base de datos."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ejecutar suites SQL (BEGIN…ROLLBACK)
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          failed=0
+          while IFS= read -r file; do
+            # saltear líneas vacías y comentarios del manifest
+            [ -z "$file" ] && continue
+            case "$file" in \#*) continue ;; esac
+            echo "══════════════════════════════════════════════"
+            echo "▶ supabase/tests/$file"
+            if psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f "supabase/tests/$file"; then
+              echo "✅ $file"
+            else
+              echo "❌ $file"
+              failed=1
+            fi
+          done < supabase/tests/ci-manifest.txt
+          exit "$failed"
