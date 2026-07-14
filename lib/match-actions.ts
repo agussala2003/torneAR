@@ -1,4 +1,4 @@
-import { supabase, supabaseRpc } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import type { MatchResultFormData, CancellationFormData, WoClaimFormData } from '@/components/matches/types';
 import type { Database } from '@/types/supabase';
 
@@ -64,7 +64,7 @@ export async function submitProposal(
 }
 
 export async function acceptProposal(proposalId: string, matchId: string): Promise<void> {
-  const { error } = await supabaseRpc('confirm_match_proposal', {
+  const { error } = await supabase.rpc('confirm_match_proposal', {
     p_proposal_id: proposalId,
     p_match_id: matchId,
   });
@@ -96,11 +96,13 @@ export async function doCheckin(
   teamId: string,
   coords?: { lat: number; lng: number },
 ): Promise<void> {
-  const { error } = await supabaseRpc('checkin_team', {
+  // p_lat/p_lng son args opcionales del RPC tipado: undefined = omitidos en el
+  // body y toman el DEFAULT NULL del servidor (misma semántica que antes).
+  const { error } = await supabase.rpc('checkin_team', {
     p_match_id: matchId,
     p_team_id: teamId,
-    p_lat: coords?.lat ?? null,
-    p_lng: coords?.lng ?? null,
+    p_lat: coords?.lat,
+    p_lng: coords?.lng,
   });
   if (error) throw error;
 }
@@ -160,11 +162,11 @@ export async function requestCancellation(
   data: CancellationFormData,
   opponentTeamId: string,
 ): Promise<void> {
-  const { error } = await supabaseRpc('request_match_cancellation', {
+  const { error } = await supabase.rpc('request_match_cancellation', {
     p_match_id: matchId,
     p_team_id: teamId,
     p_reason: data.reason,
-    p_notes: data.notes ?? null,
+    p_notes: data.notes ?? undefined,
   });
   if (error) throw error;
 
@@ -185,7 +187,7 @@ export async function respondToCancellationRequest(
   accept: boolean,
   requestedByTeamId: string,
 ): Promise<string> {
-  const { data, error } = await supabaseRpc('respond_to_cancellation_request', {
+  const { data, error } = await supabase.rpc('respond_to_cancellation_request', {
     p_request_id: requestId,
     p_accept: accept,
   });
@@ -207,19 +209,20 @@ export async function respondToCancellationRequest(
 // ─── Guest join ───────────────────────────────────────────────────────────────
 // SECURITY DEFINER RPC — any authenticated user can join via unique code.
 
-export interface GuestJoinResult {
+// type (no interface): habilita el cast directo desde el Json tipado del RPC.
+export type GuestJoinResult = {
   matchId: string;
   teamId: string;
   teamSide: 'A' | 'B';
   teamAName: string;
   teamBName: string;
-}
+};
 
 export async function joinMatchAsGuest(
   uniqueCode: string,
   teamSide: 'A' | 'B',
 ): Promise<GuestJoinResult> {
-  const { data, error } = await supabaseRpc('join_match_as_guest', {
+  const { data, error } = await supabase.rpc('join_match_as_guest', {
     p_unique_code: uniqueCode,
     p_team_side: teamSide,
   });
@@ -230,23 +233,24 @@ export async function joinMatchAsGuest(
 // ─── Dispute ──────────────────────────────────────────────────────────────────
 
 export async function submitDisputeVote(matchId: string, votedTeamId: string): Promise<void> {
-  const { error } = await supabaseRpc('submit_dispute_vote', {
+  const { error } = await supabase.rpc('submit_dispute_vote', {
     p_match_id: matchId,
     p_voted_team_id: votedTeamId,
   });
   if (error) throw error;
 }
 
-export interface DisputeResolveResult {
+// type (no interface): habilita el cast directo desde el Json tipado del RPC.
+export type DisputeResolveResult = {
   winnerTeamId: string;
   loserTeamId: string;
   votesA: number;
   votesB: number;
   resolutionMethod: 'votes' | 'fair_play_score';
-}
+};
 
 export async function resolveMatchDispute(matchId: string): Promise<DisputeResolveResult> {
-  const { data, error } = await supabaseRpc('resolve_match_dispute', { p_match_id: matchId });
+  const { data, error } = await supabase.rpc('resolve_match_dispute', { p_match_id: matchId });
   if (error) throw error;
   return data as DisputeResolveResult;
 }
@@ -282,13 +286,14 @@ export async function claimWo(
 
   const scorers = (data.scorers ?? []).map((s) => ({ profile_id: s.profileId, goals: s.goals }));
 
-  const { error } = await supabaseRpc('claim_wo', {
+  // p_mvp_id es opcional en el RPC tipado: undefined = omitido (DEFAULT NULL).
+  const { error } = await supabase.rpc('claim_wo', {
     p_match_id: matchId,
     p_team_id: teamId,
     p_reason: data.reason,
     p_photo_url: photoUrl,
     p_scorers: scorers,
-    p_mvp_id: data.mvpProfileId ?? null,
+    p_mvp_id: data.mvpProfileId ?? undefined,
   });
   if (error) throw error;
 }
