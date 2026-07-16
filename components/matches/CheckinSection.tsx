@@ -5,6 +5,8 @@ import type { MatchDetailViewData } from '@/components/matches/types';
 interface Props {
   match: MatchDetailViewData;
   onCheckin: () => void;
+  // Capitán/subcapitán: abre la pantalla de convocatoria (lista de buena fe)
+  onOpenSquadList?: () => void;
 }
 
 function TeamCheckinBox({
@@ -57,7 +59,7 @@ function isWithin2Hours(scheduledAt: string | null): boolean {
   return diff <= 2 * 60 * 60 * 1000 && diff > -60 * 60 * 1000;
 }
 
-export function CheckinSection({ match, onCheckin }: Props) {
+export function CheckinSection({ match, onCheckin, onOpenSquadList }: Props) {
   const { teamA, teamB, myTeamId, checkinTeamAAt, checkinTeamBAt, scheduledAt } = match;
 
   const isMyTeamA = teamA.id === myTeamId;
@@ -94,13 +96,25 @@ export function CheckinSection({ match, onCheckin }: Props) {
       )}
 
       {canCheckin && (
-        <TouchableOpacity
-          onPress={onCheckin}
-          activeOpacity={0.8}
-          className="rounded-xl bg-brand-primary py-3"
-        >
-          <Text className="font-uiBold text-center text-sm text-[#003914]">Marcar llegada</Text>
-        </TouchableOpacity>
+        onOpenSquadList ? (
+          <TouchableOpacity
+            onPress={onOpenSquadList}
+            activeOpacity={0.8}
+            className="rounded-xl bg-brand-primary py-3"
+          >
+            <Text className="font-uiBold text-center text-sm text-[#003914]">
+              Armar lista y hacer check-in
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={onCheckin}
+            activeOpacity={0.8}
+            className="rounded-xl bg-brand-primary py-3"
+          >
+            <Text className="font-uiBold text-center text-sm text-[#003914]">Marcar llegada</Text>
+          </TouchableOpacity>
+        )
       )}
 
       {alreadyCheckedIn && (
@@ -108,6 +122,13 @@ export function CheckinSection({ match, onCheckin }: Props) {
           <Text className="font-uiBold text-center text-sm text-brand-primary">
             Ya marcaste tu llegada
           </Text>
+          {onOpenSquadList && (
+            <TouchableOpacity onPress={onOpenSquadList} activeOpacity={0.8} className="mt-2">
+              <Text className="font-ui text-center text-xs text-brand-primary underline">
+                Ajustar la convocatoria
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>

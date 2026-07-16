@@ -166,6 +166,55 @@ export interface MatchDetailViewData {
     cancellationRequest: CancellationRequestEntry | null;
 }
 
+// ─── Check-in de convocatoria (lista de buena fe) ─────────────────────────────
+
+export type LineupRole = Database['public']['Enums']['lineup_role'];
+
+// Ciclo visual de cada jugador en la pantalla de convocatoria:
+// AFUERA → TITULAR → SUPLENTE → AFUERA
+export type CheckinLineupState = 'AFUERA' | LineupRole;
+
+export interface FormatRulesEntry {
+    format: TeamFormat;
+    playersOnField: number;      // titulares exactos en cancha
+    minPlayersToStart: number;   // mínimo para presentar equipo
+    maxSquadSize: number;        // máximo de convocados (titulares + suplentes)
+}
+
+export interface CheckinRosterPlayer {
+    profileId: string;
+    fullName: string;
+    username: string;
+    avatarUrl: string | null;
+    teamRole: Database['public']['Enums']['team_role'] | null;  // null = invitado
+    isGuest: boolean;
+    // lineup_role ya persistido si el equipo re-presenta la lista
+    currentLineupRole: LineupRole | null;
+}
+
+export interface CheckinViewData {
+    matchId: string;
+    matchStatus: MatchStatus;
+    format: TeamFormat;
+    scheduledAt: string | null;
+    venueId: string | null;
+    myTeamCheckinAt: string | null;
+    rules: FormatRulesEntry;
+    roster: CheckinRosterPlayer[];
+}
+
+// Resumen que devuelve la RPC submit_team_checkin.
+// type (no interface): habilita el cast directo desde el Json tipado del RPC.
+export type TeamCheckinSummary = {
+    matchId: string;
+    teamId: string;
+    format: TeamFormat;
+    starters: number;
+    substitutes: number;
+    total: number;
+    matchStatus: MatchStatus;
+};
+
 // ─── Dispute voting ───────────────────────────────────────────────────────────
 
 export interface DisputeState {

@@ -353,7 +353,19 @@ export default function MatchDetailScreen() {
         {status === 'CONFIRMADO' && (
           <>
             <MatchDetailsSection match={match} />
-            <CheckinSection match={match} onCheckin={() => void handleCheckin()} />
+            <CheckinSection
+              match={match}
+              onCheckin={() => void handleCheckin()}
+              onOpenSquadList={
+                match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN'
+                  ? () =>
+                      router.push({
+                        pathname: '/match-checkin' as never,
+                        params: { matchId: match.id, myTeamId },
+                      })
+                  : undefined
+              }
+            />
             {hasPendingCancellation && match.cancellationRequest && (
               <CancellationRequestSection
                 request={match.cancellationRequest}
