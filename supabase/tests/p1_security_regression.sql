@@ -77,7 +77,7 @@ BEGIN
   END;
 
   -- ── 4. checkin_team invocado por alguien sin equipo en el partido ─────────
-  UPDATE matches SET status = 'CONFIRMADO' WHERE id = v_match;
+  UPDATE matches SET status = 'CONFIRMADO', format = 'FUTBOL_5' WHERE id = v_match;
   PERFORM set_config('request.jwt.claims', '{"sub":"8e7bd5df-5201-4622-8f6b-b94725c18da8"}', true);
   BEGIN
     PERFORM public.checkin_team(v_match, c_leones, NULL, NULL);

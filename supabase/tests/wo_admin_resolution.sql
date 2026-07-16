@@ -34,11 +34,11 @@ BEGIN
   INSERT INTO teams (name, category, zone, preferred_format) VALUES ('TB_WO', 'HOMBRES', 'ZWO_TEST', 'FUTBOL_5') RETURNING id INTO v_tb;
   -- Con season_id: al aprobar, el motor unificado escribe elo_history y la
   -- columna season_id es NOT NULL (igual que en producción).
-  INSERT INTO matches (team_a_id, team_b_id, status, match_type, season_id)
-  VALUES (v_ta, v_tb, 'CONFIRMADO', 'RANKING', (SELECT id FROM seasons WHERE is_active = true LIMIT 1))
+  INSERT INTO matches (team_a_id, team_b_id, status, match_type, format, season_id)
+  VALUES (v_ta, v_tb, 'CONFIRMADO', 'RANKING', 'FUTBOL_5', (SELECT id FROM seasons WHERE is_active = true LIMIT 1))
   RETURNING id INTO v_m1;
-  INSERT INTO matches (team_a_id, team_b_id, status, match_type, season_id)
-  VALUES (v_ta, v_tb, 'CONFIRMADO', 'RANKING', (SELECT id FROM seasons WHERE is_active = true LIMIT 1))
+  INSERT INTO matches (team_a_id, team_b_id, status, match_type, format, season_id)
+  VALUES (v_ta, v_tb, 'CONFIRMADO', 'RANKING', 'FUTBOL_5', (SELECT id FROM seasons WHERE is_active = true LIMIT 1))
   RETURNING id INTO v_m2;
 
   INSERT INTO wo_claims (match_id, claimed_by, claiming_team_id, photo_url, reason, status, scorers, mvp_id)
