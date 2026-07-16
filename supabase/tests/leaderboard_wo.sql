@@ -51,8 +51,8 @@ BEGIN
   INSERT INTO teams (name, category, zone, preferred_format)
   VALUES ('__TEST WO LB AUSENTE', 'MIXTO', '__TEST_WO_LB', 'FUTBOL_5') RETURNING id INTO v_loser;
 
-  INSERT INTO matches (team_a_id, team_b_id, match_type, status, scheduled_at, season_id)
-  VALUES (v_winner, v_loser, 'RANKING', 'CONFIRMADO', now(), v_season)
+  INSERT INTO matches (team_a_id, team_b_id, match_type, status, format, scheduled_at, season_id)
+  VALUES (v_winner, v_loser, 'RANKING', 'CONFIRMADO', 'FUTBOL_5', now(), v_season)
   RETURNING id INTO v_match;
 
   -- Participantes: 2 del ganador (con check-in) + 1 del ausente.

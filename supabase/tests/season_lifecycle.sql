@@ -57,8 +57,8 @@ BEGIN
   WHERE id = v_team;
 
   -- Partido abierto (debe re-etiquetarse) en la temporada vieja.
-  INSERT INTO matches (team_a_id, team_b_id, match_type, status, scheduled_at, season_id)
-  VALUES (v_team, v_rival, 'AMISTOSO', 'CONFIRMADO', now() + interval '3 days', v_old_id)
+  INSERT INTO matches (team_a_id, team_b_id, match_type, status, format, scheduled_at, season_id)
+  VALUES (v_team, v_rival, 'AMISTOSO', 'CONFIRMADO', 'FUTBOL_5', now() + interval '3 days', v_old_id)
   RETURNING id INTO v_open_match;
 
   -- ── Transición ──────────────────────────────────────────────────────────────

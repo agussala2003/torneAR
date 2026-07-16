@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.4"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -340,6 +360,30 @@ export type Database = {
           },
         ]
       }
+      format_rules: {
+        Row: {
+          format: Database["public"]["Enums"]["team_format"]
+          max_squad_size: number
+          min_players_to_start: number
+          players_on_field: number
+          updated_at: string
+        }
+        Insert: {
+          format: Database["public"]["Enums"]["team_format"]
+          max_squad_size: number
+          min_players_to_start: number
+          players_on_field: number
+          updated_at?: string
+        }
+        Update: {
+          format?: Database["public"]["Enums"]["team_format"]
+          max_squad_size?: number
+          min_players_to_start?: number
+          players_on_field?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       market_player_post_applications: {
         Row: {
           applicant_profile_id: string
@@ -649,6 +693,7 @@ export type Database = {
           id: string
           is_guest: boolean
           is_result_loader: boolean
+          lineup_role: Database["public"]["Enums"]["lineup_role"]
           match_id: string
           profile_id: string
           team_id: string
@@ -661,6 +706,7 @@ export type Database = {
           id?: string
           is_guest?: boolean
           is_result_loader?: boolean
+          lineup_role?: Database["public"]["Enums"]["lineup_role"]
           match_id: string
           profile_id: string
           team_id: string
@@ -673,6 +719,7 @@ export type Database = {
           id?: string
           is_guest?: boolean
           is_result_loader?: boolean
+          lineup_role?: Database["public"]["Enums"]["lineup_role"]
           match_id?: string
           profile_id?: string
           team_id?: string
@@ -3011,6 +3058,16 @@ export type Database = {
         Args: { p_match_id: string; p_voted_team_id: string }
         Returns: undefined
       }
+      submit_team_checkin: {
+        Args: {
+          p_lat?: number
+          p_lng?: number
+          p_match_id: string
+          p_players: Json
+          p_team_id: string
+        }
+        Returns: Json
+      }
       transition_season: {
         Args: { p_ends_at: string; p_new_name: string; p_starts_at: string }
         Returns: string
@@ -3035,6 +3092,7 @@ export type Database = {
       challenge_status: "ENVIADA" | "ACEPTADA" | "RECHAZADA" | "CANCELADA"
       conversation_type: "MATCH_CHAT" | "MARKET_DM"
       join_request_status: "PENDIENTE" | "ACEPTADA" | "RECHAZADA"
+      lineup_role: "TITULAR" | "SUPLENTE"
       market_post_type: "BUSCA_EQUIPO" | "BUSCA_PARTIDO"
       match_status:
         | "PENDIENTE"
@@ -3219,11 +3277,15 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       challenge_status: ["ENVIADA", "ACEPTADA", "RECHAZADA", "CANCELADA"],
       conversation_type: ["MATCH_CHAT", "MARKET_DM"],
       join_request_status: ["PENDIENTE", "ACEPTADA", "RECHAZADA"],
+      lineup_role: ["TITULAR", "SUPLENTE"],
       market_post_type: ["BUSCA_EQUIPO", "BUSCA_PARTIDO"],
       match_status: [
         "PENDIENTE",
@@ -3282,3 +3344,4 @@ export const Constants = {
     },
   },
 } as const
+

@@ -47,8 +47,8 @@ BEGIN
   INSERT INTO teams (name, category, zone, preferred_format)
   VALUES ('__TEST ELO B', 'MIXTO', 'Palermo', 'FUTBOL_5') RETURNING id INTO v_team_b;
 
-  INSERT INTO matches (team_a_id, team_b_id, match_type, status, scheduled_at, season_id)
-  VALUES (v_team_a, v_team_b, 'RANKING', 'EN_VIVO', now(), v_season)
+  INSERT INTO matches (team_a_id, team_b_id, match_type, status, format, scheduled_at, season_id)
+  VALUES (v_team_a, v_team_b, 'RANKING', 'EN_VIVO', 'FUTBOL_5', now(), v_season)
   RETURNING id INTO v_match;
 
   -- Carga de resultados cruzados 2-1 (dispara trg_on_result_submitted).
@@ -123,8 +123,8 @@ BEGIN
   INSERT INTO teams (name, category, zone, preferred_format)
   VALUES ('__TEST WO B', 'MIXTO', 'Palermo', 'FUTBOL_5') RETURNING id INTO v_team_b;
 
-  INSERT INTO matches (team_a_id, team_b_id, match_type, status, scheduled_at, season_id)
-  VALUES (v_team_a, v_team_b, 'RANKING', 'CONFIRMADO', now(), v_season)
+  INSERT INTO matches (team_a_id, team_b_id, match_type, status, format, scheduled_at, season_id)
+  VALUES (v_team_a, v_team_b, 'RANKING', 'CONFIRMADO', 'FUTBOL_5', now(), v_season)
   RETURNING id INTO v_match;
 
   -- Simula la aprobación del WO (resolve_wo_claim setea el status igual).
@@ -167,8 +167,8 @@ BEGIN
   INSERT INTO teams (name, category, zone, preferred_format)
   VALUES ('__TEST AMISTOSO B', 'MIXTO', 'Palermo', 'FUTBOL_5') RETURNING id INTO v_team_b;
 
-  INSERT INTO matches (team_a_id, team_b_id, match_type, status, scheduled_at)
-  VALUES (v_team_a, v_team_b, 'AMISTOSO', 'EN_VIVO', now())
+  INSERT INTO matches (team_a_id, team_b_id, match_type, status, format, scheduled_at)
+  VALUES (v_team_a, v_team_b, 'AMISTOSO', 'EN_VIVO', 'FUTBOL_5', now())
   RETURNING id INTO v_match;
 
   INSERT INTO match_results (match_id, team_id, submitted_by, goals_scored, goals_against)

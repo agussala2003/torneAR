@@ -26,8 +26,8 @@ DECLARE
   v_id    uuid;
 BEGIN
   -- Setup: partido CONFIRMADO + capitán de Leones con check-in.
-  INSERT INTO matches (team_a_id, team_b_id, match_type, status, scheduled_at)
-  VALUES (c_leones, c_tigres, 'RANKING', 'CONFIRMADO', now() - interval '1 hour')
+  INSERT INTO matches (team_a_id, team_b_id, match_type, status, format, scheduled_at)
+  VALUES (c_leones, c_tigres, 'RANKING', 'CONFIRMADO', 'FUTBOL_5', now() - interval '1 hour')
   RETURNING id INTO v_match;
   INSERT INTO match_participants (match_id, profile_id, team_id, did_checkin)
   VALUES (v_match, c_cap, c_leones, true);
