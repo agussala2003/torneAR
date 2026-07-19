@@ -12,6 +12,7 @@ import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileStatsGrid } from '@/components/profile/ProfileStatsGrid';
 import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
 import { ProfileTeamsSection } from '@/components/profile/ProfileTeamsSection';
+import { CareerTimeline } from '@/components/profile/CareerTimeline';
 import { ProfileSettingsSection } from '@/components/profile/ProfileSettingsSection';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 
@@ -94,6 +95,7 @@ export default function ProfileScreen() {
           onOpenRequests={() => router.push('/team-requests')}
           onTeamPress={(teamId) => router.push({ pathname: '/team-manage', params: { teamId } })}
         />
+        <CareerTimeline profileId={viewData.profile.id} />
         {profile.is_admin && (
           <TouchableOpacity
             activeOpacity={0.9}

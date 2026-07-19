@@ -1536,6 +1536,73 @@ export type Database = {
           },
         ]
       }
+      team_stints: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          id: string
+          is_reconstructed: boolean
+          last_role: Database["public"]["Enums"]["team_role"] | null
+          leave_reason: Database["public"]["Enums"]["stint_leave_reason"] | null
+          profile_id: string
+          shield_url: string | null
+          started_at: string
+          stats: Json | null
+          stats_computed_at: string | null
+          team_id: string
+          team_name: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          is_reconstructed?: boolean
+          last_role?: Database["public"]["Enums"]["team_role"] | null
+          leave_reason?:
+            | Database["public"]["Enums"]["stint_leave_reason"]
+            | null
+          profile_id: string
+          shield_url?: string | null
+          started_at: string
+          stats?: Json | null
+          stats_computed_at?: string | null
+          team_id: string
+          team_name: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          is_reconstructed?: boolean
+          last_role?: Database["public"]["Enums"]["team_role"] | null
+          leave_reason?:
+            | Database["public"]["Enums"]["stint_leave_reason"]
+            | null
+          profile_id?: string
+          shield_url?: string | null
+          started_at?: string
+          stats?: Json | null
+          stats_computed_at?: string | null
+          team_id?: string
+          team_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_stints_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_stints_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_player_stats"
+            referencedColumns: ["profile_id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           category: Database["public"]["Enums"]["team_category"]
@@ -2048,6 +2115,15 @@ export type Database = {
         }
         Returns: string
       }
+      compute_stint_stats: {
+        Args: {
+          p_from: string
+          p_profile_id: string
+          p_team_id: string
+          p_to: string
+        }
+        Returns: Json
+      }
       confirm_match_proposal: {
         Args: { p_match_id: string; p_proposal_id: string }
         Returns: undefined
@@ -2288,6 +2364,7 @@ export type Database = {
           slug: string
         }[]
       }
+      get_player_career: { Args: { p_profile_id: string }; Returns: Json }
       get_player_leaderboard: {
         Args: { p_season_id?: string; p_stat: string; p_zone?: string }
         Returns: {
@@ -3134,6 +3211,11 @@ export type Database = {
         | "DELANTERO"
       proposal_status: "PENDIENTE" | "ACEPTADA" | "RECHAZADA"
       result_status: "PENDIENTE" | "CARGADO" | "CONFIRMADO" | "EN_DISPUTA"
+      stint_leave_reason:
+        | "ABANDONO"
+        | "EXPULSADO"
+        | "TRANSFERENCIA"
+        | "EQUIPO_DISUELTO"
       team_category: "HOMBRES" | "MUJERES" | "MIXTO"
       team_format:
         | "FUTBOL_5"
@@ -3330,6 +3412,12 @@ export const Constants = {
       ],
       proposal_status: ["PENDIENTE", "ACEPTADA", "RECHAZADA"],
       result_status: ["PENDIENTE", "CARGADO", "CONFIRMADO", "EN_DISPUTA"],
+      stint_leave_reason: [
+        "ABANDONO",
+        "EXPULSADO",
+        "TRANSFERENCIA",
+        "EQUIPO_DISUELTO",
+      ],
       team_category: ["HOMBRES", "MUJERES", "MIXTO"],
       team_format: [
         "FUTBOL_5",
