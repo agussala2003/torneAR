@@ -1,4 +1,6 @@
-# Suites SQL que corren en CI (job db-tests de .github/workflows/ci.yml).
+# Suites SQL legacy que corren en CI (job db-tests-legacy de ci.yml).
+# ⚠️ Directorio en extinción: las suites nuevas van en supabase/tests/ (pgTAP).
+# Cada suite migrada a pgTAP se elimina de este manifest y de tests-legacy/.
 #
 # Requisito para entrar en esta lista: la suite debe ser AUTO-VERIFICANTE —
 # cada bloque corre en BEGIN...ROLLBACK y lanza EXCEPTION "Xn FALLÓ: ..." si

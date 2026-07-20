@@ -45,11 +45,11 @@ jobs:
       - name: Tests (vitest)
         run: npm test
 
-  # ─── Tests de base de datos ─────────────────────────────────────────────────
-  # Ejecuta las suites SQL auto-verificantes de supabase/tests/ (listadas en
-  # ci-manifest.txt) contra la base del proyecto. Es SEGURO: cada suite corre
-  # íntegramente en BEGIN...ROLLBACK y jamás persiste datos; si una regresión
-  # reaparece, el bloque lanza EXCEPTION y el job queda en rojo.
+  # ─── Tests de base de datos (LEGACY · en extinción) ─────────────────────────
+  # Ejecuta las suites SQL imperativas de supabase/tests-legacy/ (listadas en
+  # ci-manifest.txt) contra la base del proyecto vía pooler. Es SEGURO: cada
+  # suite corre íntegramente en BEGIN...ROLLBACK y jamás persiste datos; si
+  # una regresión reaparece, el bloque lanza EXCEPTION y el job queda en rojo.
   #
   # Configuración (una sola vez): crear el secret SUPABASE_DB_URL en
   # Settings → Secrets and variables → Actions, con la connection string del
@@ -57,13 +57,12 @@ jobs:
   # está definido (p. ej. en forks), el job se omite con un warning en lugar
   # de fallar.
   #
-  # Nota de diseño: la receta "supabase start + supabase test db" (stack local
-  # efímero + pgTAP) queda como evolución futura — requiere (a) llevar el
-  # schema base de docs/schema.sql a una migración baseline, (b) un seed.sql
-  # con los datos que las suites asumen y (c) convertir las suites a pgTAP.
-  # Hasta entonces, el pooler + ROLLBACK da la misma señal sin Docker.
-  db-tests:
-    name: Database tests (SQL · RLS · dominio)
+  # Plan de migración (chore/pgtap-ci): cada suite migrada a pgTAP se borra de
+  # tests-legacy/ y de su manifest. Cuando el manifest quede vacío, este job
+  # y el secret SUPABASE_DB_URL se eliminan. Las suites nuevas van SIEMPRE en
+  # supabase/tests/ (pgTAP, job db-tests-pgtap).
+  db-tests-legacy:
+    name: Database tests (legacy · SQL imperativo)
     runs-on: ubuntu-latest
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -91,12 +90,46 @@ jobs:
             [ -z "$file" ] && continue
             case "$file" in \#*) continue ;; esac
             echo "══════════════════════════════════════════════"
-            echo "▶ supabase/tests/$file"
-            if psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f "supabase/tests/$file"; then
+            echo "▶ supabase/tests-legacy/$file"
+            if psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f "supabase/tests-legacy/$file"; then
               echo "✅ $file"
             else
               echo "❌ $file"
               failed=1
             fi
-          done < supabase/tests/ci-manifest.txt
+          done < supabase/tests-legacy/ci-manifest.txt
           exit "$failed"
+
+  # ─── Tests de base de datos (pgTAP · stack efímero) ─────────────────────────
+  # Levanta un stack local de Supabase DESDE CERO en el runner (aplica las
+  # migraciones completas + supabase/seed.sql) y corre las suites declarativas
+  # de supabase/tests/ con pg_prove (supabase test db). Ventajas sobre el job
+  # legacy: hermético (no toca la base real ni compite entre PRs), corre en
+  # forks sin secrets, y valida en cada PR que la cadena de migraciones
+  # aplica limpia desde cero.
+  #
+  # -x excluye los servicios que los tests de DB no usan (studio, buckets,
+  # realtime, edge functions, mail, analytics...). Quedan corriendo Postgres,
+  # auth y kong. OJO: los nombres válidos dependen de la versión del CLI
+  # (`supabase start --help`); `gotrue` no es excluible y `logflare` se
+  # llama `analytics`.
+  #
+  # pgTAP y el schema tests.* los instala supabase/tests/000-setup.sql al
+  # inicio de la corrida — nunca via migración, así jamás llegan a Producción.
+  db-tests-pgtap:
+    name: Database tests (pgTAP · stack efímero)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start ephemeral stack (migraciones + seed)
+        run: supabase start -x studio,imgproxy,inbucket,edge-runtime,functions,realtime,storage,analytics,vector,meta,rest
+
+      - name: Run pgTAP suites (supabase test db)
+        run: supabase test db
