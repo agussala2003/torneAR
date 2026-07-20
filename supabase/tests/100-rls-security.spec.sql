@@ -25,32 +25,13 @@
 -- autorización a mano (RAISE EXCEPTION 'No autorizado...'), NO devuelven
 -- "permission denied" de Postgres → se usa throws_matching contra el mensaje
 -- real. El caso 6 (UPDATE directo) no lanza error: RLS filtra la fila en
--- silencio → un helper efímero captura ROW_COUNT como el legacy (no sirve
--- UPDATE ... RETURNING: exige GRANT SELECT que authenticated no tiene sobre
--- challenges en el schema de migraciones puras).
+-- silencio → is_empty sobre UPDATE ... RETURNING. Depende de los grants
+-- base de la migración 20260719120000_fix_challenges_grants.sql (drift
+-- detectado por el stack efímero de CI).
 -- ============================================================
 
 begin;
 select plan(7);
-
--- ── Helper efímero del caso 6 (muere con el ROLLBACK) ───────────────────────
--- Ejecuta el UPDATE puro como el rol ACTUAL de la sesión (security invoker,
--- el default) y devuelve las filas afectadas vía GET DIAGNOSTICS — igual que
--- el legacy. No usa RETURNING porque esa cláusula exige GRANT SELECT sobre
--- la tabla, y authenticated no lo tiene sobre challenges en el schema de
--- migraciones puras (lo detectó el stack efímero de CI: "permission denied").
-create function tests.try_update_challenge_case6(p_challenge_id uuid)
-returns integer
-language plpgsql
-as $fn$
-declare
-  v_rows integer;
-begin
-  update public.challenges set status = 'ACEPTADA' where id = p_challenge_id;
-  get diagnostics v_rows = row_count;
-  return v_rows;
-end;
-$fn$;
 
 -- ── Setup: el capitán de Rayos entra como JUGADOR raso de Leones ────────────
 insert into team_members (team_id, profile_id, role)
@@ -138,14 +119,16 @@ select throws_matching(
 );
 
 -- ── 6. UPDATE directo a challenges por un usuario ajeno (bypass del RPC) ────
--- RLS no lanza error en UPDATE: filtra la fila y afecta 0 registros. El
--- helper try_update_challenge_case6 (creado arriba) corre el UPDATE con el
--- rol authenticated de esta sesión y reporta el ROW_COUNT.
+-- RLS no lanza error en UPDATE: filtra la fila y afecta 0 registros → el
+-- RETURNING vacío prueba que la policy bloqueó la escritura. Requiere los
+-- grants base de 20260719120000_fix_challenges_grants.sql (el WHERE y el
+-- RETURNING exigen SELECT además de UPDATE — hallazgo del stack efímero).
 select tests.authenticate_as_profile('aaaaaaaa-0000-0000-0000-000000000004');
 
-select is(
-  tests.try_update_challenge_case6('99999999-0000-0000-0000-000000000001'),
-  0,
+select is_empty(
+  $$ update public.challenges set status = 'ACEPTADA'
+     where id = '99999999-0000-0000-0000-000000000001'
+     returning 1 $$,
   'P1-6: RLS bloquea el UPDATE directo de un ajeno al desafío (0 filas)'
 );
 
