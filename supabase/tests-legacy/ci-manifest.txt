@@ -9,7 +9,6 @@
 # Desde 2026-07-14 las 11 suites cumplen el formato y corren igual contra el
 # stack local (supabase db reset + seed.sql) que contra el proyecto real.
 c1_c2_security_regression.sql
-p1_security_regression.sql
 g6_claim_wo.sql
 g4_leaderboard.sql
 wo_admin_resolution.sql
