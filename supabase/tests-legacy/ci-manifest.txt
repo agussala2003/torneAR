@@ -19,3 +19,4 @@ leaderboard_wo.sql
 season_lifecycle.sql
 rls_performance_regression.sql
 squad_formats.sql
+transfer_history.sql
