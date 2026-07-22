@@ -123,10 +123,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Versión PINEADA a propósito: 010-schema.spec.sql afirma la matriz de
+      # privilegios de authenticated con table_privs_are (exact-match), y el
+      # baseline de default privileges de Supabase varía entre versiones del
+      # CLI. Con `latest`, una actualización de Supabase rompería esos tests
+      # sin que cambiara nuestro schema (version-skew). Al subir de versión,
+      # re-medir los arrays de 010-schema contra el nuevo baseline.
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.109.1
 
       - name: Start ephemeral stack (migraciones + seed)
         run: supabase start -x studio,imgproxy,inbucket,edge-runtime,functions,realtime,storage,analytics,vector,meta,rest

@@ -10,7 +10,6 @@
 # stack local (supabase db reset + seed.sql) que contra el proyecto real.
 g6_claim_wo.sql
 wo_admin_resolution.sql
-elo_engine_unification.sql
 leaderboard_wo.sql
 season_lifecycle.sql
 rls_performance_regression.sql
