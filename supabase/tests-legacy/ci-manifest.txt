@@ -8,5 +8,4 @@
 #
 # Desde 2026-07-14 las 11 suites cumplen el formato y corren igual contra el
 # stack local (supabase db reset + seed.sql) que contra el proyecto real.
-squad_formats.sql
 transfer_history.sql
