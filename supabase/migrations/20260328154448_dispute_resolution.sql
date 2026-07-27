@@ -15,7 +15,7 @@
 -- ─── 1. Tabla match_dispute_votes ────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.match_dispute_votes (
-  id             uuid        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id             uuid        PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
   match_id       uuid        NOT NULL REFERENCES matches(id)  ON DELETE CASCADE,
   profile_id     uuid        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   voted_team_id  uuid        NOT NULL REFERENCES teams(id)    ON DELETE CASCADE,

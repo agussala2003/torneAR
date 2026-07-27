@@ -26,8 +26,19 @@ create extension if not exists pg_net;
 -- ============================================================
 --  EXTENSIONES
 -- ============================================================
-create extension if not exists "uuid-ossp";
-create extension if not exists "postgis"; -- opcional, para geo queries avanzadas
+-- Los proyectos de Supabase (local y hosted) instalan estas extensiones en el
+-- schema `extensions`, NO en `public`. Por eso todas las llamadas de abajo van
+-- calificadas como `extensions.uuid_generate_v4()`: `supabase db reset --linked`
+-- aplica las migraciones con un rol efímero ("Initialising login role...") cuyo
+-- search_path es solo `public`, así que la forma sin calificar resuelve en local
+-- pero revienta contra el proyecto remoto con 42883.
+create extension if not exists "uuid-ossp" with schema extensions;
+
+-- postgis: hoy NO lo usa nada del schema (get_nearest_venues resuelve la
+-- distancia con Haversine puro: acos/cos/radians). Se instala en `extensions`
+-- y no en `public` — la migración 20260708160102 ya dejaba anotado como deuda
+-- justamente sacarlo de public.
+create extension if not exists "postgis" with schema extensions;
 
 
 -- ============================================================
@@ -109,7 +120,7 @@ create type notification_type as enum (
 --  Extiende auth.users de Supabase
 -- ============================================================
 create table profiles (
-  id               uuid primary key default uuid_generate_v4(),
+  id               uuid primary key default extensions.uuid_generate_v4(),
   auth_user_id     uuid not null unique references auth.users(id) on delete cascade,
   username         text not null unique,
   full_name        text not null,
@@ -130,7 +141,7 @@ comment on column profiles.zone is 'Ciudad o zona geográfica, capturada en onbo
 --  Temporadas fijas: Apertura (ene-jun) y Clausura (jul-dic)
 -- ============================================================
 create table seasons (
-  id         uuid primary key default uuid_generate_v4(),
+  id         uuid primary key default extensions.uuid_generate_v4(),
   name       text not null,           -- ej: "Apertura 2025"
   slug       text not null unique,    -- ej: "apertura-2025"
   starts_at  date not null,
@@ -152,7 +163,7 @@ create unique index seasons_single_active_idx
 --  Zonas geográficas definidas manualmente por el equipo
 -- ============================================================
 create table zones (
-  id         uuid primary key default uuid_generate_v4(),
+  id         uuid primary key default extensions.uuid_generate_v4(),
   name       text not null unique,   -- ej: "Villa Crespo", "Palermo", "Lanús"
   slug       text not null unique,   -- ej: "villa-crespo", "palermo", "lanus"
   is_active  boolean not null default true,
@@ -167,7 +178,7 @@ comment on table zones is 'Zonas geográficas cargadas manualmente por el equipo
 --  Canchas cargadas manualmente por el equipo
 -- ============================================================
 create table venues (
-  id         uuid primary key default uuid_generate_v4(),
+  id         uuid primary key default extensions.uuid_generate_v4(),
   name       text not null,                        -- ej: "Complejo Deportivo El Potrillo"
   address    text,                                 -- ej: "Av. Rivadavia 1234, CABA"
   zone_id    uuid references zones(id) on delete set null,
@@ -192,7 +203,7 @@ create index venues_zone_active_idx on venues (zone_id, is_active);
 --  5. TEAMS
 -- ============================================================
 create table teams (
-  id               uuid primary key default uuid_generate_v4(),
+  id               uuid primary key default extensions.uuid_generate_v4(),
   name             text not null,
   category         team_category not null,
   zone             text not null,
@@ -224,7 +235,7 @@ comment on column teams.in_ranking is 'Se activa cuando el equipo completa 5 par
 --  Un usuario puede estar en múltiples equipos con distintos roles
 -- ============================================================
 create table team_members (
-  id         uuid primary key default uuid_generate_v4(),
+  id         uuid primary key default extensions.uuid_generate_v4(),
   team_id    uuid not null references teams(id) on delete cascade,
   profile_id uuid not null references profiles(id) on delete cascade,
   role       team_role not null default 'JUGADOR',
@@ -240,7 +251,7 @@ comment on table team_members is 'Pertenencia de un jugador a un equipo. Un juga
 --  Solicitudes de unión al equipo via invite_code
 -- ============================================================
 create table team_join_requests (
-  id         uuid primary key default uuid_generate_v4(),
+  id         uuid primary key default extensions.uuid_generate_v4(),
   team_id    uuid not null references teams(id) on delete cascade,
   profile_id uuid not null references profiles(id) on delete cascade,
   status     join_request_status not null default 'PENDIENTE',
@@ -255,7 +266,7 @@ create table team_join_requests (
 --  Solicitudes de desafío entre equipos
 -- ============================================================
 create table challenges (
-  id            uuid primary key default uuid_generate_v4(),
+  id            uuid primary key default extensions.uuid_generate_v4(),
   from_team_id  uuid not null references teams(id) on delete cascade,
   to_team_id    uuid not null references teams(id) on delete cascade,
   status        challenge_status not null default 'ENVIADA',
@@ -272,7 +283,7 @@ comment on table challenges is 'Solicitudes de desafío. Al aceptarse se crea un
 --  9. MATCHES
 -- ============================================================
 create table matches (
-  id                uuid primary key default uuid_generate_v4(),
+  id                uuid primary key default extensions.uuid_generate_v4(),
   challenge_id      uuid references challenges(id) on delete set null,
   team_a_id         uuid not null references teams(id),
   team_b_id         uuid not null references teams(id),
@@ -312,7 +323,7 @@ comment on column matches.location is 'Nombre libre de la cancha. Se usa cuando 
 --  Propuesta formal de detalles del partido (cualquier equipo puede enviar)
 -- ============================================================
 create table match_proposals (
-  id            uuid primary key default uuid_generate_v4(),
+  id            uuid primary key default extensions.uuid_generate_v4(),
   match_id      uuid not null references matches(id) on delete cascade,
   proposed_by   uuid not null references profiles(id),
   from_team_id  uuid not null references teams(id),
@@ -340,7 +351,7 @@ comment on column match_proposals.venue_id is 'Si el proponente elige una cancha
 --  Registro de quién jugó cada partido (titulares + invitados)
 -- ============================================================
 create table match_participants (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default extensions.uuid_generate_v4(),
   match_id        uuid not null references matches(id) on delete cascade,
   profile_id      uuid not null references profiles(id),
   team_id         uuid not null references teams(id),
@@ -362,7 +373,7 @@ comment on column match_participants.is_result_loader is 'El miembro que hizo ch
 --  Una fila por equipo. Se comparan para detectar discrepancias.
 -- ============================================================
 create table match_results (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default extensions.uuid_generate_v4(),
   match_id        uuid not null references matches(id) on delete cascade,
   team_id         uuid not null references teams(id),
   submitted_by    uuid not null references profiles(id),  -- quien hizo checkin
@@ -385,7 +396,7 @@ comment on column match_results.scorers is 'Array JSON: [{"profile_id": "uuid", 
 --  Votación cuando los resultados no coinciden
 -- ============================================================
 create table result_dispute_votes (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default extensions.uuid_generate_v4(),
   match_id        uuid not null references matches(id) on delete cascade,
   voter_id        uuid not null references profiles(id),
   voted_for_team  uuid not null references teams(id),  -- equipo cuyo resultado vota como correcto
@@ -401,7 +412,7 @@ comment on table result_dispute_votes is 'Votos de los participantes en caso de 
 --  Reclamo de puntos por ausencia del rival
 -- ============================================================
 create table wo_claims (
-  id                uuid primary key default uuid_generate_v4(),
+  id                uuid primary key default extensions.uuid_generate_v4(),
   match_id          uuid not null references matches(id) on delete cascade,
   claimed_by        uuid not null references profiles(id),
   claiming_team_id  uuid not null references teams(id),
@@ -419,7 +430,7 @@ create table wo_claims (
 --  Historial de movimientos de rating por partido y temporada
 -- ============================================================
 create table elo_history (
-  id          uuid primary key default uuid_generate_v4(),
+  id          uuid primary key default extensions.uuid_generate_v4(),
   team_id     uuid not null references teams(id) on delete cascade,
   season_id   uuid not null references seasons(id),
   match_id    uuid not null references matches(id),
@@ -437,7 +448,7 @@ comment on table elo_history is 'Registro de cada cambio de ELO. Permite reconst
 --  Publicaciones de equipos buscando jugadores
 -- ============================================================
 create table market_team_posts (
-  id               uuid primary key default uuid_generate_v4(),
+  id               uuid primary key default extensions.uuid_generate_v4(),
   team_id          uuid not null references teams(id) on delete cascade,
   created_by       uuid not null references profiles(id),
   position_wanted  player_position not null default 'CUALQUIERA',
@@ -455,7 +466,7 @@ comment on table market_team_posts is 'Gestionada por CAPITÁN o SUBCAPITÁN. Un
 --  Publicaciones individuales: busco equipo o busco partido (falta 1)
 -- ============================================================
 create table market_player_posts (
-  id               uuid primary key default uuid_generate_v4(),
+  id               uuid primary key default extensions.uuid_generate_v4(),
   profile_id       uuid not null references profiles(id) on delete cascade,
   post_type        market_post_type not null,  -- BUSCA_EQUIPO | BUSCA_PARTIDO
   position         player_position not null default 'CUALQUIERA',
@@ -473,7 +484,7 @@ comment on column market_player_posts.post_type is 'BUSCA_EQUIPO = quiere unirse
 --  Un modelo unificado para todos los tipos de chat
 -- ============================================================
 create table conversations (
-  id           uuid primary key default uuid_generate_v4(),
+  id           uuid primary key default extensions.uuid_generate_v4(),
   type         conversation_type not null,
   -- MATCH_CHAT: chat interno del partido entre equipos
   match_id     uuid references matches(id) on delete cascade,
@@ -500,7 +511,7 @@ create unique index conversations_match_chat_unique_idx
 --  19. MESSAGES
 -- ============================================================
 create table messages (
-  id                  uuid primary key default uuid_generate_v4(),
+  id                  uuid primary key default extensions.uuid_generate_v4(),
   conversation_id     uuid not null references conversations(id) on delete cascade,
   sender_profile_id   uuid not null references profiles(id),
   -- En chats de equipo, también registramos en nombre de qué equipo habla
@@ -517,7 +528,7 @@ comment on column messages.sender_team_id is 'Populated en MATCH_CHAT y MARKET_D
 --  20. NOTIFICATIONS
 -- ============================================================
 create table notifications (
-  id         uuid primary key default uuid_generate_v4(),
+  id         uuid primary key default extensions.uuid_generate_v4(),
   profile_id uuid not null references profiles(id) on delete cascade,
   type       notification_type not null,
   title      text not null,
@@ -539,7 +550,7 @@ create index notifications_profile_unread_idx
 --  21. BADGES (INSIGNIAS)
 -- ============================================================
 create table badges (
-  id          uuid primary key default uuid_generate_v4(),
+  id          uuid primary key default extensions.uuid_generate_v4(),
   slug        text not null unique,   -- ej: 'primera_victoria', 'racha_5'
   name        text not null,
   description text,
@@ -547,7 +558,7 @@ create table badges (
 );
 
 create table profile_badges (
-  id          uuid primary key default uuid_generate_v4(),
+  id          uuid primary key default extensions.uuid_generate_v4(),
   profile_id  uuid not null references profiles(id) on delete cascade,
   badge_id    uuid not null references badges(id),
   earned_at   timestamptz not null default now(),
