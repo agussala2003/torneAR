@@ -43,7 +43,9 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      # Lanza el build de ambas plataformas en el perfil production, sin prompts.
+      # Lanza el build de Android en el perfil production, sin prompts.
+      # iOS queda fuera hasta tener la cuenta de Apple Developer + certificados
+      # de distribución. Cuando estén, volver a --platform all.
       # --non-interactive => falla en vez de preguntar si falta algo (credenciales, etc).
-      - name: Build Android + iOS (production)
-        run: eas build --platform all --profile production --non-interactive --no-wait
+      - name: Build Android (production)
+        run: eas build --platform android --profile production --non-interactive --no-wait
