@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import type { Session } from '@supabase/supabase-js';
@@ -8,10 +9,13 @@ import { extractDeepLinkUrl, resolveDeepLink } from '@/lib/deep-linking';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
 import { useAuth } from '@/context/AuthContext';
 
-// Expo Go (Android, SDK 53+) crashea al inicializar expo-notifications. En ese
-// entorno el hook queda inerte: los push tokens solo tienen sentido en un dev
-// client / build real, que es donde se prueba esta fase.
-const isExpoGo = Constants.appOwnership === 'expo';
+// Entornos donde expo-notifications no aplica y el hook queda inerte:
+//  - Expo Go (Android, SDK 53+) crashea al inicializar el módulo.
+//  - Web: varios métodos nativos (getLastNotificationResponseAsync, listeners de
+//    push token) no están implementados y lanzan UnavailabilityError.
+// Los push tokens solo tienen sentido en un dev client / build real, que es
+// donde se prueba esta fase.
+const isUnsupportedEnv = Constants.appOwnership === 'expo' || Platform.OS === 'web';
 
 /**
  * Orquesta las push notifications del lado del cliente:
@@ -50,7 +54,7 @@ export function usePushNotifications(): void {
 
   // ─── Handler de presentación + listener de taps (una vez, si no es Expo Go) ──
   useEffect(() => {
-    if (isExpoGo) return;
+    if (isUnsupportedEnv) return;
 
     let responseSubscription: { remove: () => void } | undefined;
     let cancelled = false;
@@ -92,7 +96,7 @@ export function usePushNotifications(): void {
 
   // ─── Registro / refresco del expo_push_token del perfil autenticado ─────────
   useEffect(() => {
-    if (isExpoGo) return;
+    if (isUnsupportedEnv) return;
     if (!hydrated || !session || !profile?.id) return;
 
     let cancelled = false;

@@ -39,7 +39,11 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     storage: getStorage(),
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // Solo en web: al volver del consentimiento de Google, supabase-js levanta
+    // la sesión de la URL por sí mismo. En nativo no hay `window.location` que
+    // inspeccionar — ahí el callback lo resuelve `signInWithGoogle()`
+    // (lib/auth-data.ts) leyendo la URL que devuelve `openAuthSessionAsync`.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
 

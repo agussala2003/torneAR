@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   deepLinkToHref,
   extractDeepLinkUrl,
+  isOAuthCallback,
   isProtectedDeepLink,
   resolveDeepLink,
 } from './deep-linking';
@@ -186,6 +187,48 @@ describe('deepLinkToHref (helpers de bajo nivel)', () => {
     expect(deepLinkToHref('tornear://match-detail?id=7&tab=stats')).toEqual({
       pathname: '/match-detail',
       params: { id: '7', tab: 'stats' },
+    });
+  });
+});
+
+describe('isOAuthCallback · callback de Google', () => {
+  it('reconoce el callback con los tokens en el fragment (implicit)', () => {
+    expect(
+      isOAuthCallback('tornear://auth/callback#access_token=abc&refresh_token=def&expires_in=3600'),
+    ).toBe(true);
+  });
+
+  it('reconoce el callback con el code en el query (pkce)', () => {
+    expect(isOAuthCallback('tornear://auth/callback?code=abc123')).toBe(true);
+  });
+
+  it('reconoce el callback pelado', () => {
+    expect(isOAuthCallback('tornear://auth/callback')).toBe(true);
+  });
+
+  it('no confunde una ruta cualquiera con el callback', () => {
+    expect(isOAuthCallback('tornear://match-detail?id=1')).toBe(false);
+    expect(isOAuthCallback('tornear://auth')).toBe(false);
+  });
+
+  it('exige el scheme de la app', () => {
+    expect(isOAuthCallback('evilapp://auth/callback#access_token=abc')).toBe(false);
+  });
+});
+
+describe('resolveDeepLink · el callback de OAuth nunca navega ni se difiere', () => {
+  // El eco que Android manda al listener de Linking despues de que
+  // signInWithGoogle() ya canjeo los tokens. Si se difiriera, el guard
+  // navegaria a /auth/callback (ruta inexistente) apenas hubiera sesion.
+  it('ignora el callback sin sesion (no lo guarda como pendiente)', () => {
+    expect(
+      resolveDeepLink('tornear://auth/callback#access_token=abc&refresh_token=def', false),
+    ).toEqual({ kind: 'ignore' });
+  });
+
+  it('ignora el callback con sesion ya activa', () => {
+    expect(resolveDeepLink('tornear://auth/callback?code=abc123', true)).toEqual({
+      kind: 'ignore',
     });
   });
 });

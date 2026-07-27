@@ -59,6 +59,28 @@ export function getAuthErrorMessage(error: unknown, mode: 'login' | 'signup' = '
     return 'No hay conexion con el servidor. Verifica internet e intentalo nuevamente.';
   }
 
+  // ── Login federado (Google) ────────────────────────────────────────────────
+  // El proveedor no esta habilitado en el panel de Supabase (Auth > Providers).
+  if (msg.includes('provider is not enabled') || msg.includes('unsupported provider')) {
+    return 'El acceso con Google no esta disponible por ahora. Entra con tu correo.';
+  }
+
+  // El usuario rechazo el consentimiento en la pantalla de Google.
+  if (msg.includes('access_denied') || msg.includes('access denied')) {
+    return 'Cancelaste el acceso con Google.';
+  }
+
+  // Mismo correo ya registrado con otro metodo y sin verificar: Supabase se
+  // niega a vincular las identidades en silencio.
+  if (msg.includes('identity is already linked') || msg.includes('email address is already')) {
+    return 'Ese correo ya tiene una cuenta. Entra con tu contrasena y despues vincula Google.';
+  }
+
+  // redirect_uri / client_id mal configurados en Google Cloud o en Supabase.
+  if (msg.includes('redirect_uri_mismatch') || msg.includes('invalid_client')) {
+    return 'El acceso con Google esta mal configurado. Avisanos e intenta con tu correo.';
+  }
+
   return mode === 'login'
     ? 'No se pudo iniciar sesion. Verifica tus datos e intentalo otra vez.'
     : 'No se pudo crear la cuenta. Revisa los datos e intentalo otra vez.';

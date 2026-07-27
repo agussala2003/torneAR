@@ -16,6 +16,20 @@ const PUBLIC_DEEP_LINK_PATHS = new Set<string>(['login', 'forgot-password']);
 const APP_SCHEME = 'tornear';
 
 /**
+ * Path al que Supabase devuelve el control después del consentimiento de Google
+ * (`tornear://auth/callback`). NO es una pantalla: `signInWithGoogle()`
+ * (lib/auth-data.ts) ya resuelve esa URL desde `WebBrowser.openAuthSessionAsync`
+ * y canjea los tokens ahí mismo.
+ *
+ * En Android, además, el SO entrega la misma URL al listener de `Linking` del
+ * `_layout`. Sin esta excepción el guard la vería como una ruta protegida más:
+ * la guardaría como deep link pendiente y, apenas la sesión quedara lista,
+ * navegaría a `/auth/callback` — una ruta que no existe. Por eso se ignora
+ * explícitamente.
+ */
+export const OAUTH_CALLBACK_PATH = 'auth/callback';
+
+/**
  * Normaliza el path de una URL `tornear://...`. `Linking.parse` reparte el
  * primer segmento entre `hostname` y `path` según la cantidad de barras
  * (`tornear://match-detail` vs `tornear:///match-detail`), así que los unimos
@@ -27,6 +41,22 @@ function extractPath(parsed: Linking.ParsedURL): string {
     .join('/')
     .replace(/^\/+/, '')
     .replace(/\/+$/, '');
+}
+
+/**
+ * Reconoce la URL de callback de OAuth. Compara sobre la URL sin query ni
+ * fragment porque Supabase vuelve con los tokens colgados ahí
+ * (`...#access_token=…` en implicit, `...?code=…` en PKCE).
+ */
+export function isOAuthCallback(url: string): boolean {
+  const withoutParams = url.split('#')[0].split('?')[0];
+  const parsed = Linking.parse(withoutParams);
+
+  if (parsed.scheme !== APP_SCHEME) {
+    return false;
+  }
+
+  return extractPath(parsed) === OAUTH_CALLBACK_PATH;
 }
 
 /**
@@ -81,6 +111,13 @@ export type DeepLinkAction =
   | { kind: 'navigate'; href: Href };
 
 export function resolveDeepLink(url: string, isAuthenticated: boolean): DeepLinkAction {
+  // El callback de OAuth ya lo consume signInWithGoogle(): acá sólo llega el
+  // eco que Android manda al listener de Linking. Navegar a él sería ir a una
+  // ruta inexistente, y diferirlo dejaría un deep link pendiente envenenado.
+  if (isOAuthCallback(url)) {
+    return { kind: 'ignore' };
+  }
+
   const href = deepLinkToHref(url);
   if (!href) {
     return { kind: 'ignore' };

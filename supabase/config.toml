@@ -62,7 +62,12 @@ schema_paths = []
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+#
+# El stack local y el CI cargan `seed_testing.sql` (fixtures de los 160 pgTAP +
+# la liga de 16 equipos para el frontend). `seed.sql` es el seed de PRODUCCIÓN:
+# se corre a mano una única vez y NO debe aplicarse en local — chocaría con los
+# datos de testing (zonas duplicadas, temporada activa doble).
+sql_paths = ["./seed_testing.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
@@ -153,7 +158,12 @@ enabled = true
 # in emails.
 site_url = "http://127.0.0.1:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# `tornear://**` habilita el callback del login con Google en la app nativa
+# (lib/auth-data.ts → Linking.createURL('auth/callback')). Sin esta entrada
+# GoTrue rechaza el `redirectTo` y el flujo muere antes de abrir el navegador.
+# ⚠️ La misma URL hay que cargarla en el dashboard (Auth > URL Configuration)
+# del proyecto de producción: este archivo solo configura el stack local.
+additional_redirect_urls = ["https://127.0.0.1:3000", "tornear://**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -316,6 +326,24 @@ url = ""
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
+
+# ─── Google (login federado de la app) ───────────────────────────────────────
+# Solo aplica al STACK LOCAL. En producción esto se configura en el dashboard
+# (Auth > Sign In / Providers > Google) — este archivo no lo toca.
+#
+# Para probarlo en local: exportá SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID y
+# ..._SECRET (los del "Web application" OAuth client de Google Cloud) y poné
+# enabled = true. El client de Google necesita tener autorizado el redirect
+# http://127.0.0.1:54321/auth/v1/callback.
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+# Requerido para el sign in con Google en local (lo dice el propio CLI).
+skip_nonce_check = true
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
