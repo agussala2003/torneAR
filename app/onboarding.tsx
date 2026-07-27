@@ -37,6 +37,16 @@ export default function OnboardingScreen() {
 
   const { showAlert, AlertComponent } = useCustomAlert();
 
+  // Google devuelve el nombre en `user_metadata` (name / full_name). Lo usamos
+  // de valor inicial para no pedirle al usuario algo que el proveedor ya dio;
+  // sigue siendo editable. En el alta por email no hay metadata y queda vacio.
+  const googleFullName =
+    typeof user?.user_metadata?.full_name === 'string'
+      ? user.user_metadata.full_name
+      : typeof user?.user_metadata?.name === 'string'
+        ? user.user_metadata.name
+        : '';
+
   const {
     control,
     handleSubmit,
@@ -47,7 +57,7 @@ export default function OnboardingScreen() {
   } = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
     defaultValues: {
-      fullName: '',
+      fullName: googleFullName,
       username: '',
       zone: '',
       position: 'CUALQUIERA',

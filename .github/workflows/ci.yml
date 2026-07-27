@@ -47,7 +47,7 @@ jobs:
 
   # ─── Tests de base de datos (pgTAP · stack efímero) ─────────────────────────
   # Levanta un stack local de Supabase DESDE CERO en el runner (aplica las
-  # migraciones completas + supabase/seed.sql) y corre las suites declarativas
+  # migraciones completas + supabase/seed_testing.sql) y corre las suites declarativas
   # de supabase/tests/ con pg_prove (supabase test db). Ventajas sobre el job
   # legacy: hermético (no toca la base real ni compite entre PRs), corre en
   # forks sin secrets, y valida en cada PR que la cadena de migraciones

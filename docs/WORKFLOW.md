@@ -145,8 +145,16 @@ Como no hay Staging, estas reglas son la única protección de los datos reales:
    con cuidado extra, hacela idempotente (`IF NOT EXISTS`, `OR REPLACE`) y evitá
    operaciones destructivas (`DROP`, `DELETE` masivos, `TRUNCATE`).
 
-4. **Nunca corras seeds ni `db reset` contra el proyecto compartido.** Esos
-   comandos son solo para la base local.
+4. **Nunca corras `db reset` contra el proyecto compartido.** Es solo para la
+   base local. Con los seeds hay que distinguir cuál:
+
+   | Archivo | Para qué | Cómo se aplica |
+   |---------|----------|----------------|
+   | `supabase/seed_testing.sql` | Fixtures de los pgTAP + la liga de 16 equipos / 160 jugadores para probar la UI | Automático en `supabase db reset` / `supabase start` (`sql_paths` de `config.toml`). **Jamás en producción.** |
+   | `supabase/seed.sql` | Seed de **producción**: catálogo de zonas, Temporada 1, predios y los perfiles admin | A mano, una sola vez: `psql "$PROD_DB_URL" -f supabase/seed.sql`. Es idempotente y no se aplica en local. |
+
+   Los catálogos `badges` y `format_rules` no están en ningún seed: los siembran
+   sus propias migraciones, así que viajan con `db push`.
 
 5. **`.env` apunta al mismo proyecto en ambas ramas.** No hay credenciales de
    Staging; `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_KEY` son las de

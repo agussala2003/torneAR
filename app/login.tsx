@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { AuthError } from '@supabase/supabase-js';
-import { signIn, signUp } from '@/lib/auth-data';
+import { signIn, signInWithGoogle, signUp } from '@/lib/auth-data';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
 import { HeroButton } from '@/components/ui/HeroButton';
+import { GoogleAuthButton } from '@/components/ui/GoogleAuthButton';
 import { router } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import {
@@ -18,6 +19,7 @@ import {
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
 
   const { showAlert, AlertComponent } = useCustomAlert();
@@ -80,6 +82,30 @@ export default function LoginScreen() {
     // pendingDeepLink guardado (deep link que llego mientras estabamos deslogueados)
     // lo consume y navega ahi; si no, cae en /(tabs) — respetando siempre el gate
     // de onboarding. Redirigir aca competiria con ese guard y podria saltear onboarding.
+  };
+
+  // Google no distingue entre "entrar" y "registrarse": el proveedor crea la
+  // cuenta en el primer consentimiento. Por eso el boton es el mismo en los dos
+  // modos, y el gate de onboarding (app/_layout.tsx) es el que pide los datos
+  // del perfil que Google no aporta (zona, posicion, pie habil, nacimiento).
+  const onGooglePress = async () => {
+    if (loading || googleLoading) return;
+
+    setGoogleLoading(true);
+    try {
+      const { error, cancelled } = await signInWithGoogle();
+
+      // Cerrar la ventana de Google es una decision del usuario, no un fallo:
+      // volvemos al formulario sin alerta.
+      if (!cancelled && error) {
+        showAlert('Error de autenticacion', getAuthErrorMessage(error, 'login'));
+      }
+    } catch (unexpectedError) {
+      showAlert('Error de autenticacion', getAuthErrorMessage(unexpectedError, 'login'));
+    } finally {
+      setGoogleLoading(false);
+    }
+    // Igual que arriba: no navegamos, el guard de _layout atrapa la sesion nueva.
   };
 
   return (
@@ -172,8 +198,22 @@ export default function LoginScreen() {
         <HeroButton
           onPress={handleSubmit(onSubmit)}
           isLoading={loading}
+          disabled={googleLoading}
           label={isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           style={{ marginBottom: 24, width: '100%', shadowColor: '#53E076', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
+        />
+
+        <View className="mb-6 flex-row items-center gap-4">
+          <View className="h-px flex-1 bg-neutral-outline/30" />
+          <Text className="font-ui text-xs uppercase tracking-widest text-neutral-outline">o</Text>
+          <View className="h-px flex-1 bg-neutral-outline/30" />
+        </View>
+
+        <GoogleAuthButton
+          onPress={onGooglePress}
+          isLoading={googleLoading}
+          disabled={loading}
+          label={isLogin ? 'Continuar con Google' : 'Registrarme con Google'}
         />
 
         <TouchableOpacity onPress={toggleMode} className="items-center py-4">
