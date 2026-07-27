@@ -18,6 +18,8 @@
     "android": {
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "adaptiveIcon": {
@@ -28,7 +30,35 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.agussala2003.tornear"
+      "package": "com.agussala2003.tornear",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "tornear"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "tornear"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -65,6 +95,12 @@
       "eas": {
         "projectId": "aa6a530a-0bb5-45c2-9c28-6ade3ede1e46"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/aa6a530a-0bb5-45c2-9c28-6ade3ede1e46"
     }
   }
 }

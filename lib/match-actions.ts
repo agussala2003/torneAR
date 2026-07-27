@@ -111,6 +111,18 @@ export async function doCheckin(
 // RLS allows CAPITAN/SUBCAPITAN to insert results regardless of is_result_loader.
 // resolve_match trigger fires automatically and handles FINALIZADO / EN_DISPUTA / ELO.
 
+/**
+ * El equipo ya tiene un resultado cargado para este partido (UNIQUE match_id +
+ * team_id). Se expone como error tipado para que la UI distinga "ya estaba
+ * cargado" de un fallo real y refresque el estado en vez de mostrar un genérico.
+ */
+export class ResultAlreadySubmittedError extends Error {
+  constructor() {
+    super('Tu equipo ya cargó el resultado de este partido.');
+    this.name = 'ResultAlreadySubmittedError';
+  }
+}
+
 export async function submitMatchResult(
   matchId: string,
   teamId: string,
@@ -144,9 +156,13 @@ export async function submitMatchResult(
 
   if (error) {
     // Código 23505 = unique_violation: el resultado ya fue enviado (UNIQUE match_id + team_id).
-    // Esto ocurre cuando el usuario reintenta tras un timeout de red donde el servidor sí
-    // procesó el INSERT. Es idempotente: el resultado ya está guardado correctamente.
-    if (error.code === '23505') return;
+    //
+    // Antes se tragaba con un `return` silencioso, asumiendo un reintento tras
+    // timeout de red. Pero eso también enmascaraba el doble envío real: la UI
+    // mostraba "Resultado cargado" dos veces y el usuario creía haber
+    // registrado dos resultados distintos. Ahora se tipa y decide el caller
+    // (que refresca el estado y avisa que ya estaba cargado).
+    if (error.code === '23505') throw new ResultAlreadySubmittedError();
     throw error;
   }
 }

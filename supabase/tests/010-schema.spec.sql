@@ -15,9 +15,11 @@
 --
 -- ── Sobre los privilegios afirmados (medidos post `supabase db reset`,
 --    es decir, contra migraciones puras = lo que construye CI) ──
---   challenges / matches / team_members : los 7 (incluye REFERENCES,
---     TRIGGER, TRUNCATE que Supabase otorga por default a authenticated en
---     toda tabla de public) + INSERT/UPDATE/DELETE de nuestros grants.
+--   challenges / matches : los 7 (incluye REFERENCES, TRIGGER, TRUNCATE que
+--     Supabase otorga por default a authenticated en toda tabla de public) +
+--     INSERT/UPDATE/DELETE de nuestros grants.
+--   team_members : los mismos MENOS DELETE — revocado por 20260723123000
+--     para que las salidas pasen por las RPCs que fijan tornear.leave_reason.
 --   profiles / teams : los mismos MENOS UPDATE — el lockdown por columna de
 --     20260714022651 (restaurado en 20260719130000) revoca UPDATE a nivel
 --     tabla y lo re-otorga sólo sobre columnas editables. Que UPDATE NO
@@ -68,9 +70,17 @@ select table_privs_are('public', 'challenges', 'authenticated',
 select table_privs_are('public', 'matches', 'authenticated',
   array['DELETE','INSERT','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE'],
   'matches: authenticated conserva DML completo');
+-- team_members: SIN DELETE a nivel tabla desde 20260723123000. El borrado
+-- directo del cliente dejaba el GUC tornear.leave_reason sin setear y TODA
+-- salida se registraba como ABANDONO en team_stints (expulsiones y
+-- transferencias incluidas). Las salidas entran ahora sólo por las RPCs
+-- SECURITY DEFINER (leave_team_as_member / remove_team_member /
+-- transfer_to_team / transfer_captaincy_and_leave), que fijan el motivo.
+-- Que DELETE NO aparezca acá es la aserción que protege la integridad del
+-- ledger de trayectoria.
 select table_privs_are('public', 'team_members', 'authenticated',
-  array['DELETE','INSERT','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE'],
-  'team_members: authenticated conserva DML completo');
+  array['INSERT','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE'],
+  'team_members: authenticated NO tiene DELETE (las salidas pasan por RPC con motivo)');
 
 -- profiles / teams: SIN UPDATE a nivel tabla (lockdown de columna). Esta es
 -- la aserción que se pone roja si vuelve a colarse un GRANT UPDATE tabla.

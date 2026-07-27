@@ -1,0 +1,179 @@
+import React from 'react';
+import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import {
+  Controller,
+  type Control,
+  type FieldErrors,
+  type UseFormSetValue,
+  type UseFormWatch,
+} from 'react-hook-form';
+import { AppIcon } from '@/components/ui/AppIcon';
+import { applyDateMask } from '@/lib/date-mask';
+import type { UserProfileFormData } from '@/lib/schemas/userSchema';
+
+const GENDER_OPTIONS: { value: UserProfileFormData['gender']; label: string }[] = [
+  { value: 'M', label: 'Masculino' },
+  { value: 'F', label: 'Femenino' },
+  { value: 'X', label: 'Otro' },
+];
+
+const FOOT_OPTIONS: { value: UserProfileFormData['strongFoot']; label: string }[] = [
+  { value: 'RIGHT', label: 'Diestro' },
+  { value: 'LEFT', label: 'Zurdo' },
+  { value: 'BOTH', label: 'Ambidiestro' },
+];
+
+interface ProfileFormFieldsProps {
+  control: Control<UserProfileFormData>;
+  errors: FieldErrors<UserProfileFormData>;
+  setValue: UseFormSetValue<UserProfileFormData>;
+  watch: UseFormWatch<UserProfileFormData>;
+  onOpenFavoriteTeamPicker: () => void;
+}
+
+/**
+ * Bloque de datos personales compartido por /onboarding y /profile-edit:
+ * fecha de nacimiento, genero, pierna habil y cuadro favorito.
+ *
+ * Existe para cerrar el bug 2. Antes cada pantalla renderizaba sus propios
+ * campos y editar-perfil se habia quedado sin tres de los que el schema exige,
+ * asi que el resolver fallaba en silencio y "Guardar cambios" no hacia nada.
+ * Con un unico componente, lo que el onboarding pide es exactamente lo que la
+ * edicion expone: las dos pantallas no pueden volver a divergir.
+ */
+export function ProfileFormFields({
+  control,
+  errors,
+  setValue,
+  watch,
+  onOpenFavoriteTeamPicker,
+}: ProfileFormFieldsProps) {
+  const selectedGender = watch('gender');
+  const selectedFoot = watch('strongFoot');
+  const selectedFavoriteTeam = watch('favoriteTeam');
+
+  return (
+    <View className="gap-6">
+      {/* ── FECHA DE NACIMIENTO ─────────────────────────────────────────── */}
+      <View>
+        <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">
+          Fecha de Nacimiento
+        </Text>
+        <Controller
+          control={control}
+          name="dateOfBirth"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${
+                errors.dateOfBirth ? 'border-red-500' : 'border-neutral-outline-variant/15'
+              } bg-surface-low`}
+              placeholder="DD/MM/AAAA"
+              placeholderTextColor="#3A3939"
+              keyboardType="numeric"
+              maxLength={10}
+              onBlur={onBlur}
+              onChangeText={(text) => onChange(applyDateMask(text))}
+              value={value ?? ''}
+            />
+          )}
+        />
+        {errors.dateOfBirth && (
+          <Text className="text-red-500 text-xs mt-1">{errors.dateOfBirth.message}</Text>
+        )}
+      </View>
+
+      {/* ── GÉNERO ──────────────────────────────────────────────────────── */}
+      <View>
+        <Text className="font-display text-xs uppercase tracking-wider mb-3 text-neutral-on-surface-variant">
+          Género
+        </Text>
+        <View className="flex-row gap-3">
+          {GENDER_OPTIONS.map(({ value, label }) => (
+            <TouchableOpacity
+              key={value}
+              activeOpacity={0.85}
+              onPress={() => setValue('gender', value, { shouldValidate: true })}
+              className={`flex-1 py-3.5 rounded-xl border items-center ${
+                selectedGender === value
+                  ? 'bg-brand-primary border-[#003914]'
+                  : 'bg-surface-low border-neutral-outline-variant/15'
+              }`}
+            >
+              <Text
+                className={`font-display uppercase tracking-widest text-xs ${
+                  selectedGender === value ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
+                }`}
+                numberOfLines={1}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {errors.gender && (
+          <Text className="text-red-500 text-xs mt-2">{errors.gender.message}</Text>
+        )}
+      </View>
+
+      {/* ── PIERNA HÁBIL ────────────────────────────────────────────────── */}
+      <View>
+        <Text className="font-display text-xs uppercase tracking-wider mb-3 text-neutral-on-surface-variant">
+          Pierna Hábil
+        </Text>
+        <View className="flex-row gap-3">
+          {FOOT_OPTIONS.map(({ value, label }) => (
+            <TouchableOpacity
+              key={value}
+              activeOpacity={0.85}
+              onPress={() => setValue('strongFoot', value, { shouldValidate: true })}
+              className={`flex-1 py-3.5 rounded-xl border items-center ${
+                selectedFoot === value
+                  ? 'bg-brand-primary border-[#003914]'
+                  : 'bg-surface-low border-neutral-outline-variant/15'
+              }`}
+            >
+              <Text
+                className={`font-display uppercase tracking-widest text-xs ${
+                  selectedFoot === value ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
+                }`}
+                numberOfLines={1}
+              >
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {errors.strongFoot && (
+          <Text className="text-red-500 text-xs mt-2">{errors.strongFoot.message}</Text>
+        )}
+      </View>
+
+      {/* ── CUADRO FAVORITO (obligatorio, catálogo cerrado) ─────────────── */}
+      <View>
+        <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">
+          Cuadro Favorito
+        </Text>
+        <TouchableOpacity
+          onPress={onOpenFavoriteTeamPicker}
+          activeOpacity={0.8}
+          className={`w-full rounded-xl px-4 py-4 flex-row justify-between items-center border ${
+            errors.favoriteTeam ? 'border-red-500' : 'border-neutral-outline-variant/15'
+          } bg-surface-low`}
+        >
+          <Text
+            className={`flex-1 ${selectedFavoriteTeam ? 'text-neutral-on-surface' : 'text-surface-bright'}`}
+            style={{ minWidth: 0 }}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {selectedFavoriteTeam || 'Selecciona tu equipo'}
+          </Text>
+          <AppIcon family="material-icons" name="keyboard-arrow-down" size={22} color="#BCCBB9" />
+        </TouchableOpacity>
+        {errors.favoriteTeam && (
+          <Text className="text-red-500 text-xs mt-1">{errors.favoriteTeam.message}</Text>
+        )}
+      </View>
+    </View>
+  );
+}

@@ -2,26 +2,34 @@ import { useCallback, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
+import { useTeamStore } from '@/stores/teamStore';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { getAuthErrorMessage, getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchProfileViewData } from '@/lib/profile-data';
-import { ProfileViewData } from '@/components/profile/types';
+import { leaveTeam, getTeamActionErrorMessage } from '@/lib/team-manage-data';
+import { ProfileViewData, TeamItem } from '@/components/profile/types';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileStatsGrid } from '@/components/profile/ProfileStatsGrid';
 import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
 import { ProfileTeamsSection } from '@/components/profile/ProfileTeamsSection';
 import { CareerTimeline } from '@/components/profile/CareerTimeline';
 import { ProfileSettingsSection } from '@/components/profile/ProfileSettingsSection';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 export default function ProfileScreen() {
   const { signOut, profile } = useAuth();
+  const { fetchMyTeams } = useTeamStore();
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<ProfileViewData | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  
+
+  // Abandonar equipo (ConfirmDialog custom, no Alert nativo).
+  const [teamToLeave, setTeamToLeave] = useState<TeamItem | null>(null);
+  const [isLeaving, setIsLeaving] = useState(false);
+
   const { showAlert, AlertComponent } = useCustomAlert();
 
   const loadProfileData = useCallback(async () => {
@@ -46,6 +54,24 @@ export default function ProfileScreen() {
       void loadProfileData();
     }, [loadProfileData])
   );
+
+  const handleConfirmLeaveTeam = useCallback(async () => {
+    if (!teamToLeave || !profile || isLeaving) return;
+    setIsLeaving(true);
+    try {
+      await leaveTeam(teamToLeave.id);
+      await fetchMyTeams(profile.id);
+      await loadProfileData();
+      setTeamToLeave(null);
+      showAlert('Saliste del equipo', `Tu ciclo en ${teamToLeave.name} quedó cerrado en tu trayectoria.`);
+    } catch (error) {
+      // CAPTAIN_MUST_TRANSFER / ACTIVE_MATCH llegan tipados desde la RPC.
+      setTeamToLeave(null);
+      showAlert('No pudimos sacarte del equipo', getTeamActionErrorMessage(error, 'No se pudo abandonar el equipo.'));
+    } finally {
+      setIsLeaving(false);
+    }
+  }, [teamToLeave, profile, isLeaving, fetchMyTeams, loadProfileData, showAlert]);
 
   const handleSignOut = async () => {
     try {
@@ -94,6 +120,7 @@ export default function ProfileScreen() {
           onJoinTeam={() => router.push('/team-join')}
           onOpenRequests={() => router.push('/team-requests')}
           onTeamPress={(teamId) => router.push({ pathname: '/team-manage', params: { teamId } })}
+          onLeaveTeam={setTeamToLeave}
         />
         <CareerTimeline profileId={viewData.profile.id} />
         {profile.is_admin && (
@@ -110,6 +137,18 @@ export default function ProfileScreen() {
         )}
         <ProfileSettingsSection isSigningOut={isSigningOut} onSignOut={handleSignOut} />
       </ScrollView>
+
+      <ConfirmDialog
+        visible={teamToLeave !== null}
+        title="Abandonar equipo"
+        message={`Tu ciclo en ${teamToLeave?.name ?? 'este equipo'} se cerrará y quedará registrado en tu trayectoria. Las estadísticas ganadas se conservan.`}
+        confirmLabel="Abandonar"
+        cancelLabel="Cancelar"
+        confirmTone="danger"
+        loading={isLeaving}
+        onConfirm={() => void handleConfirmLeaveTeam()}
+        onCancel={() => setTeamToLeave(null)}
+      />
 
       {AlertComponent}
 

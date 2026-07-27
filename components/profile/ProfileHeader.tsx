@@ -134,18 +134,48 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
         </View>
       </TouchableOpacity>
 
-      <Text className="font-displayBlack mt-4 text-3xl tracking-tight text-neutral-on-surface">{profile.full_name}</Text>
-      <Text className="font-ui mt-1 text-base text-neutral-on-surface-variant">@{profile.username}</Text>
+      {/* w-full + px: acota el ancho del texto al del contenedor. Sin esto, un
+          nombre largo sin espacios (o con emojis) desborda horizontalmente.
+          Se permiten 2 lineas antes de truncar: cortar un nombre completo en la
+          primera linea del perfil es demasiado agresivo. */}
+      <View className="mt-4 w-full items-center px-6">
+        <Text
+          className="font-displayBlack text-center text-3xl tracking-tight text-neutral-on-surface"
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {profile.full_name}
+        </Text>
+        <Text
+          className="font-ui mt-1 text-center text-base text-neutral-on-surface-variant"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          @{profile.username}
+        </Text>
+      </View>
 
-      <View className="mt-3 flex-row items-center gap-3">
-        <View className="flex-row items-center gap-1 rounded-full bg-surface-high px-3 py-1">
+      {/* flex-wrap: con zona y posicion largas los chips bajan de linea en vez
+          de estirar la fila fuera de pantalla. */}
+      <View className="mt-3 w-full flex-row flex-wrap items-center justify-center gap-3 px-6">
+        <View className="max-w-full flex-row items-center gap-1 rounded-full bg-surface-high px-3 py-1">
           <AppIcon family="material-community" name="map-marker-outline" size={12} color="#8CCDFF" />
-          <Text className="font-uiBold text-xs text-neutral-on-surface">{profile.zone ?? 'Sin zona'}</Text>
+          <Text
+            className="font-uiBold shrink text-xs text-neutral-on-surface"
+            numberOfLines={1}
+          >
+            {profile.zone ?? 'Sin zona'}
+          </Text>
         </View>
 
-        <View className="flex-row items-center gap-1 rounded-full border border-brand-primary/25 bg-brand-primary-container/20 px-3 py-1">
+        <View className="max-w-full flex-row items-center gap-1 rounded-full border border-brand-primary/25 bg-brand-primary-container/20 px-3 py-1">
           <AppIcon family="material-community" name="soccer" size={12} color="#53E076" />
-          <Text className="font-display text-xs uppercase text-brand-primary">{positionLabel(profile.preferred_position)}</Text>
+          <Text
+            className="font-display shrink text-xs uppercase text-brand-primary"
+            numberOfLines={1}
+          >
+            {positionLabel(profile.preferred_position)}
+          </Text>
         </View>
       </View>
 

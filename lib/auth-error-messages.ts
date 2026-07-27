@@ -1,3 +1,5 @@
+import { PASSWORD_MIN_LENGTH } from '@/lib/schemas/authSchema';
+
 type ErrorLike = {
   message?: string;
   status?: number;
@@ -35,8 +37,10 @@ export function getAuthErrorMessage(error: unknown, mode: 'login' | 'signup' = '
     return 'Ese correo ya esta registrado. Proba iniciar sesion.';
   }
 
+  // El minimo viaja desde la constante compartida: hardcodear 6 aca hacia que
+  // la UI reportara un limite distinto al que aplica el server (config.toml).
   if (msg.includes('password should be at least')) {
-    return 'La contrasena debe tener al menos 6 caracteres.';
+    return `La contrasena debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres.`;
   }
 
   if (msg.includes('unable to validate email address') || msg.includes('invalid email')) {

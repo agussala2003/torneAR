@@ -29,6 +29,7 @@ import {
   submitDisputeVote,
   resolveMatchDispute,
   claimWo,
+  ResultAlreadySubmittedError,
 } from './match-actions';
 
 const AUTH_USER = { id: 'auth-1' };
@@ -172,12 +173,18 @@ describe('submitMatchResult', () => {
     });
   });
 
-  it('trata 23505 (unique_violation) como éxito idempotente, no lo relanza', async () => {
+  // Contrato invertido a propósito (bug 8, 2026-07-23): antes el 23505 se
+  // tragaba como "reintento idempotente tras timeout de red", pero eso también
+  // enmascaraba el doble envío real y la UI mostraba "Resultado cargado" dos
+  // veces. Ahora se tipa para que la pantalla distinga ese caso y resincronice.
+  it('convierte 23505 (unique_violation) en ResultAlreadySubmittedError', async () => {
     supabaseMock.from
       .mockReturnValueOnce(createQueryBuilder({ data: PROFILE, error: null }))
       .mockReturnValueOnce(createQueryBuilder({ data: null, error: { code: '23505' } }));
 
-    await expect(submitMatchResult('m1', 'teamA', formData)).resolves.toBeUndefined();
+    await expect(submitMatchResult('m1', 'teamA', formData)).rejects.toBeInstanceOf(
+      ResultAlreadySubmittedError,
+    );
   });
 
   it('relanza cualquier otro código de error', async () => {

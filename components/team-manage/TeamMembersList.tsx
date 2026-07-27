@@ -55,31 +55,45 @@ export function TeamMembersList({
             className="rounded-lg border-l-4 bg-surface-high px-3 py-2.5"
             style={{ borderLeftColor: roleVisual.borderColor }}
           >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-3">
-                <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-surface-variant">
+            <View className="flex-row items-center justify-between gap-2">
+              {/* flex-1 + minWidth 0: un nombre largo (o con emojis) empujaba el
+                  badge de rol fuera de la card. */}
+              <View className="flex-1 flex-row items-center gap-3" style={{ minWidth: 0 }}>
+                <View className="h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-variant">
                   {avatarUrl ? (
                     <Image source={{ uri: avatarUrl }} className="h-full w-full" />
                   ) : (
                     <AppIcon family="material-community" name="account" size={18} color="#BCCBB9" />
                   )}
                 </View>
-                <View>
-                  <Text className="font-uiBold text-sm text-neutral-on-surface">
+                <View className="flex-1" style={{ minWidth: 0 }}>
+                  <Text
+                    className="font-uiBold text-sm text-neutral-on-surface"
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {member.profiles?.full_name ?? member.profiles?.username ?? 'Jugador'}
                   </Text>
-                  <Text className="font-ui text-xs text-neutral-on-surface-variant">
+                  <Text
+                    className="font-ui text-xs text-neutral-on-surface-variant"
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     @{member.profiles?.username ?? 'sin_usuario'}{isSelf ? ' (vos)' : ''}
                   </Text>
-                  <Text className="font-ui mt-1 text-[11px] tracking-wide text-neutral-on-surface-variant">
+                  <Text
+                    className="font-ui mt-1 text-[11px] tracking-wide text-neutral-on-surface-variant"
+                    numberOfLines={1}
+                  >
                     {firstLetterUpper(positionLabel(member.profiles?.preferred_position ?? 'CUALQUIERA'))}
                   </Text>
                 </View>
               </View>
 
               <Text
-                className="font-uiBold rounded px-2 py-1 text-[10px] uppercase tracking-wide"
+                className="font-uiBold shrink-0 rounded px-2 py-1 text-[10px] uppercase tracking-wide"
                 style={{ backgroundColor: roleVisual.badgeBackground, color: roleVisual.badgeText }}
+                numberOfLines={1}
               >
                 {getTeamRoleLabel(member.role)}
               </Text>

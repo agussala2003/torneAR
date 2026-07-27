@@ -11,7 +11,7 @@ import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { ScorerMvpPicker } from '@/components/matches/ScorerMvpPicker';
-import type { WoClaimFormData, WoClaimEntry, MatchParticipantEntry } from '@/components/matches/types';
+import type { WoClaimFormData, WoClaimEntry, ScorerPickerPerson } from '@/components/matches/types';
 
 type WoReason = WoClaimEntry['reason'];
 
@@ -19,7 +19,8 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onSubmit: (data: WoClaimFormData) => Promise<void>;
-  myParticipants: MatchParticipantEntry[];
+  // Sólo se necesitan profileId/fullName para cargar goleadores del 3-0.
+  myParticipants: ScorerPickerPerson[];
 }
 
 const REASONS: { value: WoReason; label: string; description: string }[] = [

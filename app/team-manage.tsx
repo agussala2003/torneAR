@@ -33,6 +33,7 @@ import {
   transferCaptain,
   grantCaptainRole,
   deleteTeam,
+  getTeamActionErrorMessage,
 } from '@/lib/team-manage-data';
 
 export default function TeamManageScreen() {
@@ -314,18 +315,18 @@ export default function TeamManageScreen() {
     try {
       setProcessingMemberId(memberForRemove.profile_id);
       await removeMember(
-        teamId, 
-        memberForRemove.profile_id, 
+        teamId,
+        memberForRemove.profile_id,
         { id: team.id, name: team.name },
         memberForRemove.profiles?.expo_push_token
       );
-      
+
       await loadTeamData();
       setShowRemoveConfirmModal(false);
       setMemberForRemove(null);
       showAlert('Miembro removido', 'El jugador fue removido del plantel.');
     } catch (error) {
-      showAlert('Error al remover', getGenericSupabaseErrorMessage(error, 'No se pudo remover al miembro.'));
+      showAlert('Error al remover', getTeamActionErrorMessage(error, 'No se pudo remover al miembro.'));
     } finally {
       setProcessingMemberId(null);
     }
@@ -339,18 +340,21 @@ export default function TeamManageScreen() {
     }
     try {
       setProcessingMemberId(profile.id);
-      await leaveTeam(teamId, profile.id);
-      
+      // El perfil lo deriva la RPC de auth.uid(); ya no se envía desde el cliente.
+      await leaveTeam(teamId);
+
       setShowLeaveConfirmModal(false);
+      if (profile?.id) await fetchMyTeams(profile.id);
       showAlert('Equipo abandonado', 'Saliste del equipo correctamente.', () => {
         router.replace('/(tabs)/profile');
       });
     } catch (error) {
-      showAlert('Error al abandonar', getGenericSupabaseErrorMessage(error, 'No se pudo abandonar el equipo.'));
+      // CAPTAIN_MUST_TRANSFER / ACTIVE_MATCH llegan tipados desde la RPC.
+      showAlert('No pudimos sacarte del equipo', getTeamActionErrorMessage(error, 'No se pudo abandonar el equipo.'));
     } finally {
       setProcessingMemberId(null);
     }
-  }, [teamId, profile, myRole, router, showAlert]);
+  }, [teamId, profile, myRole, router, showAlert, fetchMyTeams]);
 
   const startLeaveFlow = () => {
     if (!myRole) return;
@@ -394,18 +398,21 @@ export default function TeamManageScreen() {
 
     try {
       setProcessingMemberId(profile.id);
-      await transferCaptain(teamId, profile.id, transferCaptainToProfileId, newCaptain.role);
-      
+      // Promoción + salida en una sola transacción del servidor: ya no hace
+      // falta pasar el rol previo para un rollback manual.
+      await transferCaptain(teamId, transferCaptainToProfileId);
+
       setShowTransferCaptainModal(false);
+      if (profile?.id) await fetchMyTeams(profile.id);
       showAlert('Capitania transferida', 'Transferiste la capitania y saliste del equipo correctamente.', () => {
         router.replace('/(tabs)/profile');
       });
     } catch (error) {
-      showAlert('Error al transferir', getGenericSupabaseErrorMessage(error, 'No se pudo transferir la capitania y abandonar el equipo.'));
+      showAlert('Error al transferir', getTeamActionErrorMessage(error, 'No se pudo transferir la capitania y abandonar el equipo.'));
     } finally {
       setProcessingMemberId(null);
     }
-  }, [teamId, profile, transferCaptainToProfileId, transferableCaptainCandidates, router, showAlert]);
+  }, [teamId, profile, transferCaptainToProfileId, transferableCaptainCandidates, router, showAlert, fetchMyTeams]);
 
   const handleShareInvite = async () => {
     if (!team) return;

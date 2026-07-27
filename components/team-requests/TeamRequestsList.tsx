@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { TeamRequestRow } from './types';
@@ -7,6 +7,13 @@ import { getTeamCategoryLabel, getTeamFormatLabel } from '@/lib/team-options';
 
 interface TeamRequestsListProps {
   requests: TeamRequestRow[];
+  /** team_ids donde el jugador YA es miembro (para no ofrecer confirmar dos veces). */
+  memberTeamIds?: Set<string>;
+  /** True si el jugador pertenece hoy a algún equipo (el traspaso cerrará ese ciclo). */
+  hasCurrentTeam?: boolean;
+  /** id de la solicitud cuyo traspaso se está confirmando (bloquea el botón). */
+  confirmingId?: string | null;
+  onConfirmTransfer?: (request: TeamRequestRow) => void;
 }
 
 function statusStyle(status: TeamRequestRow['status']): { label: string; className: string } {
@@ -21,7 +28,13 @@ function statusStyle(status: TeamRequestRow['status']): { label: string; classNa
   return { label: 'Pendiente', className: 'bg-info-secondary/15 text-info-secondary' };
 }
 
-export function TeamRequestsList({ requests }: TeamRequestsListProps) {
+export function TeamRequestsList({
+  requests,
+  memberTeamIds,
+  hasCurrentTeam = false,
+  confirmingId = null,
+  onConfirmTransfer,
+}: TeamRequestsListProps) {
   const router = useRouter();
 
   if (requests.length === 0) {
@@ -46,6 +59,12 @@ export function TeamRequestsList({ requests }: TeamRequestsListProps) {
     <>
       {requests.map((request) => {
         const status = statusStyle(request.status);
+        const alreadyMember = memberTeamIds?.has(request.team_id) ?? false;
+        const isConfirming = confirmingId === request.id;
+        // El traspaso se ofrece sólo si la solicitud está ACEPTADA y el jugador
+        // todavía no entró (una re-confirmación daría ALREADY_MEMBER).
+        const canConfirmTransfer =
+          request.status === 'ACEPTADA' && !alreadyMember && !!onConfirmTransfer;
 
         return (
           <View key={request.id} className="rounded-xl bg-surface-low p-4">
@@ -78,6 +97,46 @@ export function TeamRequestsList({ requests }: TeamRequestsListProps) {
                 Enviada: {new Date(request.created_at).toLocaleDateString('es-AR')}
               </Text>
             </View>
+
+            {/* Solicitud ACEPTADA: el jugador confirma el traspaso (dispara
+                transfer_to_team). El capitán ya no lo suma al aceptar. */}
+            {canConfirmTransfer && (
+              <View className="mt-3 border-t border-neutral-outline-variant/10 pt-3">
+                <TouchableOpacity
+                  onPress={() => onConfirmTransfer?.(request)}
+                  disabled={isConfirming}
+                  activeOpacity={0.9}
+                  className={`flex-row items-center justify-center gap-2 rounded-lg py-3 ${
+                    isConfirming ? 'bg-brand-primary/50' : 'bg-brand-primary'
+                  }`}
+                >
+                  {isConfirming ? (
+                    <ActivityIndicator size="small" color="#003914" />
+                  ) : (
+                    <AppIcon family="material-community" name="swap-horizontal-bold" size={16} color="#003914" />
+                  )}
+                  <Text className="font-display text-[11px] uppercase tracking-wide text-[#003914]">
+                    {isConfirming ? 'Confirmando…' : 'Confirmar traspaso'}
+                  </Text>
+                </TouchableOpacity>
+                <Text className="font-ui mt-2 text-center text-[11px] text-neutral-on-surface-variant">
+                  {hasCurrentTeam
+                    ? 'Al confirmar dejarás tu equipo actual y se registrará como transferencia.'
+                    : 'Al confirmar te unirás al equipo.'}
+                </Text>
+              </View>
+            )}
+
+            {/* Ya se unió: la solicitud quedó ACEPTADA pero el jugador ya es
+                miembro, así que no se ofrece confirmar de nuevo. */}
+            {request.status === 'ACEPTADA' && alreadyMember && (
+              <View className="mt-3 flex-row items-center gap-2 border-t border-neutral-outline-variant/10 pt-3">
+                <AppIcon family="material-community" name="check-circle" size={16} color="#53E076" />
+                <Text className="font-ui text-[11px] text-brand-primary">
+                  Ya sos parte de este equipo.
+                </Text>
+              </View>
+            )}
           </View>
         );
       })}

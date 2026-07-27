@@ -1,9 +1,11 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
-import type { MatchParticipantEntry } from '@/components/matches/types';
+import type { ScorerPickerPerson } from '@/components/matches/types';
 
 interface ScorerMvpPickerProps {
-  participants: MatchParticipantEntry[];
+  // Forma mínima (profileId + fullName + inSquad?): la cumplen el plantel
+  // completo que pasa ResultModal y la convocatoria que pasa WoModal.
+  participants: ScorerPickerPerson[];
   scorers: Record<string, number>;                 // profileId -> goles
   onScorerGoalsChange: (profileId: string, goals: number) => void;
   mvpId: string | null;
@@ -59,8 +61,28 @@ export function ScorerMvpPicker({
             key={p.profileId}
             className="flex-row items-center justify-between rounded-xl bg-surface-high px-4 py-2"
           >
-            <Text className="font-ui flex-1 text-sm text-neutral-on-surface">{p.fullName}</Text>
-            <View className="flex-row items-center gap-3">
+            <View className="flex-1 flex-row items-center gap-2" style={{ minWidth: 0 }}>
+              <Text
+                className="font-ui shrink text-sm text-neutral-on-surface"
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {p.fullName}
+              </Text>
+              {/* El jugador está en el plantel pero no en la lista de buena fe.
+                  Se le pueden cargar goles igual (entró de urgencia), pero el
+                  capitán tiene que verlo explícitamente. */}
+              {p.inSquad === false && (
+                <View className="shrink-0 rounded-full bg-warning-tertiary/15 px-2 py-0.5">
+                  <Text className="font-ui text-[9px] uppercase tracking-wide text-warning-tertiary">
+                    Fuera de lista
+                  </Text>
+                </View>
+              )}
+            </View>
+            {/* shrink-0: el stepper de goles no puede perder ancho por un
+                nombre largo, o los botones +/- quedan inutilizables. */}
+            <View className="shrink-0 flex-row items-center gap-3">
               <TouchableOpacity
                 onPress={() => decrement(p.profileId)}
                 activeOpacity={0.7}
@@ -96,7 +118,9 @@ export function ScorerMvpPicker({
             key={p.profileId}
             onPress={() => onMvpChange(mvpId === p.profileId ? null : p.profileId)}
             activeOpacity={0.8}
-            className={`rounded-xl px-3 py-2 ${
+            // max-w-full: el chip nunca excede el ancho de la fila; el nombre
+            // se trunca dentro del chip en vez de estirarlo fuera del modal.
+            className={`max-w-full rounded-xl px-3 py-2 ${
               mvpId === p.profileId ? 'bg-warning-tertiary/20' : 'bg-surface-high'
             }`}
           >
@@ -104,9 +128,12 @@ export function ScorerMvpPicker({
               className={`font-ui text-sm ${
                 mvpId === p.profileId ? 'text-warning-tertiary' : 'text-neutral-on-surface-variant'
               }`}
+              numberOfLines={1}
+              ellipsizeMode="tail"
             >
               {mvpId === p.profileId ? '⭐ ' : ''}
               {p.fullName}
+              {p.inSquad === false ? ' ·' : ''}
             </Text>
           </TouchableOpacity>
         ))}

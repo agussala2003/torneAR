@@ -50,18 +50,19 @@ export function RankingTeamRow({ entry, onPress, index = 0 }: Props) {
                 </View>
             )}
 
-            {/* Nombre e info */}
-            <View className="flex-1">
-                <Text className={`font-uiBold text-[13px] ${entry.isMyTeam ? 'text-brand-primary' : 'text-neutral-on-surface'}`} numberOfLines={1}>
+            {/* Nombre e info — ya truncaba con numberOfLines; se agrega
+                minWidth 0 para que tambien encoja en el target web. */}
+            <View className="flex-1" style={{ minWidth: 0 }}>
+                <Text className={`font-uiBold text-[13px] ${entry.isMyTeam ? 'text-brand-primary' : 'text-neutral-on-surface'}`} numberOfLines={1} ellipsizeMode="tail">
                     {entry.teamName} {entry.isMyTeam && '★'}
                 </Text>
-                <Text className="font-ui text-[10px] text-neutral-on-surface-variant">
+                <Text className="font-ui text-[10px] text-neutral-on-surface-variant" numberOfLines={1}>
                     {entry.seasonWins}V · {entry.seasonLosses}D · {entry.seasonDraws}E
                 </Text>
             </View>
 
-            {/* Efectividad */}
-            <View className="mr-4 items-end">
+            {/* Efectividad — shrink-0: las metricas nunca ceden ancho al nombre */}
+            <View className="mr-4 shrink-0 items-end">
                 <Text className={`font-displayBlack text-[15px] leading-none ${entry.isMyTeam ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
                     {winRate}%
                 </Text>
@@ -69,7 +70,7 @@ export function RankingTeamRow({ entry, onPress, index = 0 }: Props) {
             </View>
 
             {/* Rating */}
-            <View className="items-end">
+            <View className="shrink-0 items-end">
                 <Text className={`font-displayBlack text-[17px] leading-none ${entry.isMyTeam ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
                     {entry.eloRating}
                 </Text>

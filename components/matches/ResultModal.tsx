@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,14 @@ import {
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { ScorerMvpPicker } from '@/components/matches/ScorerMvpPicker';
-import type { MatchResultFormData, MatchParticipantEntry } from '@/components/matches/types';
+import type { MatchResultFormData, ScorerPickerPerson } from '@/components/matches/types';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   onSubmit: (data: MatchResultFormData) => Promise<void>;
-  myParticipants: MatchParticipantEntry[];
+  // Plantel completo de mi equipo (team_roster), no la convocatoria: bug 4.
+  myParticipants: ScorerPickerPerson[];
 }
 
 function Stepper({
@@ -63,11 +64,30 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
   const [loading, setLoading] = useState(false);
   const { showAlert, AlertComponent } = useCustomAlert();
 
+  // Guard SÍNCRONO contra el doble tap. `disabled={loading}` no alcanza: entre
+  // el tap y el re-render que aplica setLoading(true) hay una ventana en la que
+  // el segundo tap ya disparó su propio submit.
+  const submittingRef = useRef(false);
+
+  // Reset al reabrir: sin esto el modal arrastra los goles de una carga
+  // anterior y el usuario podría enviar sin querer un resultado viejo.
+  useEffect(() => {
+    if (visible) {
+      setGoalsScored(0);
+      setGoalsAgainst(0);
+      setScorers({});
+      setMvpId(null);
+      submittingRef.current = false;
+    }
+  }, [visible]);
+
   function setScorerGoals(profileId: string, goals: number) {
     setScorers((prev) => ({ ...prev, [profileId]: Math.max(0, goals) }));
   }
 
   async function handleSubmit() {
+    if (submittingRef.current) return;
+
     const scorerEntries = myParticipants
       .filter((p) => (scorers[p.profileId] ?? 0) > 0)
       .map((p) => ({ profileId: p.profileId, goals: scorers[p.profileId] ?? 0 }));
@@ -81,6 +101,7 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       await onSubmit({
@@ -90,6 +111,10 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
         mvpProfileId: mvpId,
       });
       onClose();
+    } catch {
+      // El caller ya mostró el alert correspondiente. Liberamos el guard para
+      // que el usuario pueda corregir y reintentar sin cerrar el modal.
+      submittingRef.current = false;
     } finally {
       setLoading(false);
     }

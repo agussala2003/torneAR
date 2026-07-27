@@ -4,35 +4,42 @@ import { AuthError } from '@supabase/supabase-js';
 import { signIn, signUp } from '@/lib/auth-data';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { router } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
-
-// 1. Definimos el Schema con Zod
-const authSchema = z.object({
-  email: z.string().email('Ingresa un correo electrónico válido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
-});
-
-type AuthFormData = z.infer<typeof authSchema>;
+import {
+  signInSchema,
+  signUpSchema,
+  PASSWORD_MIN_LENGTH,
+  type AuthFormData,
+} from '@/lib/schemas/authSchema';
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
-  
+
   const { showAlert, AlertComponent } = useCustomAlert();
 
-  // 2. Inicializamos React Hook Form
-  const { control, handleSubmit, formState: { errors } } = useForm<AuthFormData>({
-    resolver: zodResolver(authSchema),
+  // El schema depende del modo: login no revalida el largo (cuentas viejas con
+  // 6 caracteres deben poder entrar), registro exige PASSWORD_MIN_LENGTH.
+  // RHF reasigna control._options en cada render, asi que cambiar el resolver
+  // al alternar de modo toma efecto en la validacion siguiente.
+  const { control, handleSubmit, clearErrors, formState: { errors } } = useForm<AuthFormData>({
+    resolver: zodResolver(isLogin ? signInSchema : signUpSchema),
     defaultValues: {
       email: '',
       password: '',
     },
   });
+
+  // Al alternar limpiamos los errores del schema anterior: si no, el mensaje
+  // "debe tener al menos 8 caracteres" queda colgado despues de volver a login.
+  const toggleMode = () => {
+    clearErrors();
+    setIsLogin((prev) => !prev);
+  };
 
   // 3. La función onSubmit recibe directamente los datos validados
   const onSubmit = async (data: AuthFormData) => {
@@ -68,7 +75,11 @@ export default function LoginScreen() {
     if (error) {
       showAlert('Error de autenticacion', getAuthErrorMessage(error, isLogin ? 'login' : 'signup'));
     }
-    // NOTA: No necesitamos router.replace aca, porque el _layout lo va a atrapar y redirigir automáticamente al cambiar la sesión.
+    // NOTA: No hacemos router.replace aca. El guard de app/_layout.tsx atrapa el
+    // cambio de sesion y decide el destino de forma centralizada: si hay un
+    // pendingDeepLink guardado (deep link que llego mientras estabamos deslogueados)
+    // lo consume y navega ahi; si no, cae en /(tabs) — respetando siempre el gate
+    // de onboarding. Redirigir aca competiria con ese guard y podria saltear onboarding.
   };
 
   return (
@@ -126,6 +137,14 @@ export default function LoginScreen() {
             />
             {errors.password && <Text className="text-red-500 text-xs mt-1">{errors.password.message}</Text>}
 
+            {/* Hint proactivo solo en registro: el usuario conoce la regla ANTES
+                de que el server rechace la contrasena. */}
+            {!isLogin && !errors.password && (
+              <Text className="font-ui mt-1 text-xs text-neutral-outline">
+                Mínimo {PASSWORD_MIN_LENGTH} caracteres.
+              </Text>
+            )}
+
             {isLogin && (
               <TouchableOpacity onPress={() => router.push('/forgot-password')} className="mt-2 items-end">
                 <Text className="font-uiBold text-xs text-brand-primary">¿Olvidaste tu contraseña?</Text>
@@ -157,7 +176,7 @@ export default function LoginScreen() {
           style={{ marginBottom: 24, width: '100%', shadowColor: '#53E076', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
         />
 
-        <TouchableOpacity onPress={() => setIsLogin(!isLogin)} className="items-center py-4">
+        <TouchableOpacity onPress={toggleMode} className="items-center py-4">
           <Text className="font-ui text-sm text-neutral-on-surface-variant">
             {isLogin ? "¿No tienes una cuenta? " : "¿Ya tienes una cuenta? "}
             <Text className="font-uiBold text-brand-primary">{isLogin ? 'Regístrate' : 'Inicia Sesión'}</Text>

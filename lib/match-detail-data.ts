@@ -5,6 +5,7 @@ import type {
   TeamSnippet,
   ProposalEntry,
   MatchParticipantEntry,
+  MatchRosterEntry,
   MatchResultEntry,
   ScorerEntry,
   ProfileSnippet,
@@ -85,6 +86,17 @@ interface RawParticipant {
   is_result_loader: boolean;
 }
 
+interface RawRosterMember {
+  profile_id: string;
+  full_name: string;
+  username: string;
+  avatar_url: string | null;
+  team_id: string;
+  is_guest: boolean;
+  team_role: TeamRole | null;
+  in_squad: boolean;
+}
+
 interface RawWoClaim {
   id: string;
   claiming_team_id: string;
@@ -134,6 +146,7 @@ interface RawDetail {
   my_result: RawResult | null;
   opponent_result: RawResult | null;
   participants: RawParticipant[];
+  team_roster: RawRosterMember[];
   conversation_id: string | null;
   wo_claim: RawWoClaim | null;
   cancellation_request: RawCancellationRequest | null;
@@ -250,6 +263,20 @@ export async function fetchMatchDetailViewData(
     isResultLoader: p.is_result_loader,
   }));
 
+  // Plantel de mi equipo (bug 4). El RPC ya lo devuelve ordenado: convocados
+  // primero, después el resto por nombre. `?? []` cubre a un cliente apuntando
+  // a una base sin la migración 20260723121000.
+  const teamRoster: MatchRosterEntry[] = (raw.team_roster ?? []).map((r) => ({
+    profileId: r.profile_id,
+    fullName: r.full_name,
+    username: r.username,
+    avatarUrl: r.avatar_url,
+    teamId: r.team_id,
+    isGuest: r.is_guest,
+    teamRole: r.team_role,
+    inSquad: r.in_squad,
+  }));
+
   let woClaim: WoClaimEntry | null = null;
   if (raw.wo_claim) {
     const wc = raw.wo_claim;
@@ -307,6 +334,7 @@ export async function fetchMatchDetailViewData(
     myResult: raw.my_result ? mapResult(raw.my_result) : null,
     opponentResult: raw.opponent_result ? mapResult(raw.opponent_result) : null,
     participants,
+    teamRoster,
     conversationId: raw.conversation_id,
     woClaim,
     cancellationRequest,

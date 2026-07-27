@@ -86,6 +86,38 @@ export interface MatchParticipantEntry {
     isResultLoader: boolean;
 }
 
+/**
+ * Miembro del plantel de mi equipo para ESTE partido (nodo `team_roster` del
+ * RPC get_match_detail).
+ *
+ * No confundir con MatchParticipantEntry: aquél es la CONVOCATORIA
+ * (match_participants, la lista de buena fe), éste es el plantel real
+ * (team_members + invitados registrados). `inSquad` dice si además está
+ * convocado. El selector de goleadores usa éste, porque un gol puede ser de
+ * alguien que entró sin figurar en la lista.
+ */
+export interface MatchRosterEntry {
+    profileId: string;
+    fullName: string;
+    username: string;
+    avatarUrl: string | null;
+    teamId: string;
+    isGuest: boolean;
+    teamRole: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | 'DIRECTOR_TECNICO' | null;
+    inSquad: boolean;
+}
+
+/**
+ * Forma mínima que necesita ScorerMvpPicker. La cumplen tanto
+ * MatchRosterEntry (ResultModal) como MatchParticipantEntry (WoModal), así que
+ * el componente sirve a ambos sin acoplarse a ninguna de las dos formas.
+ */
+export interface ScorerPickerPerson {
+    profileId: string;
+    fullName: string;
+    inSquad?: boolean;
+}
+
 export interface ScorerEntry {
     profileId: string;
     fullName: string;
@@ -160,7 +192,8 @@ export interface MatchDetailViewData {
     activeProposal: ProposalEntry | null;
     myResult: MatchResultEntry | null;
     opponentResult: MatchResultEntry | null;
-    participants: MatchParticipantEntry[];
+    participants: MatchParticipantEntry[];   // convocatoria (ambos equipos)
+    teamRoster: MatchRosterEntry[];          // plantel de MI equipo (bug 4)
     conversationId: string | null;
     woClaim: WoClaimEntry | null;
     cancellationRequest: CancellationRequestEntry | null;

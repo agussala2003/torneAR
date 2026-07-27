@@ -4,7 +4,35 @@ import { BadgeItem, ProfileStats, ProfileViewData, TeamItem } from '@/components
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
-type PlayerStatsRow = Database['public']['Views']['v_player_stats']['Row'];
+/**
+ * Salida de get_player_global_stats (migración 20260723122000). El RPC declara
+ * `Returns: Json`, así que se describe la forma acá para no perder el tipado.
+ *
+ * Reemplaza a la vista v_player_stats, que derivaba SÓLO de match_participants
+ * e ignoraba team_stints: un jugador con historial en ciclos cerrados (club
+ * disuelto, datos migrados, backfill) veía 0 en su perfil mientras su
+ * trayectoria mostraba 150 goles. Ése era el bug 7.
+ */
+type PlayerGlobalStats = {
+  profile_id: string;
+  matches_played: number;
+  total_goals: number;
+  total_mvps: number;
+  total_wins: number;
+  pj_ranking: number;
+  pj_amistoso: number;
+  total_draws: number;
+  total_losses: number;
+  clean_sheets: number;
+  teams_count: number;
+  active_teams_count: number;
+  guest_breakdown: {
+    matches_played: number;
+    goals: number;
+    mvps: number;
+    teams_count: number;
+  };
+};
 
 type TeamMemberJoinedRow = {
   role: Database['public']['Enums']['team_role'];
@@ -22,7 +50,7 @@ type BadgeRpcRow = {
   entity_type: string; is_earned: boolean;
 };
 
-function toStats(row: PlayerStatsRow | null): ProfileStats {
+function toStats(row: PlayerGlobalStats | null): ProfileStats {
   return {
     matchesPlayed: row?.matches_played ?? 0,
     goals: row?.total_goals ?? 0,
@@ -59,11 +87,8 @@ function mapBadgesFromRpc(data: BadgeRpcRow[] | null): BadgeItem[] {
 
 export async function fetchProfileViewData(profile: ProfileRow): Promise<ProfileViewData> {
   const [statsRes, teamsRes, badgesRpcRes] = await Promise.all([
-    supabase
-      .from('v_player_stats')
-      .select('*')
-      .eq('profile_id', profile.id)
-      .maybeSingle(),
+    // Antes: .from('v_player_stats') — ver comentario en PlayerGlobalStats.
+    supabase.rpc('get_player_global_stats', { p_profile_id: profile.id }),
     supabase
       .from('team_members')
       .select('role, teams(id, name, elo_rating, shield_url)')
@@ -75,7 +100,7 @@ export async function fetchProfileViewData(profile: ProfileRow): Promise<Profile
   ]);
 
   if (statsRes.error) {
-    console.error('Profile stats query failed', statsRes.error);
+    console.error('Profile global stats RPC failed', statsRes.error);
   }
 
   if (teamsRes.error) {
@@ -88,7 +113,9 @@ export async function fetchProfileViewData(profile: ProfileRow): Promise<Profile
 
   return {
     profile,
-    stats: toStats(statsRes.error ? null : statsRes.data),
+    stats: toStats(
+      statsRes.error ? null : ((statsRes.data as unknown) as PlayerGlobalStats | null),
+    ),
     teams: toTeams((teamsRes.error ? null : (teamsRes.data as TeamMemberJoinedRow[] | null)) ?? null),
     badges: mapBadgesFromRpc(badgesRpcRes.error ? null : (badgesRpcRes.data as unknown as BadgeRpcRow[] | null)),
   };

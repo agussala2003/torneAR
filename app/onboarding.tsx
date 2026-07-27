@@ -18,20 +18,11 @@ import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { PitchSelector } from '@/components/ui/PitchSelector';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
+import { OptionPickerDialog } from '@/components/ui/OptionPickerDialog';
+import { ProfileFormFields } from '@/components/profile/ProfileFormFields';
+import { FAVORITE_TEAM_OPTIONS } from '@/lib/favorite-teams';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
 import { saveOnboardingProfile } from '@/lib/onboarding-data';
-
-const GENDER_OPTIONS: { value: 'M' | 'F' | 'X'; label: string }[] = [
-  { value: 'M', label: 'Masculino' },
-  { value: 'F', label: 'Femenino' },
-  { value: 'X', label: 'Otro' },
-];
-
-const FOOT_OPTIONS: { value: 'RIGHT' | 'LEFT' | 'BOTH'; label: string }[] = [
-  { value: 'RIGHT', label: 'Diestro' },
-  { value: 'LEFT', label: 'Zurdo' },
-  { value: 'BOTH', label: 'Ambidiestro' },
-];
 
 const STEP_WIDTH = ['w-1/3', 'w-2/3', 'w-full'] as const;
 
@@ -42,6 +33,7 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showZonePicker, setShowZonePicker] = useState(false);
+  const [showFavoriteTeamPicker, setShowFavoriteTeamPicker] = useState(false);
 
   const { showAlert, AlertComponent } = useCustomAlert();
 
@@ -68,15 +60,16 @@ export default function OnboardingScreen() {
 
   const selectedZone = watch('zone');
   const selectedPosition = watch('position');
-  const selectedGender = watch('gender');
-  const selectedFoot = watch('strongFoot');
+  const selectedFavoriteTeam = watch('favoriteTeam');
 
   const handleNextStep = async () => {
     if (step === 1) {
       const valid = await trigger(['fullName', 'username', 'zone']);
       if (valid) setStep(2);
     } else if (step === 2) {
-      const valid = await trigger(['dateOfBirth', 'gender', 'strongFoot']);
+      // favoriteTeam entra acá: dejó de ser opcional y se elige en este paso,
+      // junto al resto de los datos personales (ProfileFormFields).
+      const valid = await trigger(['dateOfBirth', 'gender', 'strongFoot', 'favoriteTeam']);
       if (valid) setStep(3);
     }
   };
@@ -126,6 +119,7 @@ export default function OnboardingScreen() {
           paddingBottom: 60,
           paddingTop: step === 1 ? 24 : 8,
         }}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Progress bar */}
         <View className="mb-8">
@@ -134,7 +128,7 @@ export default function OnboardingScreen() {
               Paso {step} de 3
             </Text>
             <Text className="font-ui text-sm text-neutral-on-surface-variant">
-              {step === 1 ? 'Datos Base' : step === 2 ? 'Datos Personales' : 'Identidad y Cancha'}
+              {step === 1 ? 'Datos Base' : step === 2 ? 'Datos Personales' : 'Tu Cancha'}
             </Text>
           </View>
           <View className="h-1.5 w-full rounded-full overflow-hidden flex-row bg-surface-high">
@@ -217,7 +211,11 @@ export default function OnboardingScreen() {
                   activeOpacity={0.8}
                   className={`w-full rounded-xl px-4 py-4 flex-row justify-between items-center border ${errors.zone ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                 >
-                  <Text className={selectedZone ? 'text-neutral-on-surface' : 'text-surface-bright'}>
+                  <Text
+                    className={`flex-1 ${selectedZone ? 'text-neutral-on-surface' : 'text-surface-bright'}`}
+                    style={{ minWidth: 0 }}
+                    numberOfLines={1}
+                  >
                     {selectedZone || 'Selecciona una zona'}
                   </Text>
                   <AppIcon
@@ -249,116 +247,28 @@ export default function OnboardingScreen() {
               </Text>
             </View>
 
-            <View className="gap-6 mb-8">
-              {/* DATE OF BIRTH */}
-              <View>
-                <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">
-                  Fecha de Nacimiento
-                </Text>
-                <Controller
-                  control={control}
-                  name="dateOfBirth"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <TextInput
-                      className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.dateOfBirth ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
-                      placeholder="DD/MM/AAAA"
-                      placeholderTextColor="#3A3939"
-                      keyboardType="numeric"
-                      maxLength={10}
-                      onBlur={onBlur}
-                      onChangeText={(text) => {
-                        // Auto-insertar barras: 2 dígitos → "/" → 2 dígitos → "/"
-                        const digits = text.replace(/\D/g, '');
-                        let formatted = digits;
-                        if (digits.length > 2) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-                        if (digits.length > 4)
-                          formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
-                        onChange(formatted);
-                      }}
-                      value={value}
-                    />
-                  )}
-                />
-                {errors.dateOfBirth && (
-                  <Text className="text-red-500 text-xs mt-1">{errors.dateOfBirth.message}</Text>
-                )}
-              </View>
-
-              {/* GENDER */}
-              <View>
-                <Text className="font-display text-xs uppercase tracking-wider mb-3 text-neutral-on-surface-variant">
-                  Género
-                </Text>
-                <View className="flex-row gap-3">
-                  {GENDER_OPTIONS.map(({ value, label }) => (
-                    <TouchableOpacity
-                      key={value}
-                      activeOpacity={0.85}
-                      onPress={() => setValue('gender', value, { shouldValidate: true })}
-                      className={`flex-1 py-3.5 rounded-xl border items-center ${
-                        selectedGender === value
-                          ? 'bg-brand-primary border-[#003914]'
-                          : 'bg-surface-low border-neutral-outline-variant/15'
-                      }`}
-                    >
-                      <Text
-                        className={`font-display uppercase tracking-widest text-xs ${
-                          selectedGender === value ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
-                        }`}
-                      >
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                {errors.gender && (
-                  <Text className="text-red-500 text-xs mt-2">{errors.gender.message}</Text>
-                )}
-              </View>
-
-              {/* STRONG FOOT */}
-              <View>
-                <Text className="font-display text-xs uppercase tracking-wider mb-3 text-neutral-on-surface-variant">
-                  Pierna Hábil
-                </Text>
-                <View className="flex-row gap-3">
-                  {FOOT_OPTIONS.map(({ value, label }) => (
-                    <TouchableOpacity
-                      key={value}
-                      activeOpacity={0.85}
-                      onPress={() => setValue('strongFoot', value, { shouldValidate: true })}
-                      className={`flex-1 py-3.5 rounded-xl border items-center ${
-                        selectedFoot === value
-                          ? 'bg-brand-primary border-[#003914]'
-                          : 'bg-surface-low border-neutral-outline-variant/15'
-                      }`}
-                    >
-                      <Text
-                        className={`font-display uppercase tracking-widest text-xs ${
-                          selectedFoot === value ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
-                        }`}
-                      >
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                {errors.strongFoot && (
-                  <Text className="text-red-500 text-xs mt-2">{errors.strongFoot.message}</Text>
-                )}
-              </View>
+            <View className="mb-8">
+              {/* Mismo componente que usa /profile-edit: lo que se pide acá es
+                  exactamente lo que después se puede editar (bug 2). */}
+              <ProfileFormFields
+                control={control}
+                errors={errors}
+                setValue={setValue}
+                watch={watch}
+                onOpenFavoriteTeamPicker={() => setShowFavoriteTeamPicker(true)}
+              />
             </View>
 
             <HeroButton onPress={handleNextStep} label="Siguiente" style={{ width: '100%' }} />
           </View>
         )}
 
-        {/* ── PASO 3: Identidad y Cancha ─────────────────────────── */}
+        {/* ── PASO 3: Cancha ─────────────────────────────────────── */}
         {step === 3 && (
           <View>
             <View className="mb-6">
               <Text className="font-displayBlack text-3xl text-neutral-on-surface mb-2">
-                Identidad y Cancha
+                Tu Cancha
               </Text>
               <Text className="font-ui text-neutral-on-surface-variant">
                 Toca el sector de la cancha donde te destacas.
@@ -373,7 +283,7 @@ export default function OnboardingScreen() {
             <View className="flex-row items-center justify-center mb-8">
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => setValue('position', 'CUALQUIERA')}
+                onPress={() => setValue('position', 'CUALQUIERA', { shouldValidate: true })}
                 className={`px-8 py-3.5 rounded-full border ${
                   selectedPosition === 'CUALQUIERA'
                     ? 'bg-brand-primary border-[#003914]'
@@ -391,31 +301,6 @@ export default function OnboardingScreen() {
                   Soy Flexible
                 </Text>
               </TouchableOpacity>
-            </View>
-
-            {/* FAVORITE TEAM (opcional) */}
-            <View className="mb-6">
-              <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">
-                Cuadro favorito{' '}
-                <Text className="normal-case text-neutral-outline">(opcional)</Text>
-              </Text>
-              <Controller
-                control={control}
-                name="favoriteTeam"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <TextInput
-                    className="w-full rounded-xl border border-neutral-outline-variant/15 px-4 py-4 text-neutral-on-surface bg-surface-low"
-                    placeholder="Ej: River Plate, Boca Juniors..."
-                    placeholderTextColor="#3A3939"
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value ?? ''}
-                  />
-                )}
-              />
-              {errors.favoriteTeam && (
-                <Text className="text-red-500 text-xs mt-1">{errors.favoriteTeam.message}</Text>
-              )}
             </View>
 
             <View className="mb-6 flex-row flex-wrap items-center justify-center px-4 mt-8">
@@ -447,6 +332,15 @@ export default function OnboardingScreen() {
         onClose={() => setShowZonePicker(false)}
         selectedZone={selectedZone}
         onSelect={(val) => setValue('zone', val, { shouldValidate: true })}
+      />
+
+      <OptionPickerDialog
+        visible={showFavoriteTeamPicker}
+        title="Cuadro favorito"
+        options={FAVORITE_TEAM_OPTIONS}
+        selected={selectedFavoriteTeam}
+        onClose={() => setShowFavoriteTeamPicker(false)}
+        onSelect={(val) => setValue('favoriteTeam', val, { shouldValidate: true })}
       />
 
       {AlertComponent}

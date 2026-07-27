@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, type DefaultValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { useAuth } from '@/context/AuthContext';
@@ -14,9 +14,45 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { updateProfile } from '@/lib/profile-edit-data';
 import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
+import { OptionPickerDialog } from '@/components/ui/OptionPickerDialog';
+import { ProfileFormFields } from '@/components/profile/ProfileFormFields';
+import { FAVORITE_TEAM_OPTIONS } from '@/lib/favorite-teams';
+import { toDisplayDate } from '@/lib/date-mask';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
+import type { Database } from '@/types/supabase';
 
 type ProfilePos = UserProfileFormData['position'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+
+/**
+ * Hidrata el formulario desde el perfil de la sesion.
+ *
+ * ⚠️ Debe cubrir TODOS los campos de userProfileSchema. Cuando faltaban
+ * dateOfBirth / gender / strongFoot / favoriteTeam, el resolver los evaluaba
+ * como undefined, handleSubmit abortaba antes de llamar a onSubmit y — como
+ * esos campos ni siquiera se renderizaban — no habia ningun mensaje de error
+ * visible: el boton "Guardar cambios" simplemente no hacia nada. Ese era el
+ * bug 2 real, mas grave que "faltan campos".
+ */
+/*
+ * DefaultValues<T> y no T: gender/strongFoot pueden faltar en un perfil viejo y
+ * el form debe poder arrancar sin ellos para que el usuario los complete. El
+ * schema sigue exigiéndolos al guardar.
+ */
+function buildDefaultValues(profile: ProfileRow | null): DefaultValues<UserProfileFormData> {
+  return {
+    fullName: profile?.full_name ?? '',
+    username: profile?.username ?? '',
+    zone: profile?.zone ?? '',
+    position: (profile?.preferred_position as ProfilePos | null) ?? 'CUALQUIERA',
+    dateOfBirth: toDisplayDate(profile?.date_of_birth),
+    gender: (profile?.gender as UserProfileFormData['gender'] | null) ?? undefined,
+    strongFoot: (profile?.strong_foot as UserProfileFormData['strongFoot'] | null) ?? undefined,
+    // Los perfiles viejos traen texto libre ('Boca'). Se hidrata igual: el
+    // schema lo rechaza recien al guardar y el usuario elige del select.
+    favoriteTeam: profile?.favorite_team ?? '',
+  };
+}
 
 export default function ProfileEditScreen() {
   const router = useRouter();
@@ -24,47 +60,64 @@ export default function ProfileEditScreen() {
 
   const [loading, setLoading] = useState(false);
   const [showZonePicker, setShowZonePicker] = useState(false);
-  
+  const [showFavoriteTeamPicker, setShowFavoriteTeamPicker] = useState(false);
+
   const { showAlert, AlertComponent } = useCustomAlert();
 
-  const { control, handleSubmit, setValue, watch, formState: { errors } } = useForm<UserProfileFormData>({
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
-    defaultValues: {
-      fullName: profile?.full_name || '',
-      username: profile?.username || '',
-      zone: profile?.zone || '',
-      position: (profile?.preferred_position as ProfilePos) ?? 'CUALQUIERA',
-    },
+    defaultValues: buildDefaultValues(profile),
   });
+
+  // defaultValues se congela en el primer render. Si la pantalla monta antes de
+  // que AuthContext termine de cargar el perfil, el form quedaria vacio y el
+  // usuario pisaria sus propios datos con strings vacios al guardar.
+  useEffect(() => {
+    if (profile) reset(buildDefaultValues(profile));
+  }, [profile, reset]);
 
   const selectedZone = watch('zone');
   const selectedPosition = watch('position');
+  const selectedFavoriteTeam = watch('favoriteTeam');
 
-  const onSubmit = async (data: UserProfileFormData) => {
-    if (!profile) return;
-    setLoading(true);
+  const onSubmit = useCallback(
+    async (data: UserProfileFormData) => {
+      if (!profile) return;
+      setLoading(true);
 
-    try {
-      await updateProfile(profile.id, data);
+      try {
+        await updateProfile(profile.id, data);
+        await refreshProfile();
+        showAlert('Éxito', 'Tu perfil se ha actualizado correctamente.');
 
-      await refreshProfile();
-      showAlert('Éxito', 'Tu perfil se ha actualizado correctamente.');
+        // Navigate back after a short delay so user sees the success message
+        setTimeout(() => {
+          router.back();
+        }, 1500);
+      } catch (error: unknown) {
+        const code =
+          typeof error === 'object' && error !== null && 'code' in error
+            ? (error as { code?: string }).code
+            : undefined;
 
-      // Navigate back after a short delay so user sees the success message
-      setTimeout(() => {
-        router.back();
-      }, 1500);
-
-    } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'code' in error && (error as any).code === '23505') {
-        showAlert('Error al actualizar', 'Ese nombre de usuario ya está en uso. Por favor, elige otro.');
-      } else {
-        showAlert('Error al actualizar', getGenericSupabaseErrorMessage(error, 'No pudimos guardar los cambios.'));
+        if (code === '23505') {
+          showAlert('Error al actualizar', 'Ese nombre de usuario ya está en uso. Por favor, elige otro.');
+        } else {
+          showAlert('Error al actualizar', getGenericSupabaseErrorMessage(error, 'No pudimos guardar los cambios.'));
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [profile, refreshProfile, router, showAlert],
+  );
 
   if (loading) {
     return <GlobalLoader label="Guardando cambios..." />;
@@ -72,8 +125,8 @@ export default function ProfileEditScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface-base">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
         <View className="px-4 pb-2 pt-1">
@@ -82,8 +135,8 @@ export default function ProfileEditScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          className="px-4" 
+        <ScrollView
+          className="px-4"
           contentContainerStyle={{ paddingBottom: 36 }}
           keyboardShouldPersistTaps="handled"
         >
@@ -142,13 +195,26 @@ export default function ProfileEditScreen() {
                 activeOpacity={0.8}
                 className={`w-full rounded-xl px-4 py-4 flex-row justify-between items-center border ${errors.zone ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
               >
-                <Text className={selectedZone ? 'text-neutral-on-surface' : 'text-surface-bright'}>
-                  {selectedZone || "Selecciona una zona"}
+                <Text
+                  className={`flex-1 ${selectedZone ? 'text-neutral-on-surface' : 'text-surface-bright'}`}
+                  style={{ minWidth: 0 }}
+                  numberOfLines={1}
+                >
+                  {selectedZone || 'Selecciona una zona'}
                 </Text>
                 <AppIcon family="material-icons" name="keyboard-arrow-down" size={22} color="#BCCBB9" />
               </TouchableOpacity>
               {errors.zone && <Text className="text-red-500 text-xs mt-1">{errors.zone.message}</Text>}
             </View>
+
+            {/* DATOS PERSONALES — mismo bloque que exige el onboarding (bug 2) */}
+            <ProfileFormFields
+              control={control}
+              errors={errors}
+              setValue={setValue}
+              watch={watch}
+              onOpenFavoriteTeamPicker={() => setShowFavoriteTeamPicker(true)}
+            />
 
             {/* POSITION */}
             <View>
@@ -160,12 +226,12 @@ export default function ProfileEditScreen() {
                   <PitchSelector value={value} onChange={onChange} />
                 )}
               />
-              
+
               {/* Opción Flexible como lo pide el diseño */}
               <View className="flex-row items-center justify-center mt-6 mb-2">
                 <TouchableOpacity
                   activeOpacity={0.9}
-                  onPress={() => setValue('position', 'CUALQUIERA')}
+                  onPress={() => setValue('position', 'CUALQUIERA', { shouldValidate: true })}
                   className={`px-8 py-3.5 rounded-full border ${selectedPosition === 'CUALQUIERA' ? 'bg-brand-primary border-[#003914]' : 'bg-surface-low border-neutral-outline-variant/15'}`}
                 >
                   <Text className={`font-display uppercase tracking-widest text-sm ${selectedPosition === 'CUALQUIERA' ? 'text-[#003914]' : 'text-neutral-on-surface-variant'}`}>
@@ -182,7 +248,7 @@ export default function ProfileEditScreen() {
             {/* SAVE BUTTON */}
             <HeroButton
               onPress={handleSubmit(onSubmit)}
-              label={loading ? "Guardando..." : "Guardar Cambios"}
+              label={loading ? 'Guardando...' : 'Guardar Cambios'}
               isLoading={loading}
             />
           </View>
@@ -194,6 +260,15 @@ export default function ProfileEditScreen() {
         onClose={() => setShowZonePicker(false)}
         selectedZone={selectedZone}
         onSelect={(val) => setValue('zone', val, { shouldValidate: true })}
+      />
+
+      <OptionPickerDialog
+        visible={showFavoriteTeamPicker}
+        title="Cuadro favorito"
+        options={FAVORITE_TEAM_OPTIONS}
+        selected={selectedFavoriteTeam}
+        onClose={() => setShowFavoriteTeamPicker(false)}
+        onSelect={(val) => setValue('favoriteTeam', val, { shouldValidate: true })}
       />
 
       {AlertComponent}
