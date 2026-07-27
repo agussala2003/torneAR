@@ -1,4 +1,4 @@
-import { supabase, supabaseRpc } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import type { ChallengeInboxEntry } from '@/components/ranking/types';
 import type { Database } from '@/types/supabase';
@@ -100,10 +100,11 @@ async function notifyTeamLeaders(
   }
 }
 
-export interface SendChallengeResult {
+// type (no interface): habilita el cast directo desde el Json tipado del RPC.
+export type SendChallengeResult = {
   challengeId: string;
   eloDiffWarning: boolean;
-}
+};
 
 // Sends a challenge via the send_challenge RPC.
 // All business-rule validations run server-side (anti-farming, cooldown, season limit, auth).
@@ -112,7 +113,7 @@ export async function sendChallenge(
   toTeamId: string,
   matchType: 'RANKING' | 'AMISTOSO',
 ): Promise<SendChallengeResult> {
-  const { data, error } = await supabaseRpc('send_challenge', {
+  const { data, error } = await supabase.rpc('send_challenge', {
     p_from_team_id: fromTeamId,
     p_to_team_id: toTeamId,
     p_match_type: matchType,
@@ -137,7 +138,7 @@ export async function acceptChallengeWithNotification(
   challengeId: string,
   fromTeamId: string,
 ): Promise<{ matchId: string; conversationId: string }> {
-  const { data, error } = await supabaseRpc('accept_challenge', { p_challenge_id: challengeId });
+  const { data, error } = await supabase.rpc('accept_challenge', { p_challenge_id: challengeId });
   if (error) throw error;
 
   const result = data as { matchId: string; conversationId: string };

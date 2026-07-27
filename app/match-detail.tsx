@@ -21,7 +21,9 @@ import {
   claimWo,
   submitDisputeVote,
   resolveMatchDispute,
+  ResultAlreadySubmittedError,
 } from '@/lib/match-actions';
+import { useMatchRealtime } from '@/hooks/useMatchRealtime';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { MatchDetailHero } from '@/components/matches/MatchDetailHero';
@@ -83,6 +85,10 @@ export default function MatchDetailScreen() {
   }, [matchId, myTeamId, profile?.id, showAlert]);
 
   useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
+
+  // Realtime: cuando el rival carga su resultado, el partido pasa a FINALIZADO
+  // o EN_DISPUTA y esta pantalla se entera sin salir y volver a entrar.
+  useMatchRealtime(matchId, useCallback(() => { void loadData(); }, [loadData]));
 
   // Auto-open modal from navigation params once data loads
   useEffect(() => {
@@ -227,9 +233,23 @@ export default function MatchDetailScreen() {
   const { status } = match;
   const isMyTeamA = match.teamA.id === myTeamId;
   const myCheckinAt = isMyTeamA ? match.checkinTeamAAt : match.checkinTeamBAt;
-  const myTeamParticipants = match.participants.filter((p) => p.teamId === myTeamId);
   const opponentTeam = isMyTeamA ? match.teamB : match.teamA;
   const hasPendingCancellation = match.cancellationRequest?.status === 'PENDIENTE';
+
+  // Bug 4: el selector de goleadores/MVP se alimenta del PLANTEL (team_roster),
+  // no de la convocatoria (match_participants). Un gol puede ser de alguien que
+  // entró sin figurar en la lista de buena fe, y un partido iniciado con la RPC
+  // legacy checkin_team deja un solo participante por equipo.
+  const myTeamParticipants = match.teamRoster;
+
+  // Bug 8: definición ÚNICA de "puedo cargar resultado". Antes el botón
+  // "Finalizar Partido" abría el modal sin mirar myResult, así que se podía
+  // reenviar un resultado ya cargado (ResultSection sí lo chequeaba, pero ese
+  // botón paralelo no).
+  const canSubmitResult =
+    status === 'EN_VIVO' &&
+    match.myResult === null &&
+    (match.isResultLoader || match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN');
 
   function renderStatusBadge() {
     const colors: Record<string, string> = {
@@ -353,7 +373,19 @@ export default function MatchDetailScreen() {
         {status === 'CONFIRMADO' && (
           <>
             <MatchDetailsSection match={match} />
-            <CheckinSection match={match} onCheckin={() => void handleCheckin()} />
+            <CheckinSection
+              match={match}
+              onCheckin={() => void handleCheckin()}
+              onOpenSquadList={
+                match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN'
+                  ? () =>
+                      router.push({
+                        pathname: '/match-checkin' as never,
+                        params: { matchId: match.id, myTeamId },
+                      })
+                  : undefined
+              }
+            />
             {hasPendingCancellation && match.cancellationRequest && (
               <CancellationRequestSection
                 request={match.cancellationRequest}
@@ -378,10 +410,12 @@ export default function MatchDetailScreen() {
             <MatchDetailsSection match={match} />
             <ResultSection
               match={match}
-              onLoadResult={match.isResultLoader ? () => setShowResultModal(true) : undefined}
+              onLoadResult={canSubmitResult ? () => setShowResultModal(true) : undefined}
             />
-            {/* Finalizar Partido (early termination while EN_VIVO) */}
-            {(match.isResultLoader || match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN') && (
+            {/* Finalizar Partido (early termination while EN_VIVO).
+                Se oculta apenas mi equipo cargó: en su lugar queda el estado de
+                espera, para que la pantalla refleje que ya no hay nada que hacer. */}
+            {canSubmitResult ? (
               <TouchableOpacity
                 onPress={() => setShowResultModal(true)}
                 activeOpacity={0.8}
@@ -394,7 +428,14 @@ export default function MatchDetailScreen() {
                   ¿Problemas en el partido? Cargá el resultado ahora.
                 </Text>
               </TouchableOpacity>
-            )}
+            ) : match.myResult ? (
+              <View className="mt-4 flex-row items-center gap-3 rounded-2xl border border-brand-primary/30 bg-brand-primary/8 px-5 py-4">
+                <AppIcon family="material-community" name="check-circle" size={18} color="#53E076" />
+                <Text className="font-ui flex-1 text-xs text-neutral-on-surface-variant">
+                  Ya enviaste tu resultado. Esperando la carga del rival para confirmar el partido.
+                </Text>
+              </View>
+            ) : null}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
               onWo={() => setShowWoModal(true)}
@@ -480,8 +521,29 @@ export default function MatchDetailScreen() {
         visible={showResultModal}
         onClose={() => setShowResultModal(false)}
         onSubmit={async (data) => {
-          await submitMatchResult(match.id, myTeamId, data);
-          showAlert('Resultado cargado', 'Tu resultado fue enviado.', () => void loadData());
+          try {
+            await submitMatchResult(match.id, myTeamId, data);
+            // Recarga SINCRÓNICA antes del alert. Antes el loadData vivía en el
+            // callback del alert, así que la pantalla mostraba el estado viejo
+            // hasta que el usuario cerraba el mensaje: ésa era la ventana en la
+            // que el botón seguía habilitado y se podía reenviar.
+            await loadData();
+            showAlert('Resultado cargado', 'Tu resultado fue enviado.');
+          } catch (err) {
+            // Pase lo que pase, resincronizamos: si falló por duplicado, el
+            // estado real ya cambió y la UI tiene que reflejarlo.
+            await loadData();
+
+            if (err instanceof ResultAlreadySubmittedError) {
+              showAlert('Resultado ya cargado', err.message);
+              return;
+            }
+
+            showAlert('Error', getGenericSupabaseErrorMessage(err));
+            // Se relanza para que el modal NO se cierre y el usuario pueda
+            // corregir los datos sin volver a cargarlos desde cero.
+            throw err;
+          }
         }}
         myParticipants={myTeamParticipants}
       />
@@ -501,6 +563,7 @@ export default function MatchDetailScreen() {
       <WoModal
         visible={showWoModal}
         onClose={() => setShowWoModal(false)}
+        myParticipants={myTeamParticipants}
         onSubmit={async (data) => {
           await claimWo(match.id, myTeamId, data);
           showAlert('Reclamo enviado', 'Tu reclamo WO fue enviado a revisión.', () => void loadData());

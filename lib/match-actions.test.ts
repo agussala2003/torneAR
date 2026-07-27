@@ -1,18 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder, createStorageMock } from './test-utils/supabase-mock';
 
-const { supabaseMock, supabaseRpcMock } = vi.hoisted(() => ({
+const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: {
     from: vi.fn(),
+    rpc: vi.fn(),
     auth: { getUser: vi.fn() },
     storage: { from: vi.fn() },
   },
-  supabaseRpcMock: vi.fn(),
 }));
+// El DAL usa supabase.rpc() tipado; el alias conserva legible el resto del archivo.
+const supabaseRpcMock = supabaseMock.rpc;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: supabaseMock,
-  supabaseRpc: supabaseRpcMock,
 }));
 
 import {
@@ -28,6 +29,7 @@ import {
   submitDisputeVote,
   resolveMatchDispute,
   claimWo,
+  ResultAlreadySubmittedError,
 } from './match-actions';
 
 const AUTH_USER = { id: 'auth-1' };
@@ -114,14 +116,14 @@ describe('acceptProposal / rejectProposal / cancelProposal', () => {
 });
 
 describe('doCheckin', () => {
-  it('manda p_lat/p_lng null explícitos cuando no hay coords (nunca se omiten las claves)', async () => {
+  it('omite p_lat/p_lng cuando no hay coords (args opcionales: DEFAULT NULL server-side)', async () => {
     supabaseRpcMock.mockResolvedValueOnce({ data: null, error: null });
     await doCheckin('m1', 'teamA');
     expect(supabaseRpcMock).toHaveBeenCalledWith('checkin_team', {
       p_match_id: 'm1',
       p_team_id: 'teamA',
-      p_lat: null,
-      p_lng: null,
+      p_lat: undefined,
+      p_lng: undefined,
     });
   });
 
@@ -171,12 +173,18 @@ describe('submitMatchResult', () => {
     });
   });
 
-  it('trata 23505 (unique_violation) como éxito idempotente, no lo relanza', async () => {
+  // Contrato invertido a propósito (bug 8, 2026-07-23): antes el 23505 se
+  // tragaba como "reintento idempotente tras timeout de red", pero eso también
+  // enmascaraba el doble envío real y la UI mostraba "Resultado cargado" dos
+  // veces. Ahora se tipa para que la pantalla distinga ese caso y resincronice.
+  it('convierte 23505 (unique_violation) en ResultAlreadySubmittedError', async () => {
     supabaseMock.from
       .mockReturnValueOnce(createQueryBuilder({ data: PROFILE, error: null }))
       .mockReturnValueOnce(createQueryBuilder({ data: null, error: { code: '23505' } }));
 
-    await expect(submitMatchResult('m1', 'teamA', formData)).resolves.toBeUndefined();
+    await expect(submitMatchResult('m1', 'teamA', formData)).rejects.toBeInstanceOf(
+      ResultAlreadySubmittedError,
+    );
   });
 
   it('relanza cualquier otro código de error', async () => {
@@ -274,13 +282,43 @@ describe('requestCancellation / joinMatchAsGuest / submitDisputeVote / resolveMa
 });
 
 describe('claimWo', () => {
-  it('sube la foto y luego inserta el claim con status PENDIENTE_REVISION', async () => {
-    const profileBuilder = createQueryBuilder({ data: PROFILE, error: null });
-    const insertBuilder = createQueryBuilder({ data: null, error: null });
-    supabaseMock.from.mockReturnValueOnce(profileBuilder).mockReturnValueOnce(insertBuilder);
+  it('sube la foto y luego llama a la RPC claim_wo mapeando goleadores y MVP', async () => {
     supabaseMock.storage.from.mockReturnValue(
-      createStorageMock({ data: { path: 'm1/teamA_123.jpg' }, error: null }).from('wo-evidence'),
+      createStorageMock({ data: { path: 'm1/teamA_123.jpg' }, error: null }).from('wo_evidences'),
     );
+    supabaseRpcMock.mockResolvedValueOnce({ data: 'claim-1', error: null });
+
+    await claimWo('m1', 'teamA', {
+      reason: 'NO_PRESENTACION',
+      photoBase64: Buffer.from('fake-image').toString('base64'),
+      photoMimeType: 'image/jpeg',
+      notes: null,
+      scorers: [
+        { profileId: 'p1', goals: 2 },
+        { profileId: 'p2', goals: 1 },
+      ],
+      mvpProfileId: 'p1',
+    });
+
+    expect(supabaseMock.storage.from).toHaveBeenCalledWith('wo_evidences');
+    expect(supabaseRpcMock).toHaveBeenCalledWith('claim_wo', {
+      p_match_id: 'm1',
+      p_team_id: 'teamA',
+      p_reason: 'NO_PRESENTACION',
+      p_photo_url: 'm1/teamA_123.jpg',
+      p_scorers: [
+        { profile_id: 'p1', goals: 2 },
+        { profile_id: 'p2', goals: 1 },
+      ],
+      p_mvp_id: 'p1',
+    });
+  });
+
+  it('envía scorers vacío y omite el mvp cuando no se cargan goleadores', async () => {
+    supabaseMock.storage.from.mockReturnValue(
+      createStorageMock({ data: { path: 'm1/teamA_123.jpg' }, error: null }).from('wo_evidences'),
+    );
+    supabaseRpcMock.mockResolvedValueOnce({ data: 'claim-2', error: null });
 
     await claimWo('m1', 'teamA', {
       reason: 'NO_PRESENTACION',
@@ -289,21 +327,13 @@ describe('claimWo', () => {
       notes: null,
     });
 
-    expect(supabaseMock.storage.from).toHaveBeenCalledWith('wo-evidence');
-    expect(insertBuilder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        match_id: 'm1',
-        claiming_team_id: 'teamA',
-        claimed_by: PROFILE.id,
-        reason: 'NO_PRESENTACION',
-        status: 'PENDIENTE_REVISION',
-        photo_url: 'm1/teamA_123.jpg',
-      }),
+    expect(supabaseRpcMock).toHaveBeenCalledWith(
+      'claim_wo',
+      expect.objectContaining({ p_scorers: [], p_mvp_id: undefined }),
     );
   });
 
-  it('propaga el error si falla el upload y no llega a insertar el claim', async () => {
-    supabaseMock.from.mockReturnValueOnce(createQueryBuilder({ data: PROFILE, error: null }));
+  it('propaga el error si falla el upload y no llama a la RPC', async () => {
     supabaseMock.storage.from.mockReturnValue({
       upload: vi.fn().mockResolvedValue({ data: null, error: new Error('upload falló') }),
     });
@@ -317,6 +347,6 @@ describe('claimWo', () => {
       }),
     ).rejects.toThrow('upload falló');
 
-    expect(supabaseMock.from).toHaveBeenCalledTimes(1); // nunca llega al insert de wo_claims
+    expect(supabaseRpcMock).not.toHaveBeenCalled(); // nunca llega a la RPC
   });
 });

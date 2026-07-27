@@ -19,6 +19,31 @@ function ScoreCenter({ scoreA, scoreB }: { scoreA: number; scoreB: number }) {
   );
 }
 
+/**
+ * Etiqueta de localía. Es ABSOLUTA: teamA siempre es LOCAL y teamB siempre
+ * VISITANTE, sin importar cuál sea "mi equipo". El marcador de este Hero es
+ * relativo (mi equipo a la izquierda), así que sin esta ancla la lectura choca
+ * con la del listado — que es absoluta. El chip cierra esa fricción: aunque mi
+ * equipo aparezca a la izquierda, el usuario ve si jugó de local o de visitante.
+ */
+function VenueBadge({ isHome }: { isHome: boolean }) {
+  return (
+    <View
+      className={`rounded-full px-2 py-0.5 ${
+        isHome ? 'bg-info-secondary/15' : 'bg-neutral-outline/15'
+      }`}
+    >
+      <Text
+        className={`font-uiBold text-[9px] uppercase tracking-widest ${
+          isHome ? 'text-info-secondary' : 'text-neutral-on-surface-variant'
+        }`}
+      >
+        {isHome ? 'Local' : 'Visitante'}
+      </Text>
+    </View>
+  );
+}
+
 function LiveBadge() {
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -52,16 +77,25 @@ export function MatchDetailHero({ match, myTeamId }: Props) {
   const myTeam = isMyTeamA ? teamA : teamB;
   const opponentTeam = isMyTeamA ? teamB : teamA;
 
-  const myGoals = isMyTeamA ? myResult?.goalsScored : opponentResult?.goalsAgainst;
-  const opponentGoals = isMyTeamA ? opponentResult?.goalsScored : myResult?.goalsAgainst;
+  // ── Marcador SIEMPRE relativo a mi equipo ───────────────────────────────────
+  // myResult / opponentResult ya vienen orientados por el RPC get_match_detail
+  // (WHERE r.team_id = p_team_id). Este Hero además renderiza mi equipo siempre
+  // a la izquierda, así que también es relativo.
+  //
+  // El bug 9 era aplicar isMyTeamA sobre datos YA relativizados: para el equipo
+  // B eso invertía el marcador y mostraba "3-0" a favor de quien había perdido.
+  // isMyTeamA acá sólo sirve para elegir escudo y nombre, nunca para el score.
+  //
+  // Cada equipo carga (goles a favor, goles en contra) desde su perspectiva, así
+  // que el resultado del rival es el respaldo espejado si el propio falta.
+  const myGoals = myResult?.goalsScored ?? opponentResult?.goalsAgainst ?? null;
+  const opponentGoals = opponentResult?.goalsScored ?? myResult?.goalsAgainst ?? null;
 
   function renderCenter() {
     if (status === 'EN_VIVO') {
-      const sA = match.myResult?.goalsScored ?? 0;
-      const sB = match.opponentResult?.goalsScored ?? 0;
       return (
         <View className="items-center gap-1">
-          <ScoreCenter scoreA={isMyTeamA ? sA : sB} scoreB={isMyTeamA ? sB : sA} />
+          <ScoreCenter scoreA={myGoals ?? 0} scoreB={opponentGoals ?? 0} />
           <LiveBadge />
           {match.startedAt && (
             <LiveTimer
@@ -148,9 +182,10 @@ export function MatchDetailHero({ match, myTeamId }: Props) {
       }`}
     >
       <View className="flex-row items-center justify-center gap-6">
-        {/* My team */}
+        {/* My team — local si mi equipo es teamA (localía absoluta) */}
         <View className="flex-1 items-center gap-2">
           <TeamShield shieldUrl={myTeam.shieldUrl} size={72} isMyTeam />
+          <VenueBadge isHome={isMyTeamA} />
           <Text
             className="font-uiBold text-center text-sm text-neutral-on-surface"
             numberOfLines={2}
@@ -163,9 +198,10 @@ export function MatchDetailHero({ match, myTeamId }: Props) {
         {/* Center */}
         <View className="items-center">{renderCenter()}</View>
 
-        {/* Opponent team */}
+        {/* Opponent team — la localía inversa a la mía */}
         <View className="flex-1 items-center gap-2">
           <TeamShield shieldUrl={opponentTeam.shieldUrl} size={72} />
+          <VenueBadge isHome={!isMyTeamA} />
           <Text
             className="font-uiBold text-center text-sm text-neutral-on-surface"
             numberOfLines={2}

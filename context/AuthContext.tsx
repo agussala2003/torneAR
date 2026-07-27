@@ -11,6 +11,13 @@ type AuthContextType = {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  /**
+   * `true` una vez que leímos la sesión inicial de Supabase/SecureStore al
+   * arrancar. A diferencia de `loading` (que oscila en cada cambio de auth y
+   * durante el fetch del perfil), `hydrated` solo pasa a `true` una vez y no
+   * vuelve atrás: es la señal para soltar el SplashScreen nativo.
+   */
+  hydrated: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -20,6 +27,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
+  hydrated: false,
   signOut: async () => {},
   refreshProfile: async () => {},
 });
@@ -31,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
   const syncVersionRef = useRef(0);
   const authUserIdRef = useRef<string | null>(null);
 
@@ -78,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (syncVersion === syncVersionRef.current) {
         setProfile(null);
         setLoading(false);
+        setHydrated(true);
       }
       return;
     }
@@ -88,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (syncVersion === syncVersionRef.current) {
       setProfile(nextProfile);
       setLoading(false);
+      setHydrated(true);
     }
   };
 
@@ -112,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, hydrated, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

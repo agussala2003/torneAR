@@ -1,33 +1,86 @@
 name: TorneAR CI
 
+# Se ejecuta en cada Pull Request hacia main (Producción) y develop (Staging),
+# y también al pushear directo a esas ramas. Si cualquier paso falla, el check
+# queda en rojo y (con branch protection activada) bloquea el merge del PR.
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+# Cancela corridas anteriores del mismo PR/rama para no gastar minutos de más.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  quality:
+    name: Type check · Lint · Tests
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      # npm ci = install reproducible desde package-lock.json (falla si está desincronizado).
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Type Check (TypeScript)
-      run: npx tsc --noEmit
+      # 1) TypeScript en modo estricto, sin emitir. Falla ante cualquier error de tipos.
+      - name: Type Check (tsc)
+        run: npx tsc --noEmit
 
-    - name: Run Linter
-      run: npm run lint
+      # 2) ESLint (config de Expo). Falla ante errores de lint.
+      - name: Lint (eslint)
+        run: npm run lint
 
-    - name: Run Tests
-      run: npm test
+      # 3) Suite de tests (Vitest, una sola corrida). Falla si algún test no pasa.
+      - name: Tests (vitest)
+        run: npm test
+
+  # ─── Tests de base de datos (pgTAP · stack efímero) ─────────────────────────
+  # Levanta un stack local de Supabase DESDE CERO en el runner (aplica las
+  # migraciones completas + supabase/seed.sql) y corre las suites declarativas
+  # de supabase/tests/ con pg_prove (supabase test db). Ventajas sobre el job
+  # legacy: hermético (no toca la base real ni compite entre PRs), corre en
+  # forks sin secrets, y valida en cada PR que la cadena de migraciones
+  # aplica limpia desde cero.
+  #
+  # -x excluye los servicios que los tests de DB no usan (studio, buckets,
+  # realtime, edge functions, mail, analytics...). Quedan corriendo Postgres,
+  # auth y kong. OJO: los nombres válidos dependen de la versión del CLI
+  # (`supabase start --help`); `gotrue` no es excluible y `logflare` se
+  # llama `analytics`.
+  #
+  # pgTAP y el schema tests.* los instala supabase/tests/000-setup.sql al
+  # inicio de la corrida — nunca via migración, así jamás llegan a Producción.
+  db-tests-pgtap:
+    name: Database tests (pgTAP · stack efímero)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Versión PINEADA a propósito: 010-schema.spec.sql afirma la matriz de
+      # privilegios de authenticated con table_privs_are (exact-match), y el
+      # baseline de default privileges de Supabase varía entre versiones del
+      # CLI. Con `latest`, una actualización de Supabase rompería esos tests
+      # sin que cambiara nuestro schema (version-skew). Al subir de versión,
+      # re-medir los arrays de 010-schema contra el nuevo baseline.
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+
+      - name: Start ephemeral stack (migraciones + seed)
+        run: supabase start -x studio,imgproxy,inbucket,edge-runtime,functions,realtime,storage,analytics,vector,meta,rest
+
+      - name: Run pgTAP suites (supabase test db)
+        run: supabase test db

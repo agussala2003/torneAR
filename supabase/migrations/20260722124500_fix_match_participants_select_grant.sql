@@ -1,0 +1,21 @@
+-- ============================================================
+-- Grant de lectura de match_participants — 2026-07-22
+-- ------------------------------------------------------------
+-- Hallazgo del canario 270-rpc-squad-formats (S5) en CI: la migración
+-- 20260714201000 otorgó a authenticated grants POR COLUMNA de INSERT/UPDATE
+-- sobre match_participants (para cerrar la escritura de lineup_role fuera de
+-- la RPC), pero nunca un SELECT a nivel tabla. Postgres exige SELECT para
+-- evaluar la cláusula WHERE de un UPDATE (y las subconsultas USING de las
+-- policies RLS), así que como authenticated:
+--   · S5b — UPDATE ... WHERE ... → permission denied for table match_participants
+--   · S5c — idem
+-- En local (CLI v2.83.0) el default de Supabase daba ese SELECT y lo tapaba;
+-- en el stack efímero de CI (migraciones puras) no, igual que team_stints.
+--
+-- Se otorga SÓLO SELECT: la app y el DAL leen las convocatorias, y los WHERE
+-- lo necesitan. Los bloqueos de columna para INSERT/UPDATE (que impiden tocar
+-- lineup_role/team_id/is_guest/is_result_loader fuera de la RPC) quedan
+-- INTACTOS — este grant no los afecta. Idempotente: no-op donde ya existe.
+-- ============================================================
+
+GRANT SELECT ON public.match_participants TO authenticated;

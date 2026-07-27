@@ -1,12 +1,14 @@
-import { Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { PlayerLeaderboardRow } from './PlayerLeaderboardRow';
 import { RankingRowSkeleton } from './RankingRowSkeleton';
 import type { PlayerLeaderboardEntry, LeaderboardStat } from './types';
 
-const STAT_TABS: { key: LeaderboardStat; label: string; valueLabel: string }[] = [
+const STAT_TABS: { key: LeaderboardStat; label: string; valueLabel: string; isPercent?: boolean }[] = [
     { key: 'goals', label: 'Goleadores', valueLabel: 'goles' },
     { key: 'mvps', label: 'MVPs', valueLabel: 'MVPs' },
     { key: 'matches', label: 'Partidos', valueLabel: 'partidos' },
+    { key: 'clean_sheets', label: 'Vallas', valueLabel: 'vallas' },
+    { key: 'win_rate', label: 'Efectividad', valueLabel: 'efectividad', isPercent: true },
 ];
 
 interface Props {
@@ -32,7 +34,12 @@ export function PlayerLeaderboard({ entries, activeStat, onStatChange, loading }
                 ⚽ Mejores jugadores
             </Text>
 
-            <View className="mb-3 flex-row gap-2">
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="mb-3"
+                contentContainerStyle={{ gap: 8 }}
+            >
                 {STAT_TABS.map(tab => (
                     <TouchableOpacity
                         key={tab.key}
@@ -45,7 +52,7 @@ export function PlayerLeaderboard({ entries, activeStat, onStatChange, loading }
                         </Text>
                     </TouchableOpacity>
                 ))}
-            </View>
+            </ScrollView>
 
             {loading ? (
                 Array.from({ length: 5 }).map((_, i) => <RankingRowSkeleton key={i} />)
@@ -54,7 +61,7 @@ export function PlayerLeaderboard({ entries, activeStat, onStatChange, loading }
             ) : (
                 <View>
                     {topPlayers.map((entry, index) => (
-                        <PlayerLeaderboardRow key={entry.profileId} entry={entry} statLabel={activeTab.valueLabel} index={index} />
+                        <PlayerLeaderboardRow key={entry.profileId} entry={entry} statLabel={activeTab.valueLabel} isPercent={activeTab.isPercent} index={index} />
                     ))}
 
                     {isMyPlayerOutsideTop && myPlayer && (
@@ -66,7 +73,7 @@ export function PlayerLeaderboard({ entries, activeStat, onStatChange, loading }
                                 </Text>
                                 <View className="h-px flex-1 bg-surface-high" />
                             </View>
-                            <PlayerLeaderboardRow entry={myPlayer} statLabel={activeTab.valueLabel} index={topLimit} />
+                            <PlayerLeaderboardRow entry={myPlayer} statLabel={activeTab.valueLabel} isPercent={activeTab.isPercent} index={topLimit} />
                         </View>
                     )}
                 </View>

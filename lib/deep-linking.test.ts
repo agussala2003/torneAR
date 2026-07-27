@@ -1,0 +1,204 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  deepLinkToHref,
+  extractDeepLinkUrl,
+  isProtectedDeepLink,
+  resolveDeepLink,
+} from './deep-linking';
+
+// expo-linking arrastra react-native (sintaxis Flow) y no se puede importar en
+// el entorno node de Vitest. Mockeamos SOLO `parse` con una implementación fiel
+// al comportamiento de expo para schemes propios:
+//   scheme://host/rest?query  ->  { scheme, hostname: host, path: rest, queryParams }
+//   scheme:///rest            ->  { scheme, hostname: '', path: rest, ... }
+//   sin "://"                 ->  { scheme: null, ... }
+// Nuestro código combina hostname+path, así que es robusto a cómo se reparta el
+// primer segmento; lo que este test fija es NUESTRA lógica de gating, no la de expo.
+vi.mock('expo-linking', () => {
+  function parse(url: string) {
+    const schemeMatch = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(url);
+    if (!schemeMatch) {
+      return { scheme: null, hostname: null, path: url || null, queryParams: {} };
+    }
+
+    const rest = url.slice(schemeMatch[0].length);
+    const [pathPart, queryPart = ''] = rest.split('?');
+    const segments = pathPart.split('/');
+    const hostname = segments.shift() ?? '';
+    const path = segments.join('/');
+
+    const queryParams: Record<string, string> = {};
+    if (queryPart) {
+      for (const pair of queryPart.split('&')) {
+        const [key, value = ''] = pair.split('=');
+        if (key) queryParams[decodeURIComponent(key)] = decodeURIComponent(value);
+      }
+    }
+
+    return {
+      scheme: schemeMatch[1],
+      hostname: hostname === '' ? null : hostname,
+      path: path === '' ? null : path,
+      queryParams,
+    };
+  }
+
+  return { parse };
+});
+
+// Construye la forma mínima de un NotificationResponse de expo-notifications.
+const pushResponse = (data: unknown) => ({
+  notification: { request: { content: { data } } },
+});
+
+describe('extractDeepLinkUrl', () => {
+  it('devuelve la url cuando data.url es un string no vacío', () => {
+    expect(extractDeepLinkUrl(pushResponse({ url: 'tornear://market' }))).toBe('tornear://market');
+  });
+
+  it('conserva la url con query params intacta', () => {
+    const url = 'tornear://match-detail?id=123';
+    expect(extractDeepLinkUrl(pushResponse({ url, type: 'DESAFIO' }))).toBe(url);
+  });
+
+  it('devuelve null cuando data no trae url', () => {
+    expect(extractDeepLinkUrl(pushResponse({ type: 'DESAFIO' }))).toBeNull();
+  });
+
+  it('devuelve null cuando data es un objeto vacío', () => {
+    expect(extractDeepLinkUrl(pushResponse({}))).toBeNull();
+  });
+
+  it('devuelve null cuando data.url es un string vacío', () => {
+    expect(extractDeepLinkUrl(pushResponse({ url: '' }))).toBeNull();
+  });
+
+  it('devuelve null cuando data.url no es string', () => {
+    expect(extractDeepLinkUrl(pushResponse({ url: 123 }))).toBeNull();
+  });
+
+  it('devuelve null cuando data es null', () => {
+    expect(extractDeepLinkUrl(pushResponse(null))).toBeNull();
+  });
+
+  it('devuelve null cuando data es undefined', () => {
+    expect(extractDeepLinkUrl(pushResponse(undefined))).toBeNull();
+  });
+});
+
+describe('resolveDeepLink · Ignore (URLs inválidas / scheme desconocido)', () => {
+  it('ignora el scheme propio sin ruta (tornear://)', () => {
+    expect(resolveDeepLink('tornear://', false)).toEqual({ kind: 'ignore' });
+  });
+
+  it('ignora string vacío', () => {
+    expect(resolveDeepLink('', false)).toEqual({ kind: 'ignore' });
+  });
+
+  it('ignora URLs malformadas sin scheme', () => {
+    expect(resolveDeepLink('not a url', false)).toEqual({ kind: 'ignore' });
+  });
+
+  it('ignora schemes ajenos aunque la ruta parezca válida', () => {
+    expect(resolveDeepLink('evilapp://match-detail', true)).toEqual({ kind: 'ignore' });
+  });
+
+  it('ignora https (no es el scheme de la app)', () => {
+    expect(resolveDeepLink('https://tornear.app/market', true)).toEqual({ kind: 'ignore' });
+  });
+});
+
+describe('resolveDeepLink · Defer (ruta protegida sin sesión)', () => {
+  it('difiere una tab protegida y conserva la url para el store', () => {
+    expect(resolveDeepLink('tornear://market', false)).toEqual({
+      kind: 'defer',
+      url: 'tornear://market',
+    });
+  });
+
+  it('difiere una ruta protegida con query params', () => {
+    const url = 'tornear://match-detail?id=123';
+    expect(resolveDeepLink(url, false)).toEqual({ kind: 'defer', url });
+  });
+
+  it('difiere rutas protegidas anidadas', () => {
+    const url = 'tornear://admin/wo-review';
+    expect(resolveDeepLink(url, false)).toEqual({ kind: 'defer', url });
+  });
+});
+
+describe('resolveDeepLink · Navigate (pública, o protegida con sesión)', () => {
+  it('navega a una ruta pública aunque NO haya sesión (login)', () => {
+    expect(resolveDeepLink('tornear://login', false)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/login', params: {} },
+    });
+  });
+
+  it('navega a forgot-password sin sesión', () => {
+    expect(resolveDeepLink('tornear://forgot-password', false)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/forgot-password', params: {} },
+    });
+  });
+
+  it('navega a una ruta protegida CON sesión activa', () => {
+    expect(resolveDeepLink('tornear://market', true)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/market', params: {} },
+    });
+  });
+
+  it('navega y preserva los query params de una ruta protegida con sesión', () => {
+    expect(resolveDeepLink('tornear://match-detail?id=123', true)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/match-detail', params: { id: '123' } },
+    });
+  });
+
+  it('normaliza el triple-slash (tornear:///market) al mismo destino', () => {
+    expect(resolveDeepLink('tornear:///market', true)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/market', params: {} },
+    });
+  });
+
+  it('preserva rutas anidadas protegidas cuando hay sesión', () => {
+    expect(resolveDeepLink('tornear://admin/wo-review', true)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/admin/wo-review', params: {} },
+    });
+  });
+});
+
+describe('deepLinkToHref (helpers de bajo nivel)', () => {
+  it('rechaza schemes que no son el de la app', () => {
+    expect(deepLinkToHref('https://tornear.app/market')).toBeNull();
+    expect(deepLinkToHref('evilapp://market')).toBeNull();
+    expect(deepLinkToHref('not a url')).toBeNull();
+  });
+
+  it('rechaza el scheme propio sin ruta', () => {
+    expect(deepLinkToHref('tornear://')).toBeNull();
+  });
+
+  it('construye el href con pathname y params', () => {
+    expect(deepLinkToHref('tornear://match-detail?id=7&tab=stats')).toEqual({
+      pathname: '/match-detail',
+      params: { id: '7', tab: 'stats' },
+    });
+  });
+});
+
+describe('isProtectedDeepLink', () => {
+  it('marca login y forgot-password como públicas', () => {
+    expect(isProtectedDeepLink('tornear://login')).toBe(false);
+    expect(isProtectedDeepLink('tornear://forgot-password')).toBe(false);
+  });
+
+  it('marca cualquier otra ruta como protegida', () => {
+    expect(isProtectedDeepLink('tornear://market')).toBe(true);
+    expect(isProtectedDeepLink('tornear://match-detail?id=1')).toBe(true);
+    expect(isProtectedDeepLink('tornear://admin/wo-review')).toBe(true);
+  });
+});

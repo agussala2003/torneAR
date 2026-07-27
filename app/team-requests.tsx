@@ -5,20 +5,24 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { useAuth } from '@/context/AuthContext';
+import { useTeamStore } from '@/stores/teamStore';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchTeamRequestsViewData } from '@/lib/team-requests-data';
-import { TeamRequestsViewData } from '@/components/team-requests/types';
+import { transferToTeam, getTeamActionErrorMessage } from '@/lib/team-manage-data';
+import { TeamRequestsViewData, TeamRequestRow } from '@/components/team-requests/types';
 import { TeamRequestsList } from '@/components/team-requests/TeamRequestsList';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 export default function TeamRequestsScreen() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
+  const { myTeams, fetchMyTeams } = useTeamStore();
   const { showAlert, AlertComponent } = useCustomAlert();
-  
+
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<TeamRequestsViewData | null>(null);
   const [filter, setFilter] = useState<'TODAS' | 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA'>('TODAS');
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const loadRequests = useCallback(async () => {
     if (!profile) {
@@ -28,14 +32,51 @@ export default function TeamRequestsScreen() {
 
     try {
       setLoading(true);
-      const data = await fetchTeamRequestsViewData(profile.id);
+      // El store de equipos alimenta el chequeo "¿ya sos miembro?" y el origen
+      // del traspaso, así que lo refrescamos junto con las solicitudes.
+      const [data] = await Promise.all([
+        fetchTeamRequestsViewData(profile.id),
+        fetchMyTeams(profile.id),
+      ]);
       setViewData(data);
     } catch (error) {
       showAlert('Error al cargar solicitudes', getGenericSupabaseErrorMessage(error, 'No se pudieron cargar tus solicitudes.'));
     } finally {
       setLoading(false);
     }
-  }, [profile, showAlert]);
+  }, [profile, fetchMyTeams, showAlert]);
+
+  const memberTeamIds = useMemo(() => new Set(myTeams.map((t) => t.id)), [myTeams]);
+
+  const handleConfirmTransfer = useCallback(
+    async (request: TeamRequestRow) => {
+      if (!profile || confirmingId) return;
+      setConfirmingId(request.id);
+      try {
+        // Origen del traspaso: si el jugador pertenece a exactamente un equipo,
+        // ese ciclo se cierra como TRANSFERENCIA. Con 0 equipos entra como
+        // agente libre (null). Con más de uno NO adivinamos cuál dejar (cerraría
+        // el ciclo equivocado): entra sin cerrar ninguno y, si quiere salir de
+        // alguno, lo hace explícito con "Abandonar equipo".
+        const fromTeamId = myTeams.length === 1 ? myTeams[0].id : null;
+
+        await transferToTeam(request.team_id, fromTeamId);
+        await refreshProfile();
+        await fetchMyTeams(profile.id);
+        await loadRequests();
+
+        showAlert(
+          '¡Traspaso confirmado!',
+          `Ya sos parte de ${request.teams?.name ?? 'tu nuevo equipo'}.`,
+        );
+      } catch (error) {
+        showAlert('No pudimos confirmar el traspaso', getTeamActionErrorMessage(error));
+      } finally {
+        setConfirmingId(null);
+      }
+    },
+    [profile, confirmingId, myTeams, refreshProfile, fetchMyTeams, loadRequests, showAlert],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -93,7 +134,13 @@ export default function TeamRequestsScreen() {
         </View>
 
         <View className="mt-4 gap-3">
-          <TeamRequestsList requests={filteredRequests} />
+          <TeamRequestsList
+            requests={filteredRequests}
+            memberTeamIds={memberTeamIds}
+            hasCurrentTeam={myTeams.length > 0}
+            confirmingId={confirmingId}
+            onConfirmTransfer={handleConfirmTransfer}
+          />
         </View>
       </ScrollView>
 

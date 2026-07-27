@@ -1,5 +1,6 @@
 // tornear/lib/schemas/userSchema.ts
 import * as z from 'zod';
+import { isValidFavoriteTeam } from '@/lib/favorite-teams';
 
 export const userProfileSchema = z.object({
   fullName: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
@@ -25,7 +26,20 @@ export const userProfileSchema = z.object({
   strongFoot: z.enum(['RIGHT', 'LEFT', 'BOTH'], {
     error: 'Selecciona tu pierna hábil',
   }),
-  favoriteTeam: z.string().max(50, 'Máximo 50 caracteres').optional(),
+  /**
+   * Obligatorio y acotado al catalogo.
+   *
+   * Se valida con `.refine` sobre string y NO con `z.enum`: los perfiles
+   * existentes tienen texto libre del input viejo (el seed guarda 'Boca',
+   * 'River'). Con enum, ese valor no seria ni asignable al tipo ni hidratable
+   * en el form. Con refine sigue siendo un string valido para el defaultValue,
+   * y solo falla al GUARDAR — que es cuando el usuario ve el error y elige del
+   * select. La migracion de datos viejos ocurre asi, sin bloquear a nadie.
+   */
+  favoriteTeam: z
+    .string()
+    .min(1, 'Selecciona tu cuadro favorito')
+    .refine(isValidFavoriteTeam, { message: 'Selecciona un equipo de la lista' }),
 });
 
 export type UserProfileFormData = z.infer<typeof userProfileSchema>;

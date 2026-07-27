@@ -211,7 +211,7 @@ export default function MatchChatScreen() {
         </View>
       </View>
     );
-  }, [profile, header]);
+  }, [profile]);
 
   const headerTitle = header
     ? `${header.teamAName} vs ${header.teamBName}`

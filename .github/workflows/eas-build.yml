@@ -1,0 +1,51 @@
+name: EAS Build (Production)
+
+# Compila los binarios de producción (Android .aab + iOS .ipa) en la
+# infraestructura de EAS cada vez que se pushea a main (Producción).
+# Requiere el secret EXPO_TOKEN en Settings → Secrets → Actions del repo.
+on:
+  push:
+    branches: [main]
+  # Permite disparar el build manualmente desde la pestaña Actions.
+  workflow_dispatch:
+
+# Un build de producción a la vez por rama: si llega un push nuevo mientras
+# hay uno en curso, NO cancelamos el anterior (cancel-in-progress: false)
+# para no dejar un build a medias en la cola de EAS.
+concurrency:
+  group: eas-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: EAS Build · Android + iOS (production)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      # npm ci = install reproducible desde package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # Instala expo + eas-cli y autentica con el token de la cuenta de Expo.
+      # El token (EXPO_TOKEN) se lee de los Secrets del repositorio.
+      - name: Setup Expo and EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Lanza el build de Android en el perfil production, sin prompts.
+      # iOS queda fuera hasta tener la cuenta de Apple Developer + certificados
+      # de distribución. Cuando estén, volver a --platform all.
+      # --non-interactive => falla en vez de preguntar si falta algo (credenciales, etc).
+      - name: Build Android (production)
+        run: eas build --platform android --profile production --non-interactive --no-wait

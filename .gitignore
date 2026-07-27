@@ -18,6 +18,14 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Build artifacts (binarios de EAS / builds locales)
+*.apk
+*.aab
+*.ipa
+*.app
+*.tar.gz
+.eas-build-local-*/
+
 # Metro
 .metro-health-check*
 

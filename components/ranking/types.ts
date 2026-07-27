@@ -1,5 +1,5 @@
 export type RankingMode = 'RANKING' | 'RIVALES';
-export type LeaderboardStat = 'goals' | 'mvps' | 'matches';
+export type LeaderboardStat = 'goals' | 'mvps' | 'matches' | 'clean_sheets' | 'win_rate';
 
 export interface RankingFiltersState {
     zone: string | null;

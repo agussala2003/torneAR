@@ -86,6 +86,38 @@ export interface MatchParticipantEntry {
     isResultLoader: boolean;
 }
 
+/**
+ * Miembro del plantel de mi equipo para ESTE partido (nodo `team_roster` del
+ * RPC get_match_detail).
+ *
+ * No confundir con MatchParticipantEntry: aquél es la CONVOCATORIA
+ * (match_participants, la lista de buena fe), éste es el plantel real
+ * (team_members + invitados registrados). `inSquad` dice si además está
+ * convocado. El selector de goleadores usa éste, porque un gol puede ser de
+ * alguien que entró sin figurar en la lista.
+ */
+export interface MatchRosterEntry {
+    profileId: string;
+    fullName: string;
+    username: string;
+    avatarUrl: string | null;
+    teamId: string;
+    isGuest: boolean;
+    teamRole: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | 'DIRECTOR_TECNICO' | null;
+    inSquad: boolean;
+}
+
+/**
+ * Forma mínima que necesita ScorerMvpPicker. La cumplen tanto
+ * MatchRosterEntry (ResultModal) como MatchParticipantEntry (WoModal), así que
+ * el componente sirve a ambos sin acoplarse a ninguna de las dos formas.
+ */
+export interface ScorerPickerPerson {
+    profileId: string;
+    fullName: string;
+    inSquad?: boolean;
+}
+
 export interface ScorerEntry {
     profileId: string;
     fullName: string;
@@ -160,11 +192,61 @@ export interface MatchDetailViewData {
     activeProposal: ProposalEntry | null;
     myResult: MatchResultEntry | null;
     opponentResult: MatchResultEntry | null;
-    participants: MatchParticipantEntry[];
+    participants: MatchParticipantEntry[];   // convocatoria (ambos equipos)
+    teamRoster: MatchRosterEntry[];          // plantel de MI equipo (bug 4)
     conversationId: string | null;
     woClaim: WoClaimEntry | null;
     cancellationRequest: CancellationRequestEntry | null;
 }
+
+// ─── Check-in de convocatoria (lista de buena fe) ─────────────────────────────
+
+export type LineupRole = Database['public']['Enums']['lineup_role'];
+
+// Ciclo visual de cada jugador en la pantalla de convocatoria:
+// AFUERA → TITULAR → SUPLENTE → AFUERA
+export type CheckinLineupState = 'AFUERA' | LineupRole;
+
+export interface FormatRulesEntry {
+    format: TeamFormat;
+    playersOnField: number;      // titulares exactos en cancha
+    minPlayersToStart: number;   // mínimo para presentar equipo
+    maxSquadSize: number;        // máximo de convocados (titulares + suplentes)
+}
+
+export interface CheckinRosterPlayer {
+    profileId: string;
+    fullName: string;
+    username: string;
+    avatarUrl: string | null;
+    teamRole: Database['public']['Enums']['team_role'] | null;  // null = invitado
+    isGuest: boolean;
+    // lineup_role ya persistido si el equipo re-presenta la lista
+    currentLineupRole: LineupRole | null;
+}
+
+export interface CheckinViewData {
+    matchId: string;
+    matchStatus: MatchStatus;
+    format: TeamFormat;
+    scheduledAt: string | null;
+    venueId: string | null;
+    myTeamCheckinAt: string | null;
+    rules: FormatRulesEntry;
+    roster: CheckinRosterPlayer[];
+}
+
+// Resumen que devuelve la RPC submit_team_checkin.
+// type (no interface): habilita el cast directo desde el Json tipado del RPC.
+export type TeamCheckinSummary = {
+    matchId: string;
+    teamId: string;
+    format: TeamFormat;
+    starters: number;
+    substitutes: number;
+    total: number;
+    matchStatus: MatchStatus;
+};
 
 // ─── Dispute voting ───────────────────────────────────────────────────────────
 
@@ -210,6 +292,9 @@ export interface WoClaimFormData {
     photoBase64: string;
     photoMimeType: string;
     notes: string | null;
+    // G6: goleadores y MVP del 3-0 (opcionales).
+    scorers?: { profileId: string; goals: number }[];
+    mvpProfileId?: string | null;
 }
 
 export interface CancellationFormData {

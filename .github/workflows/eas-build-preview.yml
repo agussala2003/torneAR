@@ -1,0 +1,92 @@
+name: EAS Build (Preview APK)
+
+# Compila un .apk de testing interno (perfil preview) en cada Pull Request
+# hacia main. NO toca la versión de producción ni sube a las tiendas:
+# distribution=internal + buildType=apk (ver eas.json).
+# Requiere el secret EXPO_TOKEN en Settings → Secrets → Actions del repo.
+on:
+  pull_request:
+    branches: [main]
+  # Permite disparar el build manualmente desde la pestaña Actions.
+  workflow_dispatch:
+
+# Un preview build por PR: si se pushea de nuevo, cancelamos el anterior
+# (es solo un encolado con --no-wait, así no acumulamos builds viejos).
+concurrency:
+  group: eas-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+# github-script necesita permiso de escritura para comentar en el PR.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-preview:
+    name: EAS Build · Android APK (preview)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      # npm ci = install reproducible desde package-lock.json.
+      - name: Install dependencies
+        run: npm ci
+
+      # Instala expo + eas-cli y autentica con el token de la cuenta de Expo.
+      - name: Setup Expo and EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Encola el build de Android en el perfil preview (.apk), sin prompts y
+      # sin bloquear el job. Capturamos la salida para extraer el link del build.
+      - name: Build Android APK (preview)
+        id: build
+        run: |
+          set -o pipefail
+          OUTPUT=$(eas build --platform android --profile preview --non-interactive --no-wait 2>&1 | tee /dev/stderr)
+          URL=$(echo "$OUTPUT" | grep -Eo 'https://expo\.dev/[^[:space:]]*builds/[a-z0-9-]+' | head -n1)
+          echo "build_url=$URL" >> "$GITHUB_OUTPUT"
+
+      # Deja (o actualiza) un comentario en el PR con el link al build de EAS,
+      # para que el equipo descargue el .apk sin abrir GitHub Actions.
+      - name: Comment build link on PR
+        if: github.event_name == 'pull_request' && steps.build.outputs.build_url != ''
+        uses: actions/github-script@v7
+        env:
+          BUILD_URL: ${{ steps.build.outputs.build_url }}
+        with:
+          script: |
+            const marker = '<!-- eas-preview-build -->';
+            const body = [
+              marker,
+              '### 📱 Build de Preview (APK) listo para testing',
+              '',
+              `El binario se está compilando en EAS. Descargalo desde el panel del build:`,
+              '',
+              `🔗 **[Ver build / descargar .apk](${process.env.BUILD_URL})**`,
+              '',
+              '_Perfil `preview` · Android · distribución interna. No afecta la versión de producción._',
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            // Buscamos un comentario previo del bot para actualizarlo en vez de duplicar.
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.data.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
