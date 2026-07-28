@@ -5,11 +5,48 @@ interface Props {
   onCreateTeam: () => void;
   onJoinTeam: () => void;
   onGoToMarket: () => void;
+  /** Solicitudes ya aprobadas por un equipo que esperan que el jugador confirme. */
+  pendingTransfers?: number;
+  onConfirmTransfer?: () => void;
 }
 
-export function HomeOnboardingState({ onCreateTeam, onJoinTeam, onGoToMarket }: Props) {
+export function HomeOnboardingState({
+  onCreateTeam,
+  onJoinTeam,
+  onGoToMarket,
+  pendingTransfers = 0,
+  onConfirmTransfer,
+}: Props) {
+  const hasPendingTransfer = pendingTransfers > 0 && !!onConfirmTransfer;
+
   return (
     <View className="flex-1 items-center justify-center px-6">
+      {/* Un equipo ya te aceptó y falta un paso tuyo: es lo primero que tenés que
+          ver. Sin esto, la confirmación del traspaso vivía enterrada en
+          Perfil → Solicitudes y el jugador no se enteraba de que existía. */}
+      {hasPendingTransfer && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={onConfirmTransfer}
+          className="mb-8 w-full rounded-2xl border border-brand-primary bg-brand-primary/10 p-4"
+        >
+          <View className="flex-row items-center gap-3">
+            <AppIcon family="material-community" name="check-decagram" size={26} color="#53E076" />
+            <View className="flex-1">
+              <Text className="font-uiBold text-base text-brand-primary">
+                {pendingTransfers === 1
+                  ? '¡Un equipo te aceptó!'
+                  : `${pendingTransfers} equipos te aceptaron`}
+              </Text>
+              <Text className="font-ui mt-0.5 text-xs leading-4 text-neutral-on-surface-variant">
+                Confirmá el traspaso para entrar al plantel.
+              </Text>
+            </View>
+            <AppIcon family="material-community" name="chevron-right" size={22} color="#53E076" />
+          </View>
+        </TouchableOpacity>
+      )}
+
       {/* Ball icon */}
       <View className="mb-6 h-20 w-20 items-center justify-center rounded-full bg-surface-container">
         <AppIcon family="material-community" name="soccer" size={44} color="#53E076" />

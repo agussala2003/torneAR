@@ -43,6 +43,16 @@ export function useMatchRealtime(matchId: string | undefined, onChange: () => vo
         { event: '*', schema: 'public', table: 'match_results', filter: `match_id=eq.${matchId}` },
         () => onChangeRef.current(),
       )
+      // Propuestas: alta, contrapropuesta, aceptación, rechazo y cancelación.
+      // Una propuesta nueva NO toca `matches` (el partido sigue PENDIENTE hasta
+      // que alguien acepta), así que sin esto el rival veía "Sin propuesta
+      // activa" con una propuesta esperándolo. Requiere la migración
+      // 20260728130000, que publica la tabla en supabase_realtime.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'match_proposals', filter: `match_id=eq.${matchId}` },
+        () => onChangeRef.current(),
+      )
       .subscribe();
 
     return () => {

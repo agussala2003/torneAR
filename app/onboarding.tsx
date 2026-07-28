@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { HeroButton } from '@/components/ui/HeroButton';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { PitchSelector } from '@/components/ui/PitchSelector';
@@ -51,7 +51,6 @@ export default function OnboardingScreen() {
     control,
     handleSubmit,
     trigger,
-    watch,
     setValue,
     formState: { errors },
   } = useForm<UserProfileFormData>({
@@ -68,9 +67,12 @@ export default function OnboardingScreen() {
     },
   });
 
-  const selectedZone = watch('zone');
-  const selectedPosition = watch('position');
-  const selectedFavoriteTeam = watch('favoriteTeam');
+  // useWatch por consistencia con /profile-edit: suscripcion por componente, sin
+  // depender del Set global `_names.watch`. Detalle del bug en
+  // components/profile/ProfileFormFields.tsx.
+  const selectedZone = useWatch({ control, name: 'zone' });
+  const selectedPosition = useWatch({ control, name: 'position' });
+  const selectedFavoriteTeam = useWatch({ control, name: 'favoriteTeam' });
 
   const handleNextStep = async () => {
     if (step === 1) {
@@ -264,7 +266,6 @@ export default function OnboardingScreen() {
                 control={control}
                 errors={errors}
                 setValue={setValue}
-                watch={watch}
                 onOpenFavoriteTeamPicker={() => setShowFavoriteTeamPicker(true)}
               />
             </View>

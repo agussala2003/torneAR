@@ -361,11 +361,38 @@ export async function transferCaptain(teamId: string, toProfileId: string): Prom
 
 // Elimina el equipo completo. Solo debe llamarse cuando el capitán es el último miembro.
 // team_members tiene ON DELETE CASCADE, por lo que se eliminan todos los registros relacionados.
+//
+// ⚠️ El `.select()` no es decorativo: verifica FILAS AFECTADAS.
+// Un DELETE que RLS filtra no es un error en Postgres — simplemente no matchea
+// ninguna fila, y PostgREST responde 204 sin `error`. Mirando sólo `error`, el
+// cliente cantaba "Equipo eliminado correctamente" mientras el equipo seguía
+// vivo (faltaba la policy de DELETE sobre `teams`; ver la migración
+// 20260727160000). Con el select, 0 filas devueltas = fallo explícito.
 export async function deleteTeam(teamId: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('teams')
     .delete()
-    .eq('id', teamId);
+    .eq('id', teamId)
+    .select('id');
 
-  if (error) throw error;
+  if (error) {
+    // 23503 = foreign_key_violation. Los FKs de historial deportivo (matches,
+    // match_results, wo_claims, …) son NO ACTION a propósito: cascadearlos
+    // borraría partidos que también le pertenecen al equipo rival. Que no se
+    // pueda eliminar es correcto; lo que no servía era el error crudo.
+    if ((error as { code?: string }).code === '23503') {
+      throw new Error(
+        'Este equipo tiene historial deportivo (partidos, resultados o reclamos) y no se puede eliminar. ' +
+        'Podés dejarlo inactivo sin borrarlo.',
+      );
+    }
+    throw error;
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error(
+      'No se pudo eliminar el equipo: la base rechazó la operación. ' +
+      'Verificá que seas el capitán y el único miembro.',
+    );
+  }
 }

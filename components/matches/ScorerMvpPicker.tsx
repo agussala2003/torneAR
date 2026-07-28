@@ -83,9 +83,13 @@ export function ScorerMvpPicker({
             {/* shrink-0: el stepper de goles no puede perder ancho por un
                 nombre largo, o los botones +/- quedan inutilizables. */}
             <View className="shrink-0 flex-row items-center gap-3">
+              {/* El pill visual mide 28x28 para no romper la densidad de la lista;
+                  hitSlop de 8 lleva el area tactil a 44x44 sin tocar el layout.
+                  Los botones estan a 44px entre si, asi que los hitSlop no se pisan. */}
               <TouchableOpacity
                 onPress={() => decrement(p.profileId)}
                 activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 className="h-7 w-7 items-center justify-center rounded-full bg-surface-container"
               >
                 <AppIcon family="material-community" name="minus" size={14} color="#BCCBB9" />
@@ -97,6 +101,7 @@ export function ScorerMvpPicker({
                 onPress={() => increment(p.profileId)}
                 disabled={capReached}
                 activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 className={`h-7 w-7 items-center justify-center rounded-full ${
                   capReached ? 'bg-brand-primary/40' : 'bg-brand-primary'
                 }`}
@@ -118,6 +123,9 @@ export function ScorerMvpPicker({
             key={p.profileId}
             onPress={() => onMvpChange(mvpId === p.profileId ? null : p.profileId)}
             activeOpacity={0.8}
+            // El chip mide ~36px de alto; +4 arriba y abajo lo lleva a 44. No se
+            // extiende en horizontal para no solaparse con el chip vecino (gap-2).
+            hitSlop={{ top: 4, bottom: 4 }}
             // max-w-full: el chip nunca excede el ancho de la fila; el nombre
             // se trunca dentro del chip en vez de estirarlo fuera del modal.
             className={`max-w-full rounded-xl px-3 py-2 ${

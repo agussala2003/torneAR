@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -43,7 +51,12 @@ export function ConfirmDialog({
   const confirmBg = confirmTone === 'danger' ? 'bg-danger-error' : 'bg-brand-primary';
 
   return (
-    <View className="absolute inset-0 z-[999] items-center justify-center bg-black/80 p-6">
+    // Con `showNotesInput`, el teclado tapaba el textarea y los botones
+    // Confirmar/Cancelar: la card esta centrada y no scrollea.
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      className="absolute inset-0 z-[999] items-center justify-center bg-black/80 p-6"
+    >
       <TouchableWithoutFeedback onPress={loading ? undefined : onCancel}>
         <View className="absolute inset-0" />
       </TouchableWithoutFeedback>
@@ -85,6 +98,6 @@ export function ConfirmDialog({
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

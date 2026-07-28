@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View, TouchableOpacity } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -19,6 +19,10 @@ import { RankingRowSkeleton } from '@/components/ranking/RankingRowSkeleton';
 import { RivalSearchBar } from '@/components/ranking/RivalSearchBar';
 import { RivalTeamCard } from '@/components/ranking/RivalTeamCard';
 import { PlayerLeaderboard } from '@/components/ranking/PlayerLeaderboard';
+
+// Ventana de espera antes de pegarle a la BD mientras el usuario tipea. Un nombre
+// de 12 caracteres pasaba de 12 requests a 1.
+const SEARCH_DEBOUNCE_MS = 300;
 
 // Helper para parsear la categoría para el texto
 const getCategoryLabel = (cat: string | null) => {
@@ -54,107 +58,212 @@ export default function RankingScreen() {
   const [leaderboardEntries, setLeaderboardEntries] = useState<PlayerLeaderboardEntry[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
-  const userTeamIds = myTeams.map(t => t.id);
+  // `bootstrapped` habilita los efectos de datos: evita que corran con los filtros
+  // vacios del primer render, antes de conocer los del equipo activo.
+  const [bootstrapped, setBootstrapped] = useState(false);
+  // Token de refresco. El focus effect lo incrementa para recargar datos SIN
+  // tocar los filtros elegidos por el usuario.
+  const [refreshToken, setRefreshToken] = useState(0);
+  // Equipo cuyos filtros por defecto ya aplicamos. Es el guard que impide que un
+  // re-render vuelva a pisar la seleccion del usuario.
+  const bootstrappedTeamRef = useRef<string | null>(null);
+  const isFirstFocus = useRef(true);
+  // Id incremental de request de busqueda. Solo la respuesta cuyo id coincide con
+  // el ultimo emitido puede escribir en el estado.
+  const searchRequestRef = useRef(0);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const activeRole = myTeams.find(t => t.id === activeTeamId)?.role;
   const canChallenge = activeRole === 'CAPITAN' || activeRole === 'SUBCAPITAN';
 
-  const loadInitialData = useCallback(async () => {
+  // ── 1) Bootstrap: temporada, zonas, ELO y filtros por defecto del equipo ─────
+  // Corre UNA sola vez por `activeTeamId`. Es el unico punto que llama a
+  // setFilters() de forma automatica; cualquier otra escritura nace de una accion
+  // explicita del usuario. Antes esto vivia dentro de la misma funcion que cargaba
+  // los datos y se re-ejecutaba en cada focus, revirtiendo los filtros aplicados.
+  useEffect(() => {
     if (!profile) return;
-    try {
-      setLoading(true);
 
-      // Cargamos la temporada activa y las zonas activas en paralelo
-      const [activeSeasonData, zones] = await Promise.all([
-        fetchActiveSeason(),
-        fetchActiveZoneNames(),
-      ]);
+    const teamKey = activeTeamId ?? '__sin-equipo__';
+    if (bootstrappedTeamRef.current === teamKey) return;
+    bootstrappedTeamRef.current = teamKey;
 
-      setActiveSeason(activeSeasonData);
-      setAvailableZones(zones);
+    let cancelled = false;
+    setBootstrapped(false);
 
-      // Compute teamIds here to avoid a stale-closure / unstable-array dep
-      const teamIds = myTeams.map(t => t.id);
-
-      let elo = null;
-      let initialFilters: RankingFiltersState = { zone: null, category: null, format: null, rivalesIdeales: false };
-      if (activeTeamId) {
-        const team = await fetchActiveTeamRankingInfo(activeTeamId);
-        if (team) {
-          elo = team.eloRating;
-          setActiveTeamElo(elo);
-          initialFilters = { zone: team.zone, category: team.category, format: team.format, rivalesIdeales: false };
-          setFilters(initialFilters);
-        }
-      }
-
-      const activeTeamName = myTeams.find(t => t.id === activeTeamId)?.name ?? null;
-      const [ranking, players] = await Promise.all([
-        fetchRankingWithFilters(initialFilters, teamIds, elo),
-        fetchPlayerLeaderboard('goals', initialFilters.zone, activeSeasonData?.id || null, {
-          profileId: profile.id, fullName: profile.full_name, avatarUrl: profile.avatar_url ?? null,
-          teamId: activeTeamId ?? null, teamName: activeTeamName,
-        })
-      ]);
-      setRankingEntries(ranking);
-      setLeaderboardEntries(players);
-
-    } catch (error: any) {
-      showAlert('Error', error.message || 'No se pudo cargar el ranking.');
-    } finally {
-      setLoading(false);
-    }
-  }, [profile, activeTeamId, showAlert, myTeams]);
-
-  useFocusEffect(useCallback(() => { loadInitialData(); }, [loadInitialData]));
-
-  async function handleApplyFilters(newFilters: RankingFiltersState) {
-    setFilters(newFilters);
-    if (mode === 'RANKING') {
+    void (async () => {
       try {
         setLoading(true);
-        const ranking = await fetchRankingWithFilters(newFilters, userTeamIds, activeTeamElo);
-        setRankingEntries(ranking);
+        const [season, zones] = await Promise.all([
+          fetchActiveSeason(),
+          fetchActiveZoneNames(),
+        ]);
+        if (cancelled) return;
 
+        setActiveSeason(season);
+        setAvailableZones(zones);
+
+        let elo: number | null = null;
+        let defaults: RankingFiltersState = { zone: null, category: null, format: null, rivalesIdeales: false };
+
+        if (activeTeamId) {
+          const team = await fetchActiveTeamRankingInfo(activeTeamId);
+          if (cancelled) return;
+          if (team) {
+            elo = team.eloRating;
+            defaults = { zone: team.zone, category: team.category, format: team.format, rivalesIdeales: false };
+          }
+        }
+
+        setActiveTeamElo(elo);
+        setFilters(defaults);
+        setBootstrapped(true);
+      } catch (error: any) {
+        if (cancelled) return;
+        // Liberamos el guard para poder reintentar en el proximo focus.
+        bootstrappedTeamRef.current = null;
+        setLoading(false);
+        showAlert('Error', error?.message || 'No se pudo cargar el ranking.');
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [profile, activeTeamId, refreshToken, showAlert]);
+
+  // ── 2) Tabla de ranking: sigue a los filtros ─────────────────────────────────
+  useEffect(() => {
+    if (!bootstrapped) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        setLoading(true);
+        // `myTeams` se lee del store bajo demanda en lugar de declararlo como
+        // dependencia: fetchMyTeams devuelve un array nuevo en cada llamada, asi
+        // que tenerlo en deps re-disparaba esta carga aunque los equipos fueran
+        // exactamente los mismos.
+        const teamIds = useTeamStore.getState().myTeams.map(t => t.id);
+        const ranking = await fetchRankingWithFilters(filters, teamIds, activeTeamElo);
+        if (cancelled) return;
+        setRankingEntries(ranking);
+      } catch (error: any) {
+        if (!cancelled) showAlert('Error', error?.message || 'No se pudo cargar el ranking.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [bootstrapped, filters, activeTeamElo, refreshToken, showAlert]);
+
+  // ── 3) Leaderboard de jugadores: sigue a la zona y al stat elegido ───────────
+  useEffect(() => {
+    if (!bootstrapped || !profile) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
         setLeaderboardLoading(true);
-        const activeTeamName = myTeams.find(t => t.id === activeTeamId)?.name ?? null;
-        const players = await fetchPlayerLeaderboard(leaderboardStat, newFilters.zone, activeSeason?.id || null, profile ? { profileId: profile.id, fullName: profile.full_name, avatarUrl: profile.avatar_url ?? null, teamId: activeTeamId ?? null, teamName: activeTeamName } : undefined);
+        const activeTeamName = useTeamStore.getState().myTeams.find(t => t.id === activeTeamId)?.name ?? null;
+        const players = await fetchPlayerLeaderboard(
+          leaderboardStat,
+          filters.zone,
+          activeSeason?.id ?? null,
+          {
+            profileId: profile.id,
+            fullName: profile.full_name,
+            avatarUrl: profile.avatar_url ?? null,
+            teamId: activeTeamId ?? null,
+            teamName: activeTeamName,
+          },
+        );
+        if (cancelled) return;
         setLeaderboardEntries(players);
       } catch (error: any) {
-        showAlert('Error', error.message || 'Error al aplicar filtros.');
+        if (!cancelled) showAlert('Error', error?.message || 'Error al cargar jugadores.');
       } finally {
-        setLoading(false);
-        setLeaderboardLoading(false);
+        if (!cancelled) setLeaderboardLoading(false);
       }
-    } else {
-      handleSearch(searchQuery, newFilters);
-    }
-  }
+    })();
 
-  async function handleSearch(query: string, currentFilters = filters) {
+    return () => { cancelled = true; };
+  }, [bootstrapped, profile, activeTeamId, filters.zone, leaderboardStat, activeSeason?.id, refreshToken, showAlert]);
+
+  // ── 4) Refresco al volver a la pantalla ──────────────────────────────────────
+  // La callback tiene deps vacias a proposito: useFocusEffect se re-ejecuta cuando
+  // cambia su identidad, no solo al cambiar el foco. Con una callback inestable
+  // corria en cada render y arrastraba consigo el reseteo de filtros.
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        isFirstFocus.current = false;
+        return; // el bootstrap ya se encarga de la carga inicial
+      }
+      setRefreshToken((token) => token + 1);
+    }, []),
+  );
+
+  // ── 5) Busqueda de rivales ───────────────────────────────────────────────────
+  // Cada llamada toma un id incremental. Al volver la respuesta, si el id ya no
+  // es el ultimo emitido significa que el usuario siguio escribiendo (o cambio
+  // los filtros) y esa respuesta quedo obsoleta: se descarta en silencio. Sin
+  // esto, la respuesta lenta de "Bo" podia llegar despues de la de "Boca" y
+  // dejar en pantalla resultados que no correspondian al texto del input.
+  const runSearch = useCallback(
+    async (query: string, currentFilters: RankingFiltersState) => {
+      const requestId = ++searchRequestRef.current;
+      const isStale = () => requestId !== searchRequestRef.current;
+
+      try {
+        setSearchLoading(true);
+        const teamIds = useTeamStore.getState().myTeams.map(t => t.id);
+        const results = await searchRivalTeams(query, currentFilters, teamIds, activeTeamElo);
+        if (isStale()) return;
+        setSearchResults(results);
+      } catch (error: any) {
+        if (isStale()) return;
+        showAlert('Error', error?.message || 'Error en la búsqueda.');
+      } finally {
+        // Solo la request vigente puede apagar el spinner: si lo hiciera una vieja,
+        // la UI diria "listo" mientras la busqueda actual sigue en vuelo.
+        if (!isStale()) setSearchLoading(false);
+      }
+    },
+    [activeTeamElo, showAlert],
+  );
+
+  function handleSearchQueryChange(query: string) {
+    // El input se actualiza al instante; la red espera al debounce.
     setSearchQuery(query);
-    try {
-      setSearchLoading(true);
-      const results = await searchRivalTeams(query, currentFilters, userTeamIds, activeTeamElo);
-      setSearchResults(results);
-    } catch (error: any) {
-      showAlert('Error', error.message || 'Error en la búsqueda.');
-    } finally {
-      setSearchLoading(false);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    setSearchLoading(true); // feedback inmediato mientras corre la ventana
+    searchDebounceRef.current = setTimeout(() => {
+      void runSearch(query, filters);
+    }, SEARCH_DEBOUNCE_MS);
+  }
+
+  // Timer pendiente al desmontar: sin esto quedaria un setState sobre una
+  // pantalla que ya no existe.
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
+
+  function handleApplyFilters(newFilters: RankingFiltersState) {
+    // Solo movemos el estado: los efectos 2 y 3 reaccionan y recargan.
+    setFilters(newFilters);
+    if (mode === 'RIVALES') {
+      // Aplicar filtros es una accion explicita: no la hacemos esperar el
+      // debounce, y cancelamos el que hubiera pendiente del tipeo.
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      void runSearch(searchQuery, newFilters);
     }
   }
 
-  async function handleStatChange(stat: LeaderboardStat) {
+  function handleStatChange(stat: LeaderboardStat) {
+    // El efecto 3 recarga el leaderboard al cambiar `leaderboardStat`.
     setLeaderboardStat(stat);
-    try {
-      setLeaderboardLoading(true);
-      const activeTeamName = myTeams.find(t => t.id === activeTeamId)?.name ?? null;
-      const players = await fetchPlayerLeaderboard(stat, filters.zone, activeSeason?.id || null, profile ? { profileId: profile.id, fullName: profile.full_name, avatarUrl: profile.avatar_url ?? null, teamId: activeTeamId ?? null, teamName: activeTeamName } : undefined);
-      setLeaderboardEntries(players);
-    } catch (error: any) {
-      showAlert('Error', error.message || 'Error al cargar jugadores.');
-    } finally {
-      setLeaderboardLoading(false);
-    }
   }
 
   // Saber si hay filtros activos para prender el icono
@@ -239,7 +348,12 @@ export default function RankingScreen() {
               Array.from({ length: 6 }).map((_, i) => <RankingRowSkeleton key={i} />)
             ) : (
               <>
-                <RankingTable entries={rankingEntries} onTeamPress={(id: string) => router.push({ pathname: '/team-stats', params: { teamId: id, viewerTeamId: activeTeamId || '' } })} />
+                <RankingTable
+                  entries={rankingEntries}
+                  onTeamPress={(id: string) => router.push({ pathname: '/team-stats', params: { teamId: id, viewerTeamId: activeTeamId || '' } })}
+                  hasActiveFilters={hasActiveFilters}
+                  onClearFilters={() => handleApplyFilters({ zone: null, category: null, format: null, rivalesIdeales: false })}
+                />
                 <PlayerLeaderboard entries={leaderboardEntries} activeStat={leaderboardStat} onStatChange={handleStatChange} loading={leaderboardLoading} />
               </>
             )}
@@ -249,7 +363,7 @@ export default function RankingScreen() {
         {/* MODO RIVALES */}
         {mode === 'RIVALES' && (
           <>
-            <RivalSearchBar value={searchQuery} onChangeText={(q) => handleSearch(q, filters)} />
+            <RivalSearchBar value={searchQuery} onChangeText={handleSearchQueryChange} />
 
             {searchLoading ? (
               <View className="mt-2">

@@ -4,7 +4,7 @@ import { useFonts } from 'expo-font';
 import { Inter_500Medium, Inter_700Bold, Inter_900Black } from '@expo-google-fonts/inter';
 import { BarlowCondensed_700Bold, BarlowCondensed_800ExtraBold } from '@expo-google-fonts/barlow-condensed';
 import { Epilogue_700Bold } from '@expo-google-fonts/epilogue';
-import { DarkTheme, DefaultTheme, ThemeProvider, Theme } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider, Theme } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
@@ -13,8 +13,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { AppIntroSplash } from '@/components/AppIntroSplash';
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isProfileComplete } from '@/lib/auth-utils';
 import { deepLinkToHref, resolveDeepLink } from '@/lib/deep-linking';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
@@ -32,6 +30,27 @@ void SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
   anchor: '(tabs)',
+};
+
+/**
+ * torneAR es dark-only.
+ *
+ * No existe un solo estilo con variantes `dark:` / `light:` en la app: todos los
+ * tokens de color son oscuros e incondicionales. Por eso el tema de navegacion es
+ * una constante de modulo y no deriva de ningun estado — antes se hidrataba desde
+ * `AsyncStorage('app-theme')`, y un valor 'light' persistido dejaba la navegacion
+ * en tema claro sin ninguna UI para revertirlo.
+ */
+const navigationTheme: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: Colors.dark.background,
+    card: Colors.dark.card,
+    border: Colors.dark.border,
+    text: Colors.dark.text,
+    primary: Colors.dark.tint,
+  },
 };
 
 function RootNavigation() {
@@ -156,7 +175,6 @@ function RootNavigation() {
 }
 
 export default function RootLayout() {
-  const { colorScheme, setColorScheme } = useColorScheme();
   const [fontsLoaded] = useFonts({
     Inter_500Medium,
     Inter_700Bold,
@@ -166,47 +184,9 @@ export default function RootLayout() {
     Epilogue_700Bold,
   });
 
-  useEffect(() => {
-    async function loadTheme() {
-      try {
-        const savedTheme = await AsyncStorage.getItem('app-theme');
-        if (savedTheme) {
-          setColorScheme(savedTheme as any);
-        }
-      } catch {
-        // Ignored
-      }
-    }
-    void loadTheme();
-  }, [setColorScheme]);
-
   if (!fontsLoaded) {
     return null;
   }
-
-  const navigationTheme: Theme = colorScheme === 'dark'
-    ? {
-      ...DarkTheme,
-      colors: {
-        ...DarkTheme.colors,
-        background: Colors.dark.background,
-        card: Colors.dark.card,
-        border: Colors.dark.border,
-        text: Colors.dark.text,
-        primary: Colors.dark.tint,
-      },
-    }
-    : {
-      ...DefaultTheme,
-      colors: {
-        ...DefaultTheme.colors,
-        background: Colors.light.background,
-        card: Colors.light.card,
-        border: Colors.light.border,
-        text: Colors.light.text,
-        primary: Colors.light.tint,
-      },
-    };
 
   return (
     <ThemeProvider value={navigationTheme}>

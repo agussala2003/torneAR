@@ -121,7 +121,7 @@ export function TeamRequestsList({
                 </TouchableOpacity>
                 <Text className="font-ui mt-2 text-center text-[11px] text-neutral-on-surface-variant">
                   {hasCurrentTeam
-                    ? 'Al confirmar dejarás tu equipo actual y se registrará como transferencia.'
+                    ? 'Vas a poder elegir si dejás alguno de tus equipos o te sumás sin dejar ninguno.'
                     : 'Al confirmar te unirás al equipo.'}
                 </Text>
               </View>

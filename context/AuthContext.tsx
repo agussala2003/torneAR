@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/supabase';
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const syncVersionRef = useRef(0);
   const authUserIdRef = useRef<string | null>(null);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -60,16 +60,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error fetching profile', e);
       return null;
     }
-  };
+  }, []);
 
-  const refreshProfile = async () => {
-    if (user?.id) {
-      const nextProfile = await fetchProfile(user.id);
-      setProfile(nextProfile);
-    }
-  };
+  /*
+   * Lee el id del usuario del ref y no del estado `user`.
+   *
+   * Con `user?.id` como dependencia, `refreshProfile` cambiaba de identidad en
+   * cada login/logout y contaminaba las deps de quien lo consumiera — por
+   * ejemplo el `onSubmit` de app/profile-edit.tsx, que nunca llegaba a
+   * estabilizarse. `authUserIdRef` ya se mantiene sincronizado en syncAuthState
+   * con exactamente el mismo valor, asi que esta version es 100% estable.
+   */
+  const refreshProfile = useCallback(async () => {
+    const userId = authUserIdRef.current;
+    if (!userId) return;
 
-  const syncAuthState = async (nextSession: Session | null) => {
+    const nextProfile = await fetchProfile(userId);
+    setProfile(nextProfile);
+  }, [fetchProfile]);
+
+  const syncAuthState = useCallback(async (nextSession: Session | null) => {
     const syncVersion = ++syncVersionRef.current;
     const previousUserId = authUserIdRef.current;
     const nextUserId = nextSession?.user?.id ?? null;
@@ -100,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       setHydrated(true);
     }
-  };
+  }, [fetchProfile]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -116,15 +126,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
+    // `syncAuthState` es estable (useCallback sobre `fetchProfile`, que a su vez
+    // no depende de nada), asi que la suscripcion sigue montandose una sola vez.
+    // Declararla explicitamente satisface exhaustive-deps sin silenciar la regla.
+  }, [syncAuthState]);
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  return (
-    <AuthContext.Provider value={{ session, user, profile, loading, hydrated, signOut, refreshProfile }}>
-      {children}
-    </AuthContext.Provider>
+  /*
+   * Sin este useMemo, el objeto literal creaba una identidad nueva en cada render
+   * del provider y React re-renderizaba TODO consumidor de useAuth() — mas de 20
+   * archivos — aunque solo hubiera cambiado `loading`. Ahora el value solo cambia
+   * cuando cambia alguno de los datos que expone; las tres funciones son estables.
+   */
+  const value = useMemo(
+    () => ({ session, user, profile, loading, hydrated, signOut, refreshProfile }),
+    [session, user, profile, loading, hydrated, signOut, refreshProfile],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { ScorerMvpPicker } from '@/components/matches/ScorerMvpPicker';
 import type { MatchResultFormData, ScorerPickerPerson } from '@/components/matches/types';
 
@@ -34,9 +35,12 @@ function Stepper({
         {label}
       </Text>
       <View className="flex-row items-center gap-4">
+        {/* 36x36 visual + hitSlop 4 = 44x44 tactil. No se agranda el pill porque
+            las dos tarjetas de stepper ya ocupan el ancho completo del modal. */}
         <TouchableOpacity
           onPress={() => onChange(Math.max(0, value - 1))}
           activeOpacity={0.7}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           className="h-9 w-9 items-center justify-center rounded-full bg-surface-container"
         >
           <AppIcon family="material-community" name="minus" size={18} color="#BCCBB9" />
@@ -47,6 +51,7 @@ function Stepper({
         <TouchableOpacity
           onPress={() => onChange(value + 1)}
           activeOpacity={0.7}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
           className="h-9 w-9 items-center justify-center rounded-full bg-brand-primary"
         >
           <AppIcon family="material-community" name="plus" size={18} color="#003914" />
@@ -111,10 +116,15 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
         mvpProfileId: mvpId,
       });
       onClose();
-    } catch {
-      // El caller ya mostró el alert correspondiente. Liberamos el guard para
-      // que el usuario pueda corregir y reintentar sin cerrar el modal.
+    } catch (err) {
+      // El modal queda abierto para que el usuario corrija sin recargar todo, asi
+      // que el error tiene que mostrarse ACA: el alert de match-detail vive fuera
+      // de este <Modal> nativo y quedaria detras, invisible.
       submittingRef.current = false;
+      showAlert(
+        'No se pudo cargar el resultado',
+        getGenericSupabaseErrorMessage(err, 'No pudimos guardar el resultado. Intenta de nuevo.'),
+      );
     } finally {
       setLoading(false);
     }
@@ -127,7 +137,11 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 py-4">
             <Text className="font-uiBold text-lg text-neutral-on-surface">Cargar resultado</Text>
-            <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={onClose}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
               <AppIcon family="material-community" name="close" size={22} color="#869585" />
             </TouchableOpacity>
           </View>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { BadgeItem } from './types';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type ProfileBadgesSectionProps = {
   badges: BadgeItem[];
@@ -31,8 +32,13 @@ export function ProfileBadgesSection({ badges }: ProfileBadgesSectionProps) {
       </View>
 
       {badges.length === 0 ? (
-        <View className="rounded-xl border border-dashed border-neutral-outline-variant/15 bg-surface-high px-4 py-3">
-          <Text className="text-xs text-neutral-on-surface-variant">Aun no hay insignias disponibles.</Text>
+        <View className="rounded-xl border border-dashed border-neutral-outline-variant/15 bg-surface-high">
+          <EmptyState
+            compact
+            icon="medal-outline"
+            title="Sin insignias"
+            description="Todavía no hay insignias disponibles. Jugá partidos oficiales y completá desafíos para empezar a desbloquearlas."
+          />
         </View>
       ) : (
         <ScrollView

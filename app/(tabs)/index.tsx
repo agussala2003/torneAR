@@ -2,8 +2,8 @@ import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { GlobalLoader } from '@/components/GlobalLoader';
 import { GlobalHeader } from '@/components/GlobalHeader';
+import { HomeSkeleton } from '@/components/home/HomeSkeleton';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchHomeViewData } from '@/lib/home-data';
@@ -94,22 +94,26 @@ export default function HomeScreen() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  if (loading) {
-    return <GlobalLoader label="Cargando inicio" />;
-  }
-
+  // Solo la PRIMERA carga muestra esqueleto. En los refrescos por foco el
+  // contenido anterior sigue en pantalla y se actualiza en silencio: antes cada
+  // regreso a la tab borraba todo y mostraba un loader a pantalla completa.
+  const isInitialLoad = loading && !viewData;
   const hasNoTeams = !viewData || viewData.myTeams.length === 0;
 
   return (
     <View className="flex-1 bg-surface-base">
       <GlobalHeader />
 
-      {hasNoTeams ? (
+      {isInitialLoad ? (
+        <HomeSkeleton />
+      ) : hasNoTeams ? (
         // Full-screen onboarding CTA for users without any team
         <HomeOnboardingState
           onCreateTeam={handleCreateTeam}
           onJoinTeam={handleJoinTeam}
           onGoToMarket={handleGoToMarket}
+          pendingTransfers={viewData?.pendingTransfers ?? 0}
+          onConfirmTransfer={() => router.push('/team-requests')}
         />
       ) : (
         <ScrollView

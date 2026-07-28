@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import * as Location from 'expo-location';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { fetchCheckinViewData, submitTeamCheckin, getCheckinErrorMessage } from '@/lib/checkin-data';
+import { getCheckinLocation } from '@/lib/checkin-location';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { CheckinSquadCounters } from '@/components/matches/CheckinSquadCounters';
@@ -100,19 +100,17 @@ export default function MatchCheckinScreen() {
     try {
       setSubmitting(true);
 
-      // Geofence: misma exigencia que el check-in simple si hay cancha del catálogo
+      // Geofence: misma exigencia que el check-in simple si hay cancha del
+      // catálogo. Con venue, la RPC ahora RECHAZA la lista sin coordenadas
+      // (LOCATION_REQUIRED), así que no tiene sentido seguir sin ellas.
       let coords: { lat: number; lng: number } | undefined;
       if (viewData.venueId) {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          showAlert(
-            'Permiso requerido',
-            'Para presentar la lista necesitamos tu ubicación y verificar que estás en la cancha.',
-          );
+        const location = await getCheckinLocation();
+        if (!location.ok) {
+          showAlert('No pudimos validar tu ubicación', location.message);
           return;
         }
-        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+        coords = location.coords;
       }
 
       const players = Object.entries(lineup)

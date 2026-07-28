@@ -1,11 +1,26 @@
 import * as Haptics from 'expo-haptics';
 import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
 import { Colors } from '@/constants/theme';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { BlurView } from 'expo-blur';
 import { StyleSheet } from 'react-native';
+import { useAuth } from '@/context/AuthContext';
+import { useTeamStore } from '@/stores/teamStore';
 
 export default function TabLayout() {
+  const { profile } = useAuth();
+  const fetchMyTeams = useTeamStore((state) => state.fetchMyTeams);
+
+  // Punto unico de carga de los equipos del usuario. Este layout monta una sola
+  // vez para todo el grupo de tabs, asi que `myTeams` se pide una vez por sesion
+  // (o cuando cambia el perfil) en lugar de una vez por cada tab visitada.
+  useEffect(() => {
+    if (profile?.id) {
+      void fetchMyTeams(profile.id);
+    }
+  }, [profile?.id, fetchMyTeams]);
+
   return (
     <Tabs
       screenOptions={{

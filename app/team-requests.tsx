@@ -11,6 +11,7 @@ import { fetchTeamRequestsViewData } from '@/lib/team-requests-data';
 import { transferToTeam, getTeamActionErrorMessage } from '@/lib/team-manage-data';
 import { TeamRequestsViewData, TeamRequestRow } from '@/components/team-requests/types';
 import { TeamRequestsList } from '@/components/team-requests/TeamRequestsList';
+import { TransferOriginDialog } from '@/components/team-requests/TransferOriginDialog';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 
 export default function TeamRequestsScreen() {
@@ -23,6 +24,8 @@ export default function TeamRequestsScreen() {
   const [viewData, setViewData] = useState<TeamRequestsViewData | null>(null);
   const [filter, setFilter] = useState<'TODAS' | 'PENDIENTE' | 'ACEPTADA' | 'RECHAZADA'>('TODAS');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // Solicitud esperando que el jugador elija de qué club sale (o de ninguno).
+  const [requestPendingOrigin, setRequestPendingOrigin] = useState<TeamRequestRow | null>(null);
 
   const loadRequests = useCallback(async () => {
     if (!profile) {
@@ -48,26 +51,24 @@ export default function TeamRequestsScreen() {
 
   const memberTeamIds = useMemo(() => new Set(myTeams.map((t) => t.id)), [myTeams]);
 
-  const handleConfirmTransfer = useCallback(
-    async (request: TeamRequestRow) => {
+  // Ejecuta el traspaso con un origen YA elegido por el jugador.
+  // `fromTeamId === null` = alta sin cerrar ningún ciclo (sigue en sus equipos).
+  const runTransfer = useCallback(
+    async (request: TeamRequestRow, fromTeamId: string | null) => {
       if (!profile || confirmingId) return;
       setConfirmingId(request.id);
       try {
-        // Origen del traspaso: si el jugador pertenece a exactamente un equipo,
-        // ese ciclo se cierra como TRANSFERENCIA. Con 0 equipos entra como
-        // agente libre (null). Con más de uno NO adivinamos cuál dejar (cerraría
-        // el ciclo equivocado): entra sin cerrar ninguno y, si quiere salir de
-        // alguno, lo hace explícito con "Abandonar equipo".
-        const fromTeamId = myTeams.length === 1 ? myTeams[0].id : null;
-
         await transferToTeam(request.team_id, fromTeamId);
         await refreshProfile();
         await fetchMyTeams(profile.id);
         await loadRequests();
 
+        setRequestPendingOrigin(null);
         showAlert(
           '¡Traspaso confirmado!',
-          `Ya sos parte de ${request.teams?.name ?? 'tu nuevo equipo'}.`,
+          fromTeamId
+            ? `Ya sos parte de ${request.teams?.name ?? 'tu nuevo equipo'}. Tu ciclo anterior quedó registrado como transferencia.`
+            : `Ya sos parte de ${request.teams?.name ?? 'tu nuevo equipo'}.`,
         );
       } catch (error) {
         showAlert('No pudimos confirmar el traspaso', getTeamActionErrorMessage(error));
@@ -75,7 +76,25 @@ export default function TeamRequestsScreen() {
         setConfirmingId(null);
       }
     },
-    [profile, confirmingId, myTeams, refreshProfile, fetchMyTeams, loadRequests, showAlert],
+    [profile, confirmingId, refreshProfile, fetchMyTeams, loadRequests, showAlert],
+  );
+
+  // El origen del traspaso es una DECISIÓN del jugador, no una inferencia.
+  // La versión anterior hacía `myTeams.length === 1 ? myTeams[0].id : null`, así
+  // que a un capitán de un solo equipo le cerraba ese ciclo sin preguntarle y la
+  // RPC respondía CAPTAIN_MUST_TRANSFER: parecía que la app prohibía estar en dos
+  // equipos, cuando el schema siempre lo permitió (ver TransferOriginDialog).
+  const handleConfirmTransfer = useCallback(
+    (request: TeamRequestRow) => {
+      if (!profile || confirmingId) return;
+      // Sin equipos previos no hay nada que elegir: no hay ciclo que cerrar.
+      if (myTeams.length === 0) {
+        void runTransfer(request, null);
+        return;
+      }
+      setRequestPendingOrigin(request);
+    },
+    [profile, confirmingId, myTeams, runTransfer],
   );
 
   useFocusEffect(
@@ -143,6 +162,17 @@ export default function TeamRequestsScreen() {
           />
         </View>
       </ScrollView>
+
+      <TransferOriginDialog
+        visible={requestPendingOrigin !== null}
+        targetTeamName={requestPendingOrigin?.teams?.name ?? 'el nuevo equipo'}
+        teams={myTeams}
+        submitting={confirmingId !== null}
+        onCancel={() => setRequestPendingOrigin(null)}
+        onConfirm={(fromTeamId) => {
+          if (requestPendingOrigin) void runTransfer(requestPendingOrigin, fromTeamId);
+        }}
+      />
 
       {AlertComponent}
     </SafeAreaView>

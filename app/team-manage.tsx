@@ -6,8 +6,8 @@ import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
-import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { TeamManageSkeleton } from '@/components/team-manage/TeamManageSkeleton';
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -57,6 +57,11 @@ export default function TeamManageScreen() {
   const members = useMemo(() => viewData?.members ?? [], [viewData?.members]);
   const pendingRequests = useMemo(() => viewData?.pendingRequests ?? [], [viewData?.pendingRequests]);
   const historyRequests = useMemo(() => viewData?.historyRequests ?? [], [viewData?.historyRequests]);
+  // Permite distinguir "ACEPTADA y ya entró" de "ACEPTADA esperando al jugador".
+  const memberProfileIds = useMemo(
+    () => new Set(members.map((member) => member.profile_id)),
+    [members],
+  );
 
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [processingMemberId, setProcessingMemberId] = useState<string | null>(null);
@@ -234,7 +239,15 @@ export default function TeamManageScreen() {
       if (profile?.id) {
         await fetchMyTeams(profile.id);
       }
-      showAlert('Solicitud aprobada', 'El jugador fue agregado al plantel.');
+      // El alta NO ocurre acá: aceptar sólo habilita al jugador. El alta la
+      // dispara él mismo desde "Mis solicitudes" con transfer_to_team, que cierra
+      // su ciclo anterior como TRANSFERENCIA en vez de ABANDONO. El mensaje tiene
+      // que decir eso — antes afirmaba "El jugador fue agregado al plantel", que
+      // era falso y hacía parecer que el alta se había roto.
+      showAlert(
+        'Solicitud aprobada',
+        `Le avisamos a ${request.profiles?.full_name ?? 'el jugador'} que puede sumarse. Va a aparecer en el plantel cuando confirme el traspaso desde "Mis solicitudes".`,
+      );
     } catch (error) {
       showAlert('Error al aprobar', getGenericSupabaseErrorMessage(error, 'No se pudo aprobar la solicitud.'));
     } finally {
@@ -433,8 +446,8 @@ export default function TeamManageScreen() {
     }
   };
 
-  if (loading) {
-    return <GlobalLoader label="Cargando equipo" />;
+  if (loading && !team) {
+    return <TeamManageSkeleton />;
   }
 
   if (!team) {
@@ -518,7 +531,9 @@ export default function TeamManageScreen() {
           )}
         </View>
 
-        {canModerateRequests && <TeamManageHistoryRequests requests={historyRequests} />}
+        {canModerateRequests && (
+          <TeamManageHistoryRequests requests={historyRequests} memberProfileIds={memberProfileIds} />
+        )}
       </ScrollView>
 
       {/* MODALS */}

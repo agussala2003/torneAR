@@ -10,13 +10,19 @@ interface Props {
   onCancelProposal?: () => void;
 }
 
+// Mismo criterio que el Tile de MatchDetailsSection: el valor de "Lugar" es
+// "{complejo} — {dirección}" y necesita poder encoger para que trunque.
 function DetailTile({ label, value }: { label: string; value: string }) {
   return (
-    <View className="flex-1 rounded-xl bg-surface-high p-3">
+    <View className="flex-1 rounded-xl bg-surface-high p-3" style={{ minWidth: 0 }}>
       <Text className="font-ui mb-1 text-[10px] uppercase tracking-widest text-neutral-outline">
         {label}
       </Text>
-      <Text className="font-uiBold text-sm text-neutral-on-surface" numberOfLines={2}>
+      <Text
+        className="font-uiBold text-sm text-neutral-on-surface"
+        numberOfLines={2}
+        ellipsizeMode="tail"
+      >
         {value}
       </Text>
     </View>
@@ -42,11 +48,19 @@ export function ProposalSection({ proposal, myTeamId, onAccept, onReject, onCoun
 
   return (
     <View className="mt-4 rounded-2xl bg-surface-container p-4">
-      <View className="mb-3 flex-row items-center justify-between">
-        <Text className="font-uiBold text-base text-neutral-on-surface">Propuesta</Text>
-        <Text className="font-ui text-xs text-neutral-on-surface-variant">
-          por {proposal.proposedByName}
-        </Text>
+      {/* "por {nombre}" encoge y trunca: es el dato sacrificable de la fila.
+          El título "Propuesta" no cede ancho (shrink-0). */}
+      <View className="mb-3 flex-row items-center gap-2">
+        <Text className="font-uiBold shrink-0 text-base text-neutral-on-surface">Propuesta</Text>
+        <View className="flex-1" style={{ minWidth: 0 }}>
+          <Text
+            className="font-ui text-right text-xs text-neutral-on-surface-variant"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            por {proposal.proposedByName}
+          </Text>
+        </View>
       </View>
 
       {/* 2x2 detail grid */}

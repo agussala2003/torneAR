@@ -70,8 +70,27 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
     (r) => r.teams !== null,
   );
 
+  // Traspasos aprobados esperando confirmación del jugador. Se resuelve ANTES
+  // del corte por "no tiene equipos": el jugador recién aceptado no pertenece a
+  // ningún plantel todavía, así que si esto viviera más abajo nunca se
+  // calcularía justo para quien más lo necesita.
+  const myTeamIds = new Set(memberRows.map((r) => r.team_id));
+  const { data: acceptedRequests, error: acceptedError } = await supabase
+    .from('team_join_requests')
+    .select('team_id')
+    .eq('profile_id', profileId)
+    .eq('status', 'ACEPTADA');
+
+  if (acceptedError) throw acceptedError;
+
+  // Una solicitud ACEPTADA no se cierra al entrar: filtramos las de equipos en
+  // los que ya milita para no contar traspasos que en realidad ya se hicieron.
+  const pendingTransfers = (acceptedRequests ?? []).filter(
+    (r) => !myTeamIds.has(r.team_id),
+  ).length;
+
   if (memberRows.length === 0) {
-    return { myTeams: [], upcomingMatches: [], pendingActions: [] };
+    return { myTeams: [], upcomingMatches: [], pendingActions: [], pendingTransfers };
   }
 
   const teamIds = memberRows.map((r) => r.team_id);
@@ -228,5 +247,5 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
     role: r.role,
   }));
 
-  return { myTeams, upcomingMatches, pendingActions };
+  return { myTeams, upcomingMatches, pendingActions, pendingTransfers };
 }

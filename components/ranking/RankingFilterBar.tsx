@@ -41,7 +41,7 @@ export function RankingFilterBar({ filters, onOpenModal, onToggleIdeales, canUse
                     {filters.zone && <View className="rounded-lg bg-surface-container px-2 py-1"><Text className="font-uiBold text-[11px] text-neutral-on-surface-variant">{filters.zone}</Text></View>}
                     {filters.format && <View className="rounded-lg bg-surface-container px-2 py-1"><Text className="font-uiBold text-[11px] text-neutral-on-surface-variant">{filters.format}</Text></View>}
                     {filters.category && <View className="rounded-lg bg-surface-container px-2 py-1"><Text className="font-uiBold text-[11px] text-neutral-on-surface-variant">{filters.category}</Text></View>}
-                    {activeCount === 0 && <Text className="px-2 font-ui text-xs text-outline">Todos los equipos</Text>}
+                    {activeCount === 0 && <Text className="px-2 font-ui text-xs text-neutral-outline">Todos los equipos</Text>}
                 </View>
             </ScrollView>
 

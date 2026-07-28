@@ -8,12 +8,15 @@ import {
   TextInput,
   Platform,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import type { MatchProposalFormData } from '@/components/matches/types';
 import type { Database } from '@/types/supabase';
-import { fetchActiveZones, fetchVenuesByZone } from '@/lib/venue-data';
+import { fetchZonesWithVenues, fetchVenuesByZone } from '@/lib/venue-data';
 import type { ZoneEntry, VenueEntry } from '@/lib/venue-data';
 
 type TeamFormat = Database['public']['Enums']['team_format'];
@@ -47,19 +50,28 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
   const [totalCost, setTotalCost] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Zone + Venue
+  // Zone + Venue. La cancha SÓLO puede salir del catálogo `venues`: el campo de
+  // texto libre que había acá guardaba la dirección en `location` dejando
+  // `venue_id` en null, y el geofence del check-in arranca con
+  // `IF v_match.venue_id IS NOT NULL` — así que una dirección escrita a mano
+  // desactivaba la validación geoespacial sin ningún aviso.
   const [zones, setZones] = useState<ZoneEntry[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [venues, setVenues] = useState<VenueEntry[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<VenueEntry | null>(null);
   const [loadingVenues, setLoadingVenues] = useState(false);
-  const [freeTextLocation, setFreeTextLocation] = useState('');
   const [zonesLoaded, setZonesLoaded] = useState(false);
 
-  // Load zones once when modal opens
+  // Alert propio, renderizado DENTRO del <Modal> (ver abajo). Un <Modal> nativo se
+  // presenta en una ventana del sistema por encima de todo el arbol React, asi que
+  // un alert montado en la pantalla padre queda detras y el usuario no lo ve.
+  const { showAlert, AlertComponent } = useCustomAlert();
+
+  // Load zones once when modal opens. Sólo zonas con complejos cargados: elegir
+  // una zona vacía era un callejón sin salida (no hay texto libre de reemplazo).
   useEffect(() => {
     if (!visible || zonesLoaded) return;
-    fetchActiveZones()
+    fetchZonesWithVenues()
       .then(setZones)
       .catch(() => {})
       .finally(() => setZonesLoaded(true));
@@ -89,11 +101,11 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
     setTotalCost('');
     setSelectedZoneId(null);
     setSelectedVenue(null);
-    setFreeTextLocation('');
     onClose();
   }
 
   async function handleSubmit() {
+    if (loading || blockReason) return;
     setLoading(true);
     try {
       await onSubmit({
@@ -102,13 +114,22 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
         scheduledAt: scheduledDate,
         durationMinutes,
         venueId: selectedVenue?.id ?? null,
+        // `location` queda como denormalización para display; la fuente de verdad
+        // de la cancha es `venueId`, único dato que el geofence puede usar.
         location: selectedVenue
           ? [selectedVenue.name, selectedVenue.address].filter(Boolean).join(' — ')
-          : freeTextLocation.trim() || null,
+          : null,
         signalAmount: signalAmount ? parseFloat(signalAmount) : null,
         totalCost: totalCost ? parseFloat(totalCost) : null,
       });
       handleClose();
+    } catch (err) {
+      // El sheet queda abierto a proposito: el usuario no pierde lo que cargo y
+      // puede corregir y reintentar sin volver a completar el formulario.
+      showAlert(
+        'No se pudo enviar',
+        getGenericSupabaseErrorMessage(err, 'No pudimos enviar la propuesta. Intenta de nuevo.'),
+      );
     } finally {
       setLoading(false);
     }
@@ -124,14 +145,35 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
 
   const selectedZoneName = zones.find((z) => z.id === selectedZoneId)?.name ?? null;
 
+  // Un partido de RANKING mueve ELO y se valida con geofence al hacer check-in:
+  // sin `venue_id` no hay coordenadas contra las cuales medir, así que la cancha
+  // oficial es obligatoria. En AMISTOSO queda opcional, pero si se define tiene
+  // que salir igual del catálogo — no hay otra vía de carga.
+  const blockReason: string | null =
+    matchType === 'RANKING' && !selectedVenue
+      ? zonesLoaded && zones.length === 0
+        ? 'Todavía no hay complejos cargados. Escribinos para sumar tu cancha y poder proponer partidos de ranking.'
+        : 'Elegí zona y complejo: los partidos de ranking necesitan una cancha oficial para validar el check-in.'
+      : null;
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <View className="flex-1 justify-end bg-black/60">
-        <View className="rounded-t-3xl bg-surface-container pb-10">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1 justify-end bg-black/60"
+      >
+        {/* maxHeight acota el sheet para que el ScrollView tenga un alto finito y
+            pueda desplazarse hasta el fondo: los campos de seña y costo total
+            estan al final y con el teclado abierto quedaban fuera de alcance. */}
+        <View className="rounded-t-3xl bg-surface-container pb-10" style={{ maxHeight: '90%' }}>
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 py-4">
             <Text className="font-uiBold text-lg text-neutral-on-surface">Proponer detalles</Text>
-            <TouchableOpacity onPress={handleClose} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={handleClose}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
               <AppIcon family="material-community" name="close" size={22} color="#869585" />
             </TouchableOpacity>
           </View>
@@ -261,7 +303,7 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
             ) : zones.length === 0 ? (
               <View className="mb-4 rounded-xl bg-surface-high px-4 py-3">
                 <Text className="font-ui text-sm text-neutral-on-surface-variant">
-                  No hay zonas disponibles
+                  Todavía no hay zonas con complejos cargados.
                 </Text>
               </View>
             ) : (
@@ -305,7 +347,7 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
                 ) : venues.length === 0 ? (
                   <View className="mb-1 rounded-xl bg-surface-high px-4 py-3">
                     <Text className="font-ui text-sm text-neutral-on-surface-variant">
-                      Sin complejos registrados en esta zona
+                      Los complejos de esta zona ya no están disponibles. Elegí otra zona.
                     </Text>
                   </View>
                 ) : (
@@ -348,38 +390,7 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
                     ))}
                   </View>
                 )}
-                {/* Free-text fallback shown only when no venue is selected */}
-                {!selectedVenue && (
-                  <View className="mb-4 mt-2">
-                    <Text className="font-ui mb-1 text-[10px] text-neutral-outline">
-                      O ingresá la dirección manualmente
-                    </Text>
-                    <TextInput
-                      value={freeTextLocation}
-                      onChangeText={setFreeTextLocation}
-                      placeholder="Ej: Av. Santa Fe 1234, piso 2"
-                      placeholderTextColor="#869585"
-                      className="rounded-xl bg-surface-high px-4 py-3 text-sm text-neutral-on-surface"
-                    />
-                  </View>
-                )}
-                {selectedVenue && <View className="mb-4" />}
-              </>
-            )}
-
-            {/* Free-text shown when no zone selected */}
-            {!selectedZoneId && (
-              <>
-                <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-                  Dirección (opcional)
-                </Text>
-                <TextInput
-                  value={freeTextLocation}
-                  onChangeText={setFreeTextLocation}
-                  placeholder="Ej: Complejo El Potrillo, Palermo"
-                  placeholderTextColor="#869585"
-                  className="mb-4 rounded-xl bg-surface-high px-4 py-3 text-sm text-neutral-on-surface"
-                />
+                <View className="mb-4" />
               </>
             )}
 
@@ -414,19 +425,37 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
             </View>
 
             {/* ── Submit ── */}
+            {/* Motivo inline en vez de alert: el usuario ve por qué no puede
+                enviar sin tener que tocar el botón para descubrirlo. */}
+            {blockReason && (
+              <View className="mb-2 flex-row items-start gap-2 rounded-xl bg-warning-tertiary/10 px-3 py-2">
+                <AppIcon family="material-community" name="alert-circle-outline" size={14} color="#FABD32" />
+                <Text className="font-ui flex-1 text-xs text-warning-tertiary">{blockReason}</Text>
+              </View>
+            )}
             <TouchableOpacity
               onPress={() => void handleSubmit()}
-              disabled={loading}
+              disabled={loading || blockReason !== null}
               activeOpacity={0.8}
-              className="rounded-xl bg-brand-primary py-3.5"
+              className={`rounded-xl py-3.5 ${
+                loading || blockReason !== null ? 'bg-surface-high' : 'bg-brand-primary'
+              }`}
             >
-              <Text className="font-uiBold text-center text-sm text-[#003914]">
+              <Text
+                className={`font-uiBold text-center text-sm ${
+                  loading || blockReason !== null ? 'text-neutral-outline' : 'text-[#003914]'
+                }`}
+              >
                 {loading ? 'Enviando...' : 'Enviar propuesta'}
               </Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
+
+      {/* Dentro del <Modal>: si se montara en la pantalla padre quedaria detras
+          de esta ventana nativa y el error seria invisible. */}
+      {AlertComponent}
     </Modal>
   );
 }

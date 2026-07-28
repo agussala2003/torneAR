@@ -124,7 +124,11 @@ export function GuestJoinModal({ visible, onClose, onJoined }: Props) {
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 py-4">
             <Text className="font-uiBold text-lg text-neutral-on-surface">Unirse como invitado</Text>
-            <TouchableOpacity onPress={handleClose} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={handleClose}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
               <AppIcon family="material-community" name="close" size={22} color="#869585" />
             </TouchableOpacity>
           </View>

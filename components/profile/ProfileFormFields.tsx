@@ -2,10 +2,10 @@ import React from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import {
   Controller,
+  useWatch,
   type Control,
   type FieldErrors,
   type UseFormSetValue,
-  type UseFormWatch,
 } from 'react-hook-form';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { applyDateMask } from '@/lib/date-mask';
@@ -27,7 +27,6 @@ interface ProfileFormFieldsProps {
   control: Control<UserProfileFormData>;
   errors: FieldErrors<UserProfileFormData>;
   setValue: UseFormSetValue<UserProfileFormData>;
-  watch: UseFormWatch<UserProfileFormData>;
   onOpenFavoriteTeamPicker: () => void;
 }
 
@@ -45,12 +44,29 @@ export function ProfileFormFields({
   control,
   errors,
   setValue,
-  watch,
   onOpenFavoriteTeamPicker,
 }: ProfileFormFieldsProps) {
-  const selectedGender = watch('gender');
-  const selectedFoot = watch('strongFoot');
-  const selectedFavoriteTeam = watch('favoriteTeam');
+  /*
+   * useWatch y NO el `watch` de useForm — no es un detalle de estilo.
+   *
+   * `watch(name)` se apoya en `control._names.watch`, un Set global del form.
+   * `reset()` lo vacia (react-hook-form/dist/index.esm.mjs:2322) y el evento que
+   * emite no alcanza para re-renderizar el root, asi que el Set nunca se vuelve
+   * a poblar. A partir de ese momento cada `setValue()` toma la rama "campo no
+   * observado" y emite un payload que la suscripcion raiz descarta: la pantalla
+   * deja de re-renderizar y estos valores quedan congelados en la foto del reset.
+   *
+   * Sintoma exacto: en /profile-edit (que hace reset al hidratar el perfil) el
+   * chip verde no se movia al tocar otro genero/pierna, y el cuadro favorito
+   * seguia mostrando el anterior.
+   *
+   * useWatch crea una suscripcion propia por componente (`formState: { values:
+   * true }`, con `isGlobal = false`), asi que no depende de `_names.watch` y es
+   * inmune al reset.
+   */
+  const selectedGender = useWatch({ control, name: 'gender' });
+  const selectedFoot = useWatch({ control, name: 'strongFoot' });
+  const selectedFavoriteTeam = useWatch({ control, name: 'favoriteTeam' });
 
   return (
     <View className="gap-6">
@@ -92,6 +108,12 @@ export function ProfileFormFields({
             <TouchableOpacity
               key={value}
               activeOpacity={0.85}
+              // La selección se comunica solo por color: sin esto un lector de
+              // pantalla no puede saber cuál está elegida. Además es la señal
+              // que usa el test de componente, porque el className de NativeWind
+              // no llega al DOM. Props W3C (RN 0.71+): valen en nativo y en web.
+              role="radio"
+              aria-selected={selectedGender === value}
               onPress={() => setValue('gender', value, { shouldValidate: true })}
               className={`flex-1 py-3.5 rounded-xl border items-center ${
                 selectedGender === value
@@ -125,6 +147,8 @@ export function ProfileFormFields({
             <TouchableOpacity
               key={value}
               activeOpacity={0.85}
+              role="radio"
+              aria-selected={selectedFoot === value}
               onPress={() => setValue('strongFoot', value, { shouldValidate: true })}
               className={`flex-1 py-3.5 rounded-xl border items-center ${
                 selectedFoot === value

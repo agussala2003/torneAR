@@ -122,7 +122,7 @@ export function MarketListSection({
       ListEmptyComponent={
         <View className="flex-1 items-center justify-center py-20">
           <AppIcon family="material-community" name="soccer-field" size={48} color="#3F4943" />
-          <Text className="mt-4 text-center font-uiMedium text-neutral-on-surface-variant">
+          <Text className="mt-4 text-center font-ui text-neutral-on-surface-variant">
             No se encontraron publicaciones.
           </Text>
         </View>

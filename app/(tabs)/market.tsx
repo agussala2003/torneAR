@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -20,7 +20,10 @@ import { applyToTeamPost, applyToPlayerPost, fetchApplicationCounts } from '@/li
 export default function MarketScreen() {
   const { profile } = useAuth();
   const { showAlert, showLoader, hideLoader } = useUI();
-  const { fetchMyTeams, activeTeamId } = useTeamStore();
+  // La carga de `myTeams` vive en app/(tabs)/_layout.tsx; aca solo leemos el
+  // equipo activo, con selector puntual para no re-renderizar ante cualquier
+  // cambio del store.
+  const activeTeamId = useTeamStore((state) => state.activeTeamId);
 
   const [activeTab, setActiveTab] = useState<TabType>('TEAMS_LOOKING');
 
@@ -68,16 +71,15 @@ export default function MarketScreen() {
     }
   }, [profile, filterZone, filterSort, showAlert]);
 
+  // Unica fuente de carga. El useEffect que habia aca abajo era redundante:
+  // `loadMarketData` ya declara profile/filterZone/filterSort en sus deps, asi que
+  // cambiar un filtro regenera la callback y vuelve a disparar este focus effect.
+  // Tener los dos significaba dos rondas completas de fetch por cada entrada.
   useFocusEffect(
     useCallback(() => {
       void loadMarketData(true);
-      if (profile?.id) void fetchMyTeams(profile.id);
-    }, [loadMarketData, profile?.id, fetchMyTeams])
+    }, [loadMarketData])
   );
-
-  useEffect(() => {
-    if (profile) void loadMarketData(false);
-  }, [profile, filterZone, filterSort, loadMarketData]);
 
   const onRefresh = () => {
     setIsRefreshing(true);
