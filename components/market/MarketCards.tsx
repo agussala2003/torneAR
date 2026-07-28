@@ -179,7 +179,7 @@ export function MarketTeamCard({
         {scheduleLabel ? (
           <View className="flex-row items-center gap-2 bg-surface-high/40 rounded-lg px-2.5 py-2 mb-2">
             <AppIcon family="material-icons" name="calendar-month" size={14} color="#A9B7A8" />
-            <Text className="text-neutral-on-surface-variant text-[11px] font-uiMedium flex-1" numberOfLines={1}>
+            <Text className="text-neutral-on-surface-variant text-[11px] font-ui flex-1" numberOfLines={1}>
               {scheduleLabel}
             </Text>
           </View>
@@ -188,7 +188,7 @@ export function MarketTeamCard({
         {matchZone ? (
           <View className="flex-row items-center gap-2 bg-surface-high/40 rounded-lg px-2.5 py-2 mb-2">
             <AppIcon family="material-community" name="map-marker-outline" size={14} color="#A9B7A8" />
-            <Text className="text-neutral-on-surface-variant text-[11px] font-uiMedium flex-1" numberOfLines={1}>
+            <Text className="text-neutral-on-surface-variant text-[11px] font-ui flex-1" numberOfLines={1}>
               Zona del partido: {matchZone}
             </Text>
           </View>
@@ -197,7 +197,7 @@ export function MarketTeamCard({
         {resolvedPitchType ? (
           <View className="flex-row items-center gap-2 bg-surface-high/40 rounded-lg px-2.5 py-2 mb-2">
             <AppIcon family="material-community" name="account-multiple" size={14} color="#A9B7A8" />
-            <Text className="text-neutral-on-surface-variant text-[11px] font-uiMedium flex-1" numberOfLines={1}>
+            <Text className="text-neutral-on-surface-variant text-[11px] font-ui flex-1" numberOfLines={1}>
               {getPitchLabel(resolvedPitchType)}
             </Text>
           </View>
@@ -206,7 +206,7 @@ export function MarketTeamCard({
         {shouldShowComplex ? (
           <View className="flex-row items-center gap-2 bg-surface-high/40 rounded-lg px-2.5 py-2 mb-1">
             <Text style={{ fontSize: 13 }}>🏟️</Text>
-            <Text className="text-neutral-on-surface-variant text-[11px] font-uiMedium flex-1" numberOfLines={1}>
+            <Text className="text-neutral-on-surface-variant text-[11px] font-ui flex-1" numberOfLines={1}>
               {normalizedComplex}
             </Text>
           </View>
@@ -342,9 +342,17 @@ export function MarketPlayerCard({
               <AppIcon family="material-community" name="account" size={20} color="#53E076" />
             </View>
           )}
-          <View className="flex-1">
+          <View className="flex-1" style={{ minWidth: 0 }}>
             <Text className="text-neutral-on-surface font-uiBold text-sm" numberOfLines={1}>{playerName}</Text>
-            <Text className="text-neutral-on-surface-variant font-ui text-[10px]">@{username} · {subtitle}</Text>
+            {/* El nombre de arriba ya truncaba, esta línea no: un @username
+                largo junto a la posición desbordaba la cabecera de la tarjeta. */}
+            <Text
+              className="text-neutral-on-surface-variant font-ui text-[10px]"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              @{username} · {subtitle}
+            </Text>
           </View>
         </View>
       </ImageBackground>

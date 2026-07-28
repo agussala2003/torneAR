@@ -1,24 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useColorScheme } from 'nativewind';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppIcon } from '@/components/ui/AppIcon';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { colorScheme, setColorScheme } = useColorScheme();
-
-  const handleToggleTheme = async (value: boolean) => {
-    const newTheme = value ? 'dark' : 'light';
-    setColorScheme(newTheme);
-    try {
-      await AsyncStorage.setItem('app-theme', newTheme);
-    } catch {
-      // Ignored
-    }
-  };
 
   return (
     <SafeAreaView className="flex-1 bg-surface-base">
@@ -30,32 +17,6 @@ export default function SettingsScreen() {
       </View>
       
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
-        
-        {/* Settings Block: Apariencia */}
-        <View className="mb-6">
-          <Text className="font-display mb-4 px-1 text-sm uppercase tracking-wider text-neutral-on-surface-variant">
-            Apariencia
-          </Text>
-          <View className="overflow-hidden rounded-xl bg-surface-low">
-            <View className="w-full flex-row items-center justify-between px-5 py-4">
-              <View className="flex-row items-center gap-4">
-                <AppIcon family="material-community" name="theme-light-dark" size={20} color="#BCCBB9" />
-                <View>
-                  <Text className="font-ui text-sm text-neutral-on-surface">Modo Oscuro</Text>
-                  <Text className="font-ui text-xs text-neutral-on-surface-variant mt-1 max-w-[220px]">
-                    Activa para mantener el tema en Modo Oscuro.
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={colorScheme === 'dark'}
-                onValueChange={handleToggleTheme}
-                trackColor={{ false: '#3A3939', true: '#53E076' }}
-                thumbColor={colorScheme === 'dark' ? '#131313' : '#BCCBB9'}
-              />
-            </View>
-          </View>
-        </View>
 
         {/* Settings Block: Legal */}
         <View className="mb-6">

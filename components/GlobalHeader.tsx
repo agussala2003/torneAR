@@ -18,7 +18,12 @@ type GlobalHeaderProps = {
 
 export function GlobalHeader({ onNotificationPress, notificationCount, isMarketTab, isRankingTab }: GlobalHeaderProps) {
   const { profile } = useAuth();
-  const { fetchMyTeams, activeTeamId } = useTeamStore(); // Sacamos activeTeamId para los desafíos
+  // Selector puntual: el header solo necesita el equipo activo para el badge de
+  // desafios. Suscribirse al store entero lo re-renderizaba ante cualquier cambio.
+  // La carga de `myTeams` vive en app/(tabs)/_layout.tsx — no aca: GlobalHeader se
+  // monta en las 5 tabs y disparaba un fetch por tab, y cada uno reemplazaba
+  // `myTeams` por un array nuevo, invalidando los useCallback que lo tenian en deps.
+  const activeTeamId = useTeamStore((state) => state.activeTeamId);
   const [internalNotificationCount, setInternalNotificationCount] = useState(0);
   const [chatCount, setChatCount] = useState(0);
   const [challengeCount, setChallengeCount] = useState(0); // NUEVO
@@ -35,11 +40,10 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
       .eq('profile_id', profile.id)
       .eq('is_read', false);
 
-    if (error) {
-      return;
-    }
-
-    setInternalNotificationCount(count ?? 0);
+    // Un badge es informacion accesoria: si el conteo falla lo llevamos a 0 para
+    // que desaparezca, en vez de dejar colgado un numero viejo que ya no
+    // corresponde. El header se renderiza igual — nunca lo bloqueamos por esto.
+    setInternalNotificationCount(error ? 0 : (count ?? 0));
   }, [profile?.id]);
 
   useEffect(() => {
@@ -70,19 +74,16 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
     };
   }, [loadUnreadNotificationsCount, profile?.id]);
 
-  useEffect(() => {
-    if (profile?.id) {
-      void fetchMyTeams(profile.id);
-    }
-  }, [profile?.id, fetchMyTeams]);
-
   // -- Lógica de Mercado --
   const loadChatCount = useCallback(async () => {
     if (!profile?.id) return;
     try {
       const count = await fetchUnreadChatCount();
       setChatCount(count);
-    } catch { }
+    } catch {
+      // Mismo criterio que las notificaciones: ocultamos el badge y seguimos.
+      setChatCount(0);
+    }
   }, [profile?.id]);
 
   useEffect(() => {
@@ -106,7 +107,9 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
     try {
       const inbox = await fetchChallengesInbox(activeTeamId);
       setChallengeCount(inbox.filter(c => c.direction === 'RECIBIDO' && c.status === 'ENVIADA').length);
-    } catch { }
+    } catch {
+      setChallengeCount(0);
+    }
   }, [activeTeamId]);
 
   useEffect(() => {
@@ -143,10 +146,18 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
         <ActiveTeamSelector />
       </View>
 
-      <View className="flex-row items-center gap-4">
+      {/* gap-6 (24px) y no gap-4: con hitSlop de 12 por lado, 16px de separacion
+          hacia que las areas tactiles de dos iconos vecinos se solaparan y el tap
+          en la banda intermedia disparara el handler equivocado. */}
+      <View className="flex-row items-center gap-6">
         {/* Market Chats Icon */}
         {isMarketTab && (
-          <TouchableOpacity onPress={() => router.push('/market-chats' as any)} activeOpacity={0.7} className="relative">
+          <TouchableOpacity
+            onPress={() => router.push('/market-chats' as any)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            className="relative"
+          >
             <AppIcon family="material-icons" name="chat" size={21} />
             {chatCount > 0 && (
               <View className="absolute -right-1.5 -top-1.5 h-4 w-4 items-center justify-center rounded-full border border-[#53E076] bg-[#003914]">
@@ -160,7 +171,12 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
 
         {/* NUEVO: Ranking Challenges Icon */}
         {isRankingTab && (
-          <TouchableOpacity onPress={() => router.push('/challenge-inbox' as any)} activeOpacity={0.7} className="relative">
+          <TouchableOpacity
+            onPress={() => router.push('/challenge-inbox' as any)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            className="relative"
+          >
             <AppIcon family="material-community" name="sword-cross" size={21} />
             {challengeCount > 0 && (
               <View className="absolute -right-1.5 -top-1.5 h-4 min-w-[16px] items-center justify-center rounded-full border border-surface-base bg-danger-error px-1">
@@ -173,7 +189,12 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
         )}
 
         {/* Notification Bell */}
-        <TouchableOpacity onPress={handleNotificationPress} activeOpacity={0.7} className="relative">
+        <TouchableOpacity
+          onPress={handleNotificationPress}
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          className="relative"
+        >
           <AppIcon family="material-community" name="bell" size={20} />
           {resolvedNotificationCount > 0 && (
             <View className="absolute -right-1 -top-1 h-4 w-4 items-center justify-center rounded-full bg-brand-primary">

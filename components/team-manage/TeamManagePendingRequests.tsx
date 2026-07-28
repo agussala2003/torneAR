@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { TeamJoinRequestRow } from './types';
 import { positionLabel } from '@/lib/team-helpers';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
@@ -25,7 +26,12 @@ export function TeamManagePendingRequests({
           <Text className="font-display text-xs uppercase tracking-wider text-neutral-on-surface-variant">Solicitudes pendientes</Text>
           <Text className="font-ui text-xs text-neutral-on-surface-variant" style={{ fontVariant: ['tabular-nums'] }}>0</Text>
         </View>
-        <Text className="font-ui text-sm text-neutral-on-surface-variant">No hay solicitudes pendientes.</Text>
+        <EmptyState
+          compact
+          icon="account-clock-outline"
+          title="Sin solicitudes"
+          description="Cuando alguien pida sumarse con el código de invitación, la solicitud aparece acá para que la apruebes o la rechaces."
+        />
       </View>
     );
   }

@@ -5,9 +5,15 @@ import { requestStatusChip } from '@/lib/team-helpers';
 
 interface TeamManageHistoryRequestsProps {
   requests: TeamJoinRequestRow[];
+  /**
+   * Profile ids que YA son del plantel. Una solicitud ACEPTADA no significa que
+   * el jugador entró: el alta la confirma él desde "Mis solicitudes". Sin este
+   * dato, el capitán ve "Aceptada" y da por hecho que ya está adentro.
+   */
+  memberProfileIds?: Set<string>;
 }
 
-export function TeamManageHistoryRequests({ requests }: TeamManageHistoryRequestsProps) {
+export function TeamManageHistoryRequests({ requests, memberProfileIds }: TeamManageHistoryRequestsProps) {
   if (requests.length === 0) {
     return (
       <View className="mt-4 rounded-xl bg-surface-low p-4">
@@ -30,13 +36,23 @@ export function TeamManageHistoryRequests({ requests }: TeamManageHistoryRequest
       {requests.length > 1 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
           {requests.map((request) => (
-            <HistoryCard key={request.id} request={request} isWide />
+            <HistoryCard
+              key={request.id}
+              request={request}
+              isWide
+              isMember={memberProfileIds?.has(request.profile_id) ?? true}
+            />
           ))}
         </ScrollView>
       ) : (
         <View className="gap-2">
           {requests.map((request) => (
-            <HistoryCard key={request.id} request={request} isWide={false} />
+            <HistoryCard
+              key={request.id}
+              request={request}
+              isWide={false}
+              isMember={memberProfileIds?.has(request.profile_id) ?? true}
+            />
           ))}
         </View>
       )}
@@ -44,8 +60,21 @@ export function TeamManageHistoryRequests({ requests }: TeamManageHistoryRequest
   );
 }
 
-function HistoryCard({ request, isWide }: { request: TeamJoinRequestRow; isWide: boolean }) {
-  const chip = requestStatusChip(request.status);
+function HistoryCard({
+  request,
+  isWide,
+  isMember,
+}: {
+  request: TeamJoinRequestRow;
+  isWide: boolean;
+  isMember: boolean;
+}) {
+  // Aceptada pero todavía sin entrar: falta que el jugador confirme el traspaso.
+  const esperandoConfirmacion = request.status === 'ACEPTADA' && !isMember;
+
+  const chip = esperandoConfirmacion
+    ? { label: 'Esperando al jugador', className: 'bg-warning-tertiary/15 text-warning-tertiary' }
+    : requestStatusChip(request.status);
 
   return (
     <View className={`${isWide ? 'w-[280px]' : ''} rounded-lg bg-surface-high px-3 py-3`}>
@@ -63,6 +92,12 @@ function HistoryCard({ request, isWide }: { request: TeamJoinRequestRow; isWide:
           {chip.label}
         </Text>
       </View>
+
+      {esperandoConfirmacion && (
+        <Text className="font-ui mt-2 text-[11px] leading-4 text-neutral-on-surface-variant">
+          Ya lo aprobaste. Entra al plantel cuando confirme el traspaso desde su app.
+        </Text>
+      )}
     </View>
   );
 }

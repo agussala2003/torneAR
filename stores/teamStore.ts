@@ -59,13 +59,15 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
           };
         });
 
+      const currentTeams = get().myTeams;
       const currentActiveId = get().activeTeamId;
-      
+      const currentActiveName = get().activeTeamName;
+
       // Check if current active team is still valid (user hasn't left or been kicked)
       const isActiveTeamValid = currentActiveId && formattedTeams.some(t => t.id === currentActiveId);
-      
+
       let newActiveId = currentActiveId;
-      let newActiveName = get().activeTeamName;
+      let newActiveName = currentActiveName;
 
       // Auto-select the first team if they belong to any but don't have a valid active selection
       if (!isActiveTeamValid && formattedTeams.length > 0) {
@@ -76,8 +78,35 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
         newActiveName = null;
       }
 
+      /*
+       * Estabilidad referencial: `formattedTeams` es un array nuevo en cada
+       * llamada, aunque el usuario siga en los mismos equipos con los mismos
+       * roles. Publicar esa referencia nueva invalidaba todo `useCallback` /
+       * `useEffect` que tuviera `myTeams` en sus dependencias, lo que disparaba
+       * recargas en cascada (y en Ranking llegaba a pisar los filtros elegidos
+       * por el usuario). Si el contenido es logicamente identico conservamos el
+       * array anterior: `Object.is(antes, despues)` sigue siendo true y los
+       * consumidores no se enteran de un cambio que no existio.
+       *
+       * UserTeam es plano (id/name/role), asi que alcanza con comparar campo a
+       * campo en orden — la query ya viene ordenada por `joined_at`.
+       */
+      const teamsAreEquivalent =
+        currentTeams.length === formattedTeams.length &&
+        currentTeams.every((team, index) => {
+          const next = formattedTeams[index];
+          return team.id === next.id && team.name === next.name && team.role === next.role;
+        });
+
+      // Nada cambio: no publicamos un estado nuevo mas alla de apagar el loader.
+      if (teamsAreEquivalent && newActiveId === currentActiveId && newActiveName === currentActiveName) {
+        set({ isLoading: false });
+        return;
+      }
+
       set({
-        myTeams: formattedTeams,
+        // Si solo cambio el equipo activo, mantenemos la referencia del plantel.
+        myTeams: teamsAreEquivalent ? currentTeams : formattedTeams,
         activeTeamId: newActiveId,
         activeTeamName: newActiveName,
         isLoading: false,

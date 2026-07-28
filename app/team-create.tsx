@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -25,6 +25,29 @@ export default function TeamCreateScreen() {
   const [loadingZones, setLoadingZones] = useState(true);
   const [showZonePicker, setShowZonePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /*
+   * `useState(profile?.zone ?? '')` solo se evalua en el primer render. Si esta
+   * pantalla monta antes de que AuthContext termine de hidratar el perfil —
+   * escenario real en cold start o al entrar rapido desde HomeOnboardingState —
+   * `zone` quedaba en '' para siempre y el usuario veia "Selecciona una zona"
+   * aunque su perfil ya tuviera una.
+   *
+   * Hidratamos una sola vez y nunca pisamos una eleccion del usuario: si ya
+   * eligio zona antes de que llegara el perfil, el updater funcional la respeta.
+   * Sin ese guard, un refreshProfile() posterior le revertiria la seleccion.
+   */
+  const zoneHydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (zoneHydratedRef.current) return;
+
+    const profileZone = profile?.zone;
+    if (!profileZone) return; // el perfil todavia no llego
+
+    zoneHydratedRef.current = true;
+    setZone((current) => (current.trim() ? current : profileZone));
+  }, [profile?.zone]);
 
   useEffect(() => {
     async function loadZones() {

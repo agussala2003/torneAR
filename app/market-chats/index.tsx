@@ -25,7 +25,8 @@ type ChatFilter = 'ALL' | 'TEAMS' | 'PLAYERS';
 export default function MarketInboxScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
-  const { activeTeamId, fetchMyTeams } = useTeamStore();
+  // `myTeams` se carga en app/(tabs)/_layout.tsx; aca alcanza con el equipo activo.
+  const activeTeamId = useTeamStore((state) => state.activeTeamId);
 
   const [chats, setChats] = useState<MarketConversation[]>([]);
   const [chatFilter, setChatFilter] = useState<ChatFilter>('ALL');
@@ -49,8 +50,7 @@ export default function MarketInboxScreen() {
   useFocusEffect(
     useCallback(() => {
       if (user) void loadData();
-      if (profile?.id) void fetchMyTeams(profile.id);
-    }, [user, profile?.id, loadData, fetchMyTeams])
+    }, [user, loadData])
   );
 
   const onRefresh = () => {
@@ -205,7 +205,7 @@ export default function MarketInboxScreen() {
       ) : displayedChats.length === 0 ? (
         <View className="flex-1 justify-center items-center px-6">
           <AppIcon family="material-community" name="chat-outline" size={48} color="#3F4943" />
-          <Text className="text-neutral-on-surface-variant font-uiMedium text-base text-center mt-4">
+          <Text className="text-neutral-on-surface-variant font-ui text-base text-center mt-4">
             No tenés chats activos.
           </Text>
         </View>

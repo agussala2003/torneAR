@@ -5,13 +5,20 @@ interface Props {
   match: MatchDetailViewData;
 }
 
+// `minWidth: 0` + `ellipsizeMode`: el tile "Lugar" recibe "{complejo} — {dirección}"
+// concatenado en media pantalla. Sin poder encoger, `numberOfLines` no trunca y
+// el texto se sale del recuadro.
 function Tile({ label, value }: { label: string; value: string }) {
   return (
-    <View className="flex-1 rounded-xl bg-surface-high p-3">
+    <View className="flex-1 rounded-xl bg-surface-high p-3" style={{ minWidth: 0 }}>
       <Text className="font-ui mb-1 text-[10px] uppercase tracking-widest text-neutral-outline">
         {label}
       </Text>
-      <Text className="font-uiBold text-sm text-neutral-on-surface" numberOfLines={2}>
+      <Text
+        className="font-uiBold text-sm text-neutral-on-surface"
+        numberOfLines={2}
+        ellipsizeMode="tail"
+      >
         {value}
       </Text>
     </View>

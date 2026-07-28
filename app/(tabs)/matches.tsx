@@ -2,10 +2,11 @@ import { useCallback, useState } from 'react';
 import { ScrollView, Text, View, TouchableOpacity } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { GlobalHeader } from '@/components/GlobalHeader';
-import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { MatchesSkeleton } from '@/components/matches/MatchesSkeleton';
 import { useTeamStore } from '@/stores/teamStore';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { useTeamMatchesRealtime } from '@/hooks/useTeamMatchesRealtime';
 import { fetchMatchesViewData } from '@/lib/matches-data';
 import { acceptProposal, rejectProposal, cancelProposal } from '@/lib/match-actions';
 import { MatchCard } from '@/components/matches/MatchCard';
@@ -48,6 +49,11 @@ export default function MatchesScreen() {
 
   useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
 
+  // Realtime: si el rival acepta, hace check-in o carga el resultado mientras
+  // el usuario mira la lista, la tarjeta se actualiza sola. Antes eso sólo se
+  // veía al cambiar de tab y volver.
+  useTeamMatchesRealtime(activeTeamId ?? undefined, useCallback(() => { void loadData(); }, [loadData]));
+
   function handleCardPress(matchId: string) {
     router.push({ pathname: '/match-detail' as never, params: { matchId } });
   }
@@ -60,31 +66,55 @@ export default function MatchesScreen() {
     router.push({ pathname: '/match-detail' as never, params: { matchId, openResultModal: 'true' } });
   }
 
+  // Quita la propuesta activa de una tarjeta sin esperar el round-trip.
+  // Rechazar y cancelar son acciones reversibles y de efecto obvio: mostrar la
+  // tarjeta ya sin la propuesta es correcto en el 99% de los casos, y el
+  // `loadData()` posterior corrige si el servidor dijo otra cosa.
+  function clearProposalOptimistically(matchId: string) {
+    setViewData((prev) => {
+      if (!prev) return prev;
+      const strip = (entries: MatchesViewData['upcomingMatches']) =>
+        entries.map((entry) => (entry.id === matchId ? { ...entry, activeProposal: null } : entry));
+      return { ...prev, upcomingMatches: strip(prev.upcomingMatches) };
+    });
+  }
+
+  // En los tres handlers el `await loadData()` va antes del alert: con el
+  // refetch diferido al callback de cierre, la lista seguía mostrando la
+  // propuesta vieja (y sus botones) hasta que el usuario tocaba "OK".
   async function handleAcceptProposal(proposalId: string, matchId: string) {
     try {
       await acceptProposal(proposalId, matchId);
-      showAlert('¡Propuesta aceptada!', 'El partido ha sido confirmado.', () => void loadData());
+      await loadData();
+      showAlert('¡Propuesta aceptada!', 'El partido ha sido confirmado.');
     } catch (err) {
+      await loadData();
       const msg = err instanceof Error ? err.message : 'No se pudo aceptar la propuesta.';
       showAlert('Error', msg);
     }
   }
 
-  async function handleRejectProposal(proposalId: string, _matchId: string) {
+  async function handleRejectProposal(proposalId: string, matchId: string) {
+    clearProposalOptimistically(matchId);
     try {
       await rejectProposal(proposalId);
-      showAlert('Propuesta rechazada', 'Se notificará al equipo rival.', () => void loadData());
+      await loadData();
+      showAlert('Propuesta rechazada', 'Se notificará al equipo rival.');
     } catch (err) {
+      await loadData();
       const msg = err instanceof Error ? err.message : 'No se pudo rechazar la propuesta.';
       showAlert('Error', msg);
     }
   }
 
-  async function handleCancelProposal(proposalId: string, _matchId: string) {
+  async function handleCancelProposal(proposalId: string, matchId: string) {
+    clearProposalOptimistically(matchId);
     try {
       await cancelProposal(proposalId);
-      showAlert('Propuesta cancelada', 'Tu propuesta fue cancelada.', () => void loadData());
+      await loadData();
+      showAlert('Propuesta cancelada', 'Tu propuesta fue cancelada.');
     } catch (err) {
+      await loadData();
       const msg = err instanceof Error ? err.message
         : typeof err === 'object' && err !== null && 'message' in err
           ? String((err as { message: unknown }).message)
@@ -93,7 +123,9 @@ export default function MatchesScreen() {
     }
   }
 
-  if (loading) return <GlobalLoader label="Cargando partidos..." />;
+  // Esqueleto solo en la primera carga. Con `if (loading)` a secas, cada regreso
+  // a la tab borraba la lista completa y mostraba un loader a pantalla entera.
+  const isInitialLoad = loading && !viewData;
 
   return (
     <View className="flex-1 bg-surface-base">
@@ -112,8 +144,11 @@ export default function MatchesScreen() {
         <AppIcon family="material-community" name="chevron-right" size={18} color="#53E076" />
       </TouchableOpacity>
 
+      {/* Carga inicial */}
+      {isInitialLoad && <MatchesSkeleton />}
+
       {/* No team selected */}
-      {!activeTeamId && (
+      {!isInitialLoad && !activeTeamId && (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="font-displayBlack text-2xl text-neutral-on-surface">Partidos</Text>
           <Text className="font-ui mt-2 text-center text-neutral-on-surface-variant">
@@ -122,7 +157,7 @@ export default function MatchesScreen() {
         </View>
       )}
 
-      {activeTeamId && (
+      {!isInitialLoad && activeTeamId && (
         <ScrollView
           className="px-4"
           contentContainerStyle={{ paddingTop: 18, paddingBottom: 114 }}

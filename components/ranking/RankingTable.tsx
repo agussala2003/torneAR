@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { RankingTeamRow } from './RankingTeamRow';
 import type { RankingTeamEntry } from './types';
 
@@ -6,20 +7,32 @@ interface Props {
     entries: RankingTeamEntry[];
     onTeamPress: (teamId: string) => void;
     topLimit?: number;
+    /** Permite ofrecer "limpiar filtros" desde el estado vacio. */
+    onClearFilters?: () => void;
+    hasActiveFilters?: boolean;
 }
 
-export function RankingTable({ entries, onTeamPress, topLimit = 5 }: Props) {
+export function RankingTable({ entries, onTeamPress, topLimit = 5, onClearFilters, hasActiveFilters }: Props) {
     if (entries.length === 0) {
         return (
             <View>
                 <Text className="mb-2.5 font-displayBlack text-base uppercase tracking-widest text-neutral-on-surface">
                     🏆 Mejores equipos
                 </Text>
-                <View className="items-center py-12">
-                    <Text className="font-display text-base text-neutral-on-surface-variant">
-                        No hay equipos en el ranking con estos filtros.
-                    </Text>
-                </View>
+                {/* Con zona + formato + categoria es facil llegar a cero equipos. Sin
+                    este bloque la pantalla quedaba en blanco y el usuario no tenia
+                    forma de saber que el problema eran sus propios filtros. */}
+                <EmptyState
+                    icon={hasActiveFilters ? 'filter-remove-outline' : 'trophy-outline'}
+                    title={hasActiveFilters ? 'Sin resultados' : 'Ranking vacío'}
+                    description={
+                        hasActiveFilters
+                            ? 'Ningún equipo coincide con la zona, el formato y la categoría que elegiste. Probá quitando alguno de los filtros para ampliar la búsqueda.'
+                            : 'Todavía no hay equipos rankeados en esta temporada. Jugá tu primer partido oficial para aparecer en la tabla.'
+                    }
+                    actionLabel={hasActiveFilters && onClearFilters ? 'Limpiar filtros' : undefined}
+                    onAction={hasActiveFilters ? onClearFilters : undefined}
+                />
             </View>
         );
     }

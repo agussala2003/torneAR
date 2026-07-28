@@ -30,6 +30,10 @@ export const CHECKIN_ERROR_CODES = [
   'SQUAD_LIMIT_EXCEEDED',
   'PLAYER_NOT_IN_TEAM',
   'GEOFENCE_FAILED',
+  // Desde 20260728140000: si el partido tiene venue con coordenadas, mandar
+  // coords deja de ser opcional. Antes, omitirlas salteaba el geofence entero.
+  'LOCATION_REQUIRED',
+  'VENUE_REQUIRED',
 ] as const;
 
 export type CheckinErrorCode = (typeof CHECKIN_ERROR_CODES)[number];
@@ -48,7 +52,14 @@ const CHECKIN_ERROR_MESSAGES: Record<CheckinErrorCode, string> = {
   TOO_MANY_STARTERS: 'Marcaste más titulares de los que entran en la cancha.',
   SQUAD_LIMIT_EXCEEDED: 'Superaste el máximo de convocados para este formato.',
   PLAYER_NOT_IN_TEAM: 'Hay jugadores en la lista que no son miembros ni invitados del equipo.',
-  GEOFENCE_FAILED: 'Estás demasiado lejos de la cancha. El check-in requiere estar a menos de 150m.',
+  // Sin distancia hardcodeada: el radio vive en app_settings y viaja en el
+  // detalle del error del servidor. Repetir "150m" acá era una cuarta fuente de
+  // verdad que quedaba desactualizada al primer ajuste.
+  GEOFENCE_FAILED: 'Estás demasiado lejos de la cancha para hacer el check-in.',
+  LOCATION_REQUIRED:
+    'Este partido se juega en un complejo registrado: necesitamos tu ubicación para confirmar que estás ahí.',
+  VENUE_REQUIRED:
+    'Los partidos de ranking necesitan una cancha del catálogo. Acordá el complejo con el rival antes de confirmar.',
 };
 
 export class CheckinError extends Error {

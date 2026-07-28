@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useForm, Controller, type DefaultValues } from 'react-hook-form';
+import { useForm, Controller, useWatch, type DefaultValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { useAuth } from '@/context/AuthContext';
@@ -68,7 +68,6 @@ export default function ProfileEditScreen() {
     control,
     handleSubmit,
     setValue,
-    watch,
     reset,
     formState: { errors },
   } = useForm<UserProfileFormData>({
@@ -83,9 +82,12 @@ export default function ProfileEditScreen() {
     if (profile) reset(buildDefaultValues(profile));
   }, [profile, reset]);
 
-  const selectedZone = watch('zone');
-  const selectedPosition = watch('position');
-  const selectedFavoriteTeam = watch('favoriteTeam');
+  // useWatch y no `watch`: el reset() de arriba vacia `control._names.watch` y
+  // deja al `watch` de useForm sin poder re-renderizar. Detalle en
+  // components/profile/ProfileFormFields.tsx.
+  const selectedZone = useWatch({ control, name: 'zone' });
+  const selectedPosition = useWatch({ control, name: 'position' });
+  const selectedFavoriteTeam = useWatch({ control, name: 'favoriteTeam' });
 
   const onSubmit = useCallback(
     async (data: UserProfileFormData) => {
@@ -212,7 +214,6 @@ export default function ProfileEditScreen() {
               control={control}
               errors={errors}
               setValue={setValue}
-              watch={watch}
               onOpenFavoriteTeamPicker={() => setShowFavoriteTeamPicker(true)}
             />
 

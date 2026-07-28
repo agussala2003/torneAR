@@ -40,4 +40,10 @@ export interface HomeViewData {
   myTeams: HomeTeamSnapshot[];
   upcomingMatches: HomeMatchEntry[];
   pendingActions: PendingAction[];
+  /**
+   * Solicitudes ACEPTADAS por un equipo que todavía esperan que el jugador
+   * confirme el traspaso. Se calcula incluso sin equipos: ése es justamente el
+   * caso del jugador recién aceptado que aún no entró a ningún plantel.
+   */
+  pendingTransfers: number;
 }

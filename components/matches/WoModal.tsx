@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { ScorerMvpPicker } from '@/components/matches/ScorerMvpPicker';
 import type { WoClaimFormData, WoClaimEntry, ScorerPickerPerson } from '@/components/matches/types';
 
@@ -129,6 +130,14 @@ export function WoModal({ visible, onClose, onSubmit, myParticipants }: Props) {
         mvpProfileId: includeScorers ? mvpId : null,
       });
       close();
+    } catch (err) {
+      // Antes no habia catch y el `onSubmit` del caller tampoco: un fallo de red
+      // terminaba en un unhandled rejection con el sheet abierto, la foto cargada
+      // y cero feedback. El alert interno ya se renderiza dentro del <Modal>.
+      showAlert(
+        'No se pudo enviar el reclamo',
+        getGenericSupabaseErrorMessage(err, 'No pudimos enviar el reclamo WO. Intenta de nuevo.'),
+      );
     } finally {
       setLoading(false);
     }

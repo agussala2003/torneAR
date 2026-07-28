@@ -3,6 +3,7 @@ import { usePlayerCareer } from '@/hooks/usePlayerCareer';
 import { GuestAppearance } from '@/lib/career-data';
 import { CareerStintCard } from './CareerStintCard';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
@@ -110,13 +111,13 @@ export function CareerTimeline({ profileId }: CareerTimelineProps) {
     return (
       <View className="mt-8">
         <SectionTitle>Trayectoria</SectionTitle>
-        <View className="items-center rounded-xl bg-surface-low p-5">
-          <Text className="font-ui text-center text-sm text-neutral-on-surface-variant">
-            Aún no hay historial registrado 📖
-          </Text>
-          <Text className="font-ui mt-1 text-center text-xs text-neutral-on-surface-variant">
-            Tu historia se escribe con cada partido.
-          </Text>
+        <View className="rounded-xl bg-surface-low">
+          <EmptyState
+            compact
+            icon="timeline-text-outline"
+            title="Sin historial"
+            description="Tu trayectoria se escribe con cada partido: sumate a un equipo y jugá tu primer encuentro para empezar a construirla."
+          />
         </View>
       </View>
     );

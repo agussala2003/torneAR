@@ -1,13 +1,17 @@
 import { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
-import * as Location from 'expo-location';
 import { useTeamStore } from '@/stores/teamStore';
 import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchMatchDetailViewData, fetchDisputeState } from '@/lib/match-detail-data';
 import type { DisputeState } from '@/lib/match-detail-data';
+// El check-in simple comparte los códigos de error de la RPC de convocatoria
+// (GEOFENCE_FAILED, LOCATION_REQUIRED): con el mapper el usuario lee el motivo
+// real en vez del mensaje genérico de Supabase.
+import { getCheckinErrorMessage } from '@/lib/checkin-data';
+import { getCheckinLocation } from '@/lib/checkin-location';
 import * as Clipboard from 'expo-clipboard';
 import {
   submitProposal,
@@ -24,8 +28,8 @@ import {
   ResultAlreadySubmittedError,
 } from '@/lib/match-actions';
 import { useMatchRealtime } from '@/hooks/useMatchRealtime';
-import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { MatchDetailSkeleton } from '@/components/matches/MatchDetailSkeleton';
 import { MatchDetailHero } from '@/components/matches/MatchDetailHero';
 import { ProposalSection } from '@/components/matches/ProposalSection';
 import { MatchDetailsSection } from '@/components/matches/MatchDetailsSection';
@@ -98,12 +102,22 @@ export default function MatchDetailScreen() {
     }
   }, [loading, match, openProposalModal, openResultModal]);
 
+  // ─── Patrón de resincronización ────────────────────────────────────────────
+  // `await loadData()` va SIEMPRE antes del alert, nunca en su callback de
+  // cierre. Con el refetch diferido, entre la mutación y el tap en "OK" la
+  // pantalla mostraba estado viejo con los botones habilitados; y si el usuario
+  // descartaba el alert sin tocarlo (o la pantalla perdía foco), el refetch no
+  // corría nunca y había que salir y volver a entrar. Ver el mismo criterio ya
+  // aplicado en el onSubmit de ResultModal.
+
   async function handleAcceptProposal() {
     if (!match?.activeProposal) return;
     try {
       await acceptProposal(match.activeProposal.id, match.id);
-      showAlert('¡Propuesta aceptada!', 'El partido ha sido confirmado.', () => void loadData());
+      await loadData();
+      showAlert('¡Propuesta aceptada!', 'El partido ha sido confirmado.');
     } catch (err) {
+      await loadData();
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
@@ -112,8 +126,10 @@ export default function MatchDetailScreen() {
     if (!match?.activeProposal) return;
     try {
       await rejectProposal(match.activeProposal.id);
-      showAlert('Propuesta rechazada', 'Se notificará al equipo rival.', () => void loadData());
+      await loadData();
+      showAlert('Propuesta rechazada', 'Se notificará al equipo rival.');
     } catch (err) {
+      await loadData();
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
@@ -122,45 +138,46 @@ export default function MatchDetailScreen() {
     if (!match?.activeProposal) return;
     try {
       await cancelProposal(match.activeProposal.id);
-      void loadData();  // immediate re-fetch — don't bury inside alert callback
+      await loadData();
       showAlert('Propuesta cancelada', 'Tu propuesta fue cancelada.');
     } catch (err) {
+      await loadData();
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
 
   async function handleProposalSubmit(data: MatchProposalFormData) {
     if (!match) return;
-    try {
-      await submitProposal(match.id, myTeamId, data);
-      showAlert('Propuesta enviada', 'El rival recibirá tu propuesta.', () => void loadData());
-    } catch (err) {
-      showAlert('Error', getGenericSupabaseErrorMessage(err));
-    }
+    // Sin catch a proposito: el error se propaga hasta ProposalModal, que lo
+    // muestra en su alert interno (por encima del sheet) y mantiene el formulario
+    // abierto. Atraparlo aca mostraba el mensaje en el alert de esta pantalla,
+    // que queda DETRAS del <Modal> nativo y por lo tanto no se ve.
+    await submitProposal(match.id, myTeamId, data);
+    await loadData();
+    showAlert('Propuesta enviada', 'El rival recibirá tu propuesta.');
   }
 
   async function handleCheckin() {
     if (!match) return;
     try {
-      // Request location permission and get coords for geofence validation
+      // Ubicación para el geofence. Con venue, `checkin_team` ahora rechaza el
+      // check-in sin coordenadas (LOCATION_REQUIRED).
       let coords: { lat: number; lng: number } | undefined;
       if (match.venueId) {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          showAlert(
-            'Permiso requerido',
-            'Para hacer check-in necesitamos acceder a tu ubicación y verificar que estás en la cancha.',
-          );
+        const location = await getCheckinLocation();
+        if (!location.ok) {
+          showAlert('No pudimos validar tu ubicación', location.message);
           return;
         }
-        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+        coords = location.coords;
       }
 
       await doCheckin(match.id, myTeamId, coords);
-      showAlert('¡Check-in realizado!', 'Marcaste tu llegada al partido.', () => void loadData());
+      await loadData();
+      showAlert('¡Check-in realizado!', 'Marcaste tu llegada al partido.');
     } catch (err) {
-      showAlert('Error', getGenericSupabaseErrorMessage(err));
+      await loadData();
+      showAlert('Error', getCheckinErrorMessage(err));
     }
   }
 
@@ -168,8 +185,10 @@ export default function MatchDetailScreen() {
     if (!match) return;
     try {
       await submitDisputeVote(match.id, teamId);
-      showAlert('¡Voto registrado!', 'Tu voto fue enviado correctamente.', () => void loadData());
+      await loadData();
+      showAlert('¡Voto registrado!', 'Tu voto fue enviado correctamente.');
     } catch (err) {
+      await loadData();
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
@@ -182,12 +201,13 @@ export default function MatchDetailScreen() {
         result.winnerTeamId === match.teamA.id ? match.teamA.name : match.teamB.name;
       const method =
         result.resolutionMethod === 'votes' ? 'por votación' : 'por Fair Play Score';
+      await loadData();
       showAlert(
         '¡Disputa resuelta!',
         `Ganó ${winnerName} ${method}. El partido pasó a FINALIZADO.`,
-        () => void loadData(),
       );
     } catch (err) {
+      await loadData();
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
@@ -206,17 +226,21 @@ export default function MatchDetailScreen() {
         accept,
         match.cancellationRequest.requestedByTeamId,
       );
+      await loadData();
       showAlert(
         accept ? 'Cancelación aceptada' : 'Solicitud rechazada',
         accept ? 'El partido fue cancelado.' : 'El partido sigue en pie.',
-        () => void loadData(),
       );
     } catch (err) {
+      await loadData();
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
 
-  if (loading) return <GlobalLoader label="Cargando partido..." />;
+  // El realtime (useMatchRealtime) recarga esta pantalla sola cuando el rival
+  // actua. Con el loader a pantalla completa cada evento borraba el detalle; con
+  // el esqueleto acotado a la carga inicial, el refresco es invisible.
+  if (loading && !match) return <MatchDetailSkeleton />;
 
   if (!match) {
     return (
@@ -535,13 +559,16 @@ export default function MatchDetailScreen() {
             await loadData();
 
             if (err instanceof ResultAlreadySubmittedError) {
+              // Caso terminal: no hay nada que corregir, el modal se cierra y por
+              // eso este alert (fuera del <Modal>) si es visible.
               showAlert('Resultado ya cargado', err.message);
               return;
             }
 
-            showAlert('Error', getGenericSupabaseErrorMessage(err));
             // Se relanza para que el modal NO se cierre y el usuario pueda
-            // corregir los datos sin volver a cargarlos desde cero.
+            // corregir los datos sin volver a cargarlos desde cero. El mensaje lo
+            // muestra ResultModal en su alert interno: uno lanzado desde aca
+            // quedaria detras del sheet abierto.
             throw err;
           }
         }}
@@ -553,10 +580,10 @@ export default function MatchDetailScreen() {
         isLateWarning={isLateForCancellation()}
         onSubmit={async (data) => {
           await requestCancellation(match.id, myTeamId, data, opponentTeam.id);
+          await loadData();
           showAlert(
             'Solicitud enviada',
             `Le pedimos a ${opponentTeam.name} que confirme la cancelación. El partido sigue en pie hasta que responda.`,
-            () => void loadData(),
           );
         }}
       />
@@ -566,7 +593,8 @@ export default function MatchDetailScreen() {
         myParticipants={myTeamParticipants}
         onSubmit={async (data) => {
           await claimWo(match.id, myTeamId, data);
-          showAlert('Reclamo enviado', 'Tu reclamo WO fue enviado a revisión.', () => void loadData());
+          await loadData();
+          showAlert('Reclamo enviado', 'Tu reclamo WO fue enviado a revisión.');
         }}
       />
 

@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { GlobalHeader } from '@/components/GlobalHeader';
+import { ProfileSkeleton } from '@/components/profile/ProfileSkeleton';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { getAuthErrorMessage, getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchProfileViewData } from '@/lib/profile-data';
@@ -84,8 +85,16 @@ export default function ProfileScreen() {
     }
   };
 
-  if (loading) {
-    return <GlobalLoader label="Cargando perfil" />;
+  // Esqueleto solo en la carga inicial; los refrescos por foco conservan el
+  // contenido para no parpadear. GlobalLoader queda reservado para acciones
+  // bloqueantes (cerrar sesion), que si justifican tapar la pantalla.
+  if (loading && !viewData) {
+    return (
+      <View className="flex-1 bg-surface-base">
+        <GlobalHeader />
+        <ProfileSkeleton />
+      </View>
+    );
   }
 
   if (!profile || !viewData) {

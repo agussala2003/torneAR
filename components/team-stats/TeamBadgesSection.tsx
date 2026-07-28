@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
 import type { TeamBadgeItem } from './types';
 
 type Props = {
@@ -26,8 +27,13 @@ export function TeamBadgesSection({ badges }: Props) {
       </View>
 
       {badges.length === 0 ? (
-        <View className="rounded-xl border border-dashed border-neutral-outline/15 bg-surface-high px-4 py-3">
-          <Text className="text-xs text-neutral-on-surface-variant">Sin insignias disponibles.</Text>
+        <View className="rounded-xl border border-dashed border-neutral-outline/15 bg-surface-high">
+          <EmptyState
+            compact
+            icon="shield-star-outline"
+            title="Sin insignias"
+            description="Este equipo todavía no tiene insignias disponibles. Se desbloquean compitiendo en partidos oficiales."
+          />
         </View>
       ) : (
         <ScrollView

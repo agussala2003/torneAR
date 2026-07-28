@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { fetchMessages, sendMessage, markConversationAsRead } from '@/lib/chat-api';
@@ -46,6 +47,11 @@ export default function MatchChatScreen() {
   const [inputText, setInputText] = useState('');
   const [loadingInit, setLoadingInit] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  // Si `init` falla, la pantalla quedaba con el header vacio y una lista sin
+  // mensajes: indistinguible de un chat legitimamente vacio. Ahora el fallo es
+  // explicito y reintentable.
+  const [loadError, setLoadError] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
 
   // Derive effective myTeamId (from param or from match membership)
   const [myTeamId, setMyTeamId] = useState<string>(paramTeamId ?? '');
@@ -54,6 +60,8 @@ export default function MatchChatScreen() {
     if (!conversationId || !profile) return;
 
     const init = async () => {
+      setLoadingInit(true);
+      setLoadError(false);
       try {
         // 1. Fetch conversation to get match_id
         const { data: conv, error: convErr } = await supabase
@@ -111,6 +119,7 @@ export default function MatchChatScreen() {
         try { await markConversationAsRead(conversationId); } catch { /* non-fatal */ }
       } catch (err) {
         console.error('Error loading match chat:', err);
+        setLoadError(true);
       } finally {
         setLoadingInit(false);
       }
@@ -136,7 +145,7 @@ export default function MatchChatScreen() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [conversationId, profile, paramTeamId]);
+  }, [conversationId, profile, paramTeamId, retryToken]);
 
   const handleSend = async () => {
     const text = inputText.trim();
@@ -240,6 +249,16 @@ export default function MatchChatScreen() {
       {loadingInit ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#53E076" />
+        </View>
+      ) : loadError ? (
+        <View className="flex-1 items-center justify-center px-6">
+          <EmptyState
+            icon="wifi-off"
+            title="No se pudo cargar el chat"
+            description="Revisá tu conexión e intentá de nuevo. Si el problema sigue, salí y volvé a entrar al partido."
+            actionLabel="Reintentar"
+            onAction={() => setRetryToken((token) => token + 1)}
+          />
         </View>
       ) : (
         <KeyboardAvoidingView

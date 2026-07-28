@@ -87,7 +87,12 @@ export function FilterModal({
             <Text className="text-neutral-on-surface text-xl font-semibold">
               Filtros
             </Text>
-            <TouchableOpacity onPress={onClose} activeOpacity={0.7} className="p-1">
+            <TouchableOpacity
+              onPress={onClose}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              className="p-1"
+            >
               <AppIcon family="material-icons" name="close" size={20} color="#E5E2E1" />
             </TouchableOpacity>
           </View>

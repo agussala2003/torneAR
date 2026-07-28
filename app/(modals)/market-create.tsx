@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -193,7 +193,16 @@ export default function MarketCreateModal() {
         </View>
       </View>
 
-      <ScrollView className="flex-1 px-6 pt-6" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1"
+      >
+      <ScrollView
+        className="flex-1 px-6 pt-6"
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
 
         {/* --- CAMPOS EXCLUSIVOS DE EQUIPO --- */}
         {creationType === 'TEAM' && (
@@ -201,8 +210,8 @@ export default function MarketCreateModal() {
             {isLoadingTeams ? (
               <ActivityIndicator size="large" color="#00E65B" className="mb-6" />
             ) : managedTeams.length === 0 ? (
-              <View className="bg-surface-high p-6 rounded-xl mb-6 border border-error/20">
-                <Text className="text-error font-uiBold text-base mb-2 text-center">Acceso Restringido</Text>
+              <View className="bg-surface-high p-6 rounded-xl mb-6 border border-danger-error/20">
+                <Text className="text-danger-error font-uiBold text-base mb-2 text-center">Acceso Restringido</Text>
                 <Text className="text-neutral-on-surface-variant text-sm text-center">
                   Debés ser Capitán o Subcapitán de un equipo para crear esta publicación.
                 </Text>
@@ -214,7 +223,7 @@ export default function MarketCreateModal() {
               <Text className="text-neutral-on-surface-variant font-ui text-xs mb-4">Completá estos datos si les falta 1 para jugar pronto. Dejalo en blanco si buscan fijo.</Text>
 
               <View className="mb-4">
-                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Día</Text>
+                <Text className="text-neutral-on-surface font-ui text-xs mb-1">Día</Text>
                 <View className="flex-row items-center bg-surface-high rounded-lg overflow-hidden">
                   <TouchableOpacity
                     onPress={() => setShowDatePicker(true)}
@@ -239,7 +248,7 @@ export default function MarketCreateModal() {
               </View>
 
               <View className="mb-4">
-                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Hora</Text>
+                <Text className="text-neutral-on-surface font-ui text-xs mb-1">Hora</Text>
                 <View className="flex-row items-center bg-surface-high rounded-lg overflow-hidden">
                   <TouchableOpacity
                     onPress={() => setShowTimePicker(true)}
@@ -266,7 +275,7 @@ export default function MarketCreateModal() {
               </View>
 
               <View>
-                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Zona</Text>
+                <Text className="text-neutral-on-surface font-ui text-xs mb-1">Zona</Text>
                 <TouchableOpacity
                   onPress={() => setShowZonePicker(true)}
                   activeOpacity={0.7}
@@ -280,7 +289,7 @@ export default function MarketCreateModal() {
               </View>
 
               <View className="mt-4">
-                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-1">Complejo (opcional)</Text>
+                <Text className="text-neutral-on-surface font-ui text-xs mb-1">Complejo (opcional)</Text>
                 {zone ? (
                   loadingVenues ? (
                     <ActivityIndicator size="small" color="#53E076" style={{ alignSelf: 'flex-start', marginTop: 4 }} />
@@ -315,18 +324,19 @@ export default function MarketCreateModal() {
                     </View>
                   )
                 ) : (
-                  <TextInput
-                    value={complex}
-                    onChangeText={setComplex}
-                    placeholder="Ej: Complejo El Potrero"
-                    placeholderTextColor="#88998D"
-                    className="bg-surface-high p-3 rounded-lg text-neutral-on-surface font-ui"
-                  />
+                  /* Sin texto libre: el complejo sale sólo del catálogo `venues`.
+                     Escribirlo a mano generaba predios fantasma que no matchean
+                     con ninguna cancha real ni tienen coordenadas. */
+                  <View className="bg-surface-high p-3 rounded-lg">
+                    <Text className="font-ui text-sm text-[#88998D]">
+                      Elegí una zona para ver sus complejos
+                    </Text>
+                  </View>
                 )}
               </View>
 
               <View className="mt-4">
-                <Text className="text-neutral-on-surface font-uiMedium text-xs mb-2">Tipo de cancha (opcional)</Text>
+                <Text className="text-neutral-on-surface font-ui text-xs mb-2">Tipo de cancha (opcional)</Text>
                 <View className="flex-row flex-wrap gap-2">
                   {TEAM_FORMAT_OPTIONS.map((item) => {
                     const active = pitchType === item.value;
@@ -359,7 +369,7 @@ export default function MarketCreateModal() {
                 activeOpacity={0.8}
                 className={`flex-1 p-4 rounded-xl border items-center ${playerPostType === 'BUSCA_EQUIPO' ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
               >
-                <Text className={`font-uiMedium text-center ${playerPostType === 'BUSCA_EQUIPO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
+                <Text className={`font-ui text-center ${playerPostType === 'BUSCA_EQUIPO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
                   Unirme a Equipo
                 </Text>
               </TouchableOpacity>
@@ -368,7 +378,7 @@ export default function MarketCreateModal() {
                 activeOpacity={0.8}
                 className={`flex-1 p-4 rounded-xl border items-center ${playerPostType === 'BUSCA_PARTIDO' ? 'bg-brand-primary/10 border-brand-primary' : 'bg-surface-low border-transparent'}`}
               >
-                <Text className={`font-uiMedium text-center ${playerPostType === 'BUSCA_PARTIDO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
+                <Text className={`font-ui text-center ${playerPostType === 'BUSCA_PARTIDO' ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
                   Jugar un Partido
                 </Text>
               </TouchableOpacity>
@@ -388,7 +398,7 @@ export default function MarketCreateModal() {
             onPress={() => setPosition('CUALQUIERA')}
             activeOpacity={0.7}
           >
-            <Text className="text-brand-primary font-uiMedium text-sm">
+            <Text className="text-brand-primary font-ui text-sm">
               {creationType === 'TEAM' ? 'Cualquier posición / Flexible' : 'Soy Flexible / Cualquier posición'}
             </Text>
           </TouchableOpacity>
@@ -421,6 +431,7 @@ export default function MarketCreateModal() {
         />
 
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <ZonePickerDialog
         visible={showZonePicker}

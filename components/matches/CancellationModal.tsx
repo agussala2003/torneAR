@@ -6,8 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import type { CancellationFormData, CancellationReason } from '@/components/matches/types';
 
 interface Props {
@@ -55,11 +59,24 @@ export function CancellationModal({ visible, onClose, onSubmit, isLateWarning }:
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Alert propio renderizado dentro del <Modal>: el de la pantalla padre queda
+  // detras de esta ventana nativa y el usuario nunca llega a verlo.
+  const { showAlert, AlertComponent } = useCustomAlert();
+
   async function handleSubmit() {
+    if (loading) return;
     setLoading(true);
     try {
       await onSubmit({ reason, notes: notes.trim() || null });
       onClose();
+    } catch (err) {
+      // Antes no habia catch y el `onSubmit` del caller tampoco lo tenia: un fallo
+      // de red terminaba en un unhandled rejection, con el sheet abierto y cero
+      // feedback para el usuario.
+      showAlert(
+        'No se pudo solicitar',
+        getGenericSupabaseErrorMessage(err, 'No pudimos enviar la solicitud. Intenta de nuevo.'),
+      );
     } finally {
       setLoading(false);
     }
@@ -67,8 +84,13 @@ export function CancellationModal({ visible, onClose, onSubmit, isLateWarning }:
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View className="flex-1 justify-end bg-black/60">
-        <View className="rounded-t-3xl bg-surface-container pb-10">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        className="flex-1 justify-end bg-black/60"
+      >
+        {/* maxHeight acota el sheet para que el ScrollView pueda llegar al fondo:
+            el textarea de notas y el boton de envio estan al final. */}
+        <View className="rounded-t-3xl bg-surface-container pb-10" style={{ maxHeight: '90%' }}>
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 py-4">
             <Text className="font-uiBold text-lg text-neutral-on-surface">
@@ -83,6 +105,7 @@ export function CancellationModal({ visible, onClose, onSubmit, isLateWarning }:
             className="px-5"
             contentContainerStyle={{ paddingBottom: 16 }}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             {/* Late warning */}
             {isLateWarning && (
@@ -163,7 +186,9 @@ export function CancellationModal({ visible, onClose, onSubmit, isLateWarning }:
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
+
+      {AlertComponent}
     </Modal>
   );
 }

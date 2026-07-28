@@ -3,7 +3,7 @@ import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { GlobalLoader } from '@/components/GlobalLoader';
+import { NotificationsSkeleton } from '@/components/notifications/NotificationsSkeleton';
 import { useAuth } from '@/context/AuthContext';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { supabase } from '@/lib/supabase';
@@ -112,11 +112,44 @@ export default function NotificationsScreen() {
         });
       }
 
-      if (item.type === 'SOLICITUD_UNION_EQUIPO' && item.data && typeof item.data === 'object') {
-        const maybeData = item.data as { team_id?: unknown };
-        if (typeof maybeData.team_id === 'string' && maybeData.team_id.length > 0) {
-          router.push({ pathname: '/team-manage', params: { teamId: maybeData.team_id } });
-        }
+      // Ruteo por tipo. Antes solo SOLICITUD_UNION_EQUIPO navegaba: el resto —
+      // incluida SOLICITUD_UNION_ACEPTADA, que justamente le pide al jugador
+      // confirmar el traspaso — se marcaba como leída y no hacía nada, dejando
+      // al usuario sin forma de llegar a la acción que la notificación pedía.
+      const maybeData = (item.data ?? {}) as { team_id?: unknown };
+      const teamId = typeof maybeData.team_id === 'string' ? maybeData.team_id : null;
+
+      switch (item.type) {
+        case 'SOLICITUD_UNION_EQUIPO':
+          // Capitán: la solicitud se modera desde la gestión del equipo.
+          if (teamId) router.push({ pathname: '/team-manage', params: { teamId } });
+          break;
+
+        case 'SOLICITUD_UNION_ACEPTADA':
+        case 'SOLICITUD_UNION_RECHAZADA':
+          // Jugador: acá confirma el traspaso que habilita su alta al plantel.
+          router.push('/team-requests');
+          break;
+
+        case 'DESAFIO_RECIBIDO':
+        case 'DESAFIO_ACEPTADO':
+        case 'DESAFIO_RECHAZADO':
+          router.push('/challenge-inbox');
+          break;
+
+        case 'ROL_ACTUALIZADO':
+        case 'EXPULSADO_EQUIPO':
+          if (teamId) router.push({ pathname: '/team-manage', params: { teamId } });
+          break;
+
+        case 'POSTULACION_RECIBIDA':
+        case 'POSTULACION_RESPONDIDA':
+          router.push('/market-chats');
+          break;
+
+        default:
+          // Partidos, disputas, WO y temporada: sin destino específico todavía.
+          break;
       }
     } catch (error) {
       showAlert('No se pudo abrir', getGenericSupabaseErrorMessage(error, 'No se pudo abrir la notificacion.'));
@@ -134,8 +167,11 @@ export default function NotificationsScreen() {
     );
   }
 
-  if (loading) {
-    return <GlobalLoader label="Cargando notificaciones" />;
+  // La suscripcion realtime recarga esta pantalla ante cualquier INSERT/UPDATE.
+  // Acotar el esqueleto a la carga inicial evita que la lista desaparezca cada
+  // vez que llega una notificacion nueva.
+  if (loading && !viewData) {
+    return <NotificationsSkeleton />;
   }
 
   return (

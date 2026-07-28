@@ -54,31 +54,49 @@ export function MatchCard({
       onPress={() => onPress(entry.id)}
       className="rounded-2xl bg-surface-container p-4"
     >
-      {/* Header */}
-      <View className="mb-3 flex-row items-center gap-2">
+      {/* Header — dos filas.
+          Antes eran cinco elementos en un solo `flex-row` sin `flex-wrap`:
+          badge de estado, badge de cancelación, tipo/formato, fecha (`ml-auto`)
+          y predio. Ninguno podía encoger, así que con un nombre de complejo
+          largo la fila se pasaba del ancho de la tarjeta. El predio además
+          quedaba DESPUÉS del `ml-auto` de la fecha, rompiendo la alineación.
+          Separar metadatos (arriba) de lugar y hora (abajo) hace que quepan por
+          diseño, no por truncado agresivo. */}
+      <View className="mb-2 flex-row flex-wrap items-center gap-2">
         <MatchStatusBadge status={entry.status} />
         {entry.hasPendingCancellation && (
-          <View className="flex-row items-center rounded bg-warning-tertiary/20 px-2 py-0.5">
+          <View className="shrink-0 flex-row items-center rounded bg-warning-tertiary/20 px-2 py-0.5">
             <Text className="font-displayBlack text-[9px] uppercase tracking-wide text-warning-tertiary">
               Cancelación pendiente
             </Text>
           </View>
         )}
-        <Text className="font-uiBold text-[11px] text-neutral-on-surface-variant">
+        <Text className="font-uiBold shrink-0 text-[11px] text-neutral-on-surface-variant">
           {MATCH_TYPE_LABEL[entry.matchType] ?? entry.matchType}
           {entry.format ? ` · ${FORMAT_SHORT[entry.format] ?? entry.format}` : ''}
         </Text>
-        {entry.scheduledAt && (
-          <Text className="ml-auto font-ui text-[10px] text-neutral-outline">
-            {formatDate(entry.scheduledAt)}
-          </Text>
-        )}
-        {entry.venue && (
-          <Text className="font-ui text-[10px] text-neutral-outline" numberOfLines={1}>
-            {entry.venue}
-          </Text>
-        )}
       </View>
+
+      {(entry.scheduledAt || entry.venue) && (
+        <View className="mb-3 flex-row items-center gap-2">
+          {entry.scheduledAt && (
+            <Text className="font-ui shrink-0 text-[10px] text-neutral-outline">
+              {formatDate(entry.scheduledAt)}
+            </Text>
+          )}
+          {entry.venue && (
+            <View className="flex-1" style={{ minWidth: 0 }}>
+              <Text
+                className="font-ui text-[10px] text-neutral-outline"
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {entry.venue}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Body: Team A | Center | Team B */}
       <View className="flex-row items-center">
