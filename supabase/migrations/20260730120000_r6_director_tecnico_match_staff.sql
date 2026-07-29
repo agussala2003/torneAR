@@ -287,3 +287,51 @@ CREATE POLICY match_results_insert_by_authorized_member ON public.match_results
 
 COMMENT ON POLICY match_results_insert_by_authorized_member ON public.match_results IS
   'R6: carga el resultado el cuerpo técnico del equipo (CAPITAN/SUBCAPITAN/DIRECTOR_TECNICO) o quien haya quedado marcado como is_result_loader al hacer check-in. El UPDATE de un resultado ajeno sigue siendo sólo del capitán.';
+
+
+-- ═══════════════════════════════════════════════════════════════
+-- 3. match_results — grants base de tabla (fix del CI de R6)
+-- ═══════════════════════════════════════════════════════════════
+-- La policy de arriba jamás llegaba a evaluarse en CI: Postgres rechazaba
+-- antes con 42501 `permission denied for table match_results`. Las RLS NO
+-- eximen de los privilegios base de la tabla — filtran filas, no conceden
+-- acceso. `match_results` se crea en 20240101000000 y ninguna migración le
+-- otorgó nunca privilegios de tabla a `authenticated`.
+--
+-- ── Por qué apareció recién ahora, y sólo en CI ──────────────────────────────
+-- Es version-skew del baseline de default privileges de Supabase, el riesgo que
+-- ya advierte la cabecera de tests/010-schema.spec.sql:
+--
+--   · CLI 2.83.0 (local)  → el baseline de `public` concedía a `authenticated`
+--     los 7 privilegios sobre toda tabla nueva, DML incluido. El grant faltante
+--     quedaba enmascarado y la suite pasaba 230/230.
+--   · CLI 2.109.1 (pineada en .github/workflows/ci.yml) → el baseline dejó de
+--     conceder DML: sólo quedan REFERENCES, TRIGGER y TRUNCATE. Toda tabla sin
+--     GRANT explícito en una migración pierde SELECT/INSERT/UPDATE/DELETE.
+--
+-- Medido en el stack efímero con 2.109.1, antes de este bloque:
+--   match_results / authenticated → REFERENCES, TRIGGER, TRUNCATE  (sin DML)
+--
+-- El GRANT explícito es la corrección real, no un parche del entorno: deja de
+-- depender de un baseline que Supabase ya cambió una vez. Mismo criterio con el
+-- que se cerró el drift de challenges (20260719120000) y de las tablas core
+-- (20260719120500), ambos disparados por este mismo pipeline.
+--
+-- ── Qué se otorga, y por qué exactamente esto ───────────────────────────────
+--   · SELECT — la app lo lee desde el cliente en lib/home-data.ts,
+--     lib/team-stats-api.ts y lib/profile-stats-api.ts, y la policy
+--     `match_results_select_all` (20240101000000) ya es `using (true)`.
+--   · INSERT — lo que habilita esta migración: la carga de resultado del cuerpo
+--     técnico, gobernada por match_results_insert_by_authorized_member.
+--   · UPDATE — la corrección de un resultado, gobernada por
+--     `match_results_update_by_loader_or_admin` (20260401015725), que ya
+--     existía sin el privilegio de tabla que la hacía alcanzable.
+--
+-- DELETE queda deliberadamente afuera: no hay ninguna policy DELETE en
+-- `match_results`, así que el grant sería inerte. Mismo criterio que
+-- 20260722130000, que revocó el DELETE inerte de match_participants.
+--
+-- Ni 010-schema ni 015-schema-interactions asertan `match_results` con
+-- table_privs_are, así que este grant no altera ninguna matriz exact-match.
+-- Idempotente: GRANT sobre un privilegio ya otorgado es un no-op.
+GRANT SELECT, INSERT, UPDATE ON public.match_results TO authenticated;
