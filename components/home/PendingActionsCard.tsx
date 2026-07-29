@@ -21,11 +21,33 @@ const ACTION_CONFIG: Record<
     color: '#8CCDFF',
     ctaLabel: 'Ver solicitudes',
   },
+  // D12 — las cuatro señales que faltaban. Rojo para lo que se cierra solo si
+  // nadie actúa (el resultado en vivo), ámbar para lo que espera una respuesta.
+  LIVE_RESULT: {
+    icon: 'scoreboard-outline',
+    color: '#FFB4AB',
+    ctaLabel: 'Cargar resultado',
+  },
+  MATCH_PROPOSAL: {
+    icon: 'calendar-clock',
+    color: '#FABD32',
+    ctaLabel: 'Ver propuesta',
+  },
+  CANCELLATION_REQUEST: {
+    icon: 'calendar-remove',
+    color: '#FFB4AB',
+    ctaLabel: 'Responder',
+  },
+  MARKET_APPLICATION: {
+    icon: 'account-multiple-plus',
+    color: '#8CCDFF',
+    ctaLabel: 'Ver Mercado',
+  },
 };
 
 interface Props {
   actions: PendingAction[];
-  onActionPress: (type: PendingActionType) => void;
+  onActionPress: (action: PendingAction) => void;
 }
 
 export function PendingActionsCard({ actions, onActionPress }: Props) {
@@ -44,7 +66,7 @@ export function PendingActionsCard({ actions, onActionPress }: Props) {
             <TouchableOpacity
               key={action.type}
               activeOpacity={0.8}
-              onPress={() => onActionPress(action.type)}
+              onPress={() => onActionPress(action)}
               className={`flex-row items-center gap-3 px-4 py-3.5 ${!isLast ? 'border-b border-neutral-outline/20' : ''}`}
             >
               {/* Icon badge */}

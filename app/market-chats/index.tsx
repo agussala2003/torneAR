@@ -19,6 +19,7 @@ import {
   MarketConversation,
 } from '@/lib/chat-api';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { Logger } from '@/lib/logger';
 
 type ChatFilter = 'ALL' | 'TEAMS' | 'PLAYERS';
 
@@ -39,7 +40,11 @@ export default function MarketInboxScreen() {
     try {
       const inbox = await fetchInbox();
       setChats(inbox);
-    } catch {
+    } catch (error) {
+      Logger.error('No se pudo cargar la bandeja de chats del mercado', {
+        scope: 'market-chats.index.loadData',
+        error,
+      });
       showAlert('Error', 'No se pudieron cargar los chats.');
     } finally {
       setIsLoading(false);

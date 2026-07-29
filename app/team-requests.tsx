@@ -13,6 +13,7 @@ import { TeamRequestsViewData, TeamRequestRow } from '@/components/team-requests
 import { TeamRequestsList } from '@/components/team-requests/TeamRequestsList';
 import { TransferOriginDialog } from '@/components/team-requests/TransferOriginDialog';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { Logger } from '@/lib/logger';
 
 export default function TeamRequestsScreen() {
   const router = useRouter();
@@ -43,6 +44,11 @@ export default function TeamRequestsScreen() {
       ]);
       setViewData(data);
     } catch (error) {
+      Logger.error('No se pudieron cargar las solicitudes del jugador', {
+        scope: 'team-requests.loadRequests',
+        profileId: profile.id,
+        error,
+      });
       showAlert('Error al cargar solicitudes', getGenericSupabaseErrorMessage(error, 'No se pudieron cargar tus solicitudes.'));
     } finally {
       setLoading(false);
@@ -64,6 +70,13 @@ export default function TeamRequestsScreen() {
         await loadRequests();
 
         setRequestPendingOrigin(null);
+        Logger.info('Traspaso confirmado por el jugador', {
+          scope: 'team-requests.runTransfer',
+          requestId: request.id,
+          toTeamId: request.team_id,
+          fromTeamId,
+          profileId: profile.id,
+        });
         showAlert(
           '¡Traspaso confirmado!',
           fromTeamId
@@ -71,6 +84,14 @@ export default function TeamRequestsScreen() {
             : `Ya sos parte de ${request.teams?.name ?? 'tu nuevo equipo'}.`,
         );
       } catch (error) {
+        Logger.error('No se pudo confirmar el traspaso', {
+          scope: 'team-requests.runTransfer',
+          requestId: request.id,
+          toTeamId: request.team_id,
+          fromTeamId,
+          profileId: profile.id,
+          error,
+        });
         showAlert('No pudimos confirmar el traspaso', getTeamActionErrorMessage(error));
       } finally {
         setConfirmingId(null);

@@ -4,6 +4,13 @@ import type { ProposalEntry } from '@/components/matches/types';
 interface Props {
   proposal: ProposalEntry;
   myTeamId: string;
+  /**
+   * Sólo CAPITAN/SUBCAPITAN pueden responder o cancelar una propuesta: lo exige
+   * la RLS de `match_proposals` y la RPC `confirm_match_proposal`. Con `false`
+   * la sección queda de sólo lectura — el resto del plantel ve los detalles
+   * acordados, que es información útil, pero no botones que van a rebotar.
+   */
+  canManage: boolean;
   onAccept: () => void;
   onReject: () => void;
   onCounterPropose?: () => void;
@@ -43,7 +50,7 @@ function formatFormat(fmt: string): string {
   return fmt.replace('FUTBOL_', 'F').replace('_', ' ');
 }
 
-export function ProposalSection({ proposal, myTeamId, onAccept, onReject, onCounterPropose, onCancelProposal }: Props) {
+export function ProposalSection({ proposal, myTeamId, canManage, onAccept, onReject, onCounterPropose, onCancelProposal }: Props) {
   const isFromMe = proposal.fromTeamId === myTeamId;
 
   return (
@@ -91,7 +98,17 @@ export function ProposalSection({ proposal, myTeamId, onAccept, onReject, onCoun
         )}
       </View>
 
-      {isFromMe ? (
+      {!canManage ? (
+        // Mismo criterio que CancellationRequestSection: en vez de esconder la
+        // sección entera, se explica quién tiene que responder.
+        <View className="rounded-xl bg-surface-high px-4 py-3">
+          <Text className="font-ui text-center text-sm text-neutral-on-surface-variant">
+            {isFromMe
+              ? 'Tu equipo envió esta propuesta. Esperando la respuesta del rival.'
+              : 'El rival propuso estos detalles. Tu capitán o subcapitán tiene que responder.'}
+          </Text>
+        </View>
+      ) : isFromMe ? (
         <View className="gap-2">
           <View className="rounded-xl bg-surface-high px-4 py-3">
             <Text className="font-ui text-center text-sm text-neutral-on-surface-variant">

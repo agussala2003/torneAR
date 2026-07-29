@@ -1,10 +1,23 @@
 import { supabase } from '@/lib/supabase';
+import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
+import { Logger } from '@/lib/logger';
 import type { MatchResultFormData, CancellationFormData, WoClaimFormData } from '@/components/matches/types';
 import type { Database } from '@/types/supabase';
 
 type NotificationType = Database['public']['Enums']['notification_type'];
 
 // Notifica a CAPITAN/SUBCAPITAN de un equipo. Silencioso: nunca bloquea el flujo principal.
+//
+// R8: sigue siendo silencioso para el USUARIO —el aviso es un efecto secundario
+// del flujo, no su objetivo— pero ya no es silencioso para nosotros. El `catch {}`
+// vacío original hacía que la no entrega de avisos críticos del ciclo del
+// partido ("el rival quiere cancelar el partido de mañana") fuera literalmente
+// inobservable: si la policy `notifications_insert_authenticated` rechazaba el
+// INSERT por alguna rama no contemplada, nadie se enteraba nunca.
+//
+// El destino final sigue siendo mover estos avisos a triggers server-side
+// (patrón de 20260711034845_g1_b2_match_status_notifications.sql); hasta
+// entonces, al menos queda registro de cada fallo.
 async function notifyTeamLeaders(
   teamId: string,
   type: NotificationType,
@@ -13,19 +26,53 @@ async function notifyTeamLeaders(
   data: Record<string, string>,
 ) {
   try {
-    const { data: members } = await supabase
+    const { data: members, error: membersError } = await supabase
       .from('team_members')
       .select('profile_id')
       .eq('team_id', teamId)
       .in('role', ['CAPITAN', 'SUBCAPITAN']);
 
-    if (!members || members.length === 0) return;
+    if (membersError) {
+      Logger.error('Error enviando notificación: no se pudo leer el plantel', {
+        scope: 'match-actions.notifyTeamLeaders',
+        teamId,
+        type,
+        error: membersError,
+      });
+      return;
+    }
 
-    await supabase.from('notifications').insert(
+    // Un equipo sin capitán ni subcapitán es un dato de dominio anómalo, no un
+    // error de red: el aviso simplemente no tiene a quién llegar.
+    if (!members || members.length === 0) {
+      Logger.warn('Notificación sin destinatarios: el equipo no tiene capitán ni subcapitán', {
+        scope: 'match-actions.notifyTeamLeaders',
+        teamId,
+        type,
+      });
+      return;
+    }
+
+    const { error: insertError } = await supabase.from('notifications').insert(
       members.map((m) => ({ profile_id: m.profile_id, type, title, body, data })),
     );
-  } catch {
-    // Silenciamos errores de notificación para no bloquear el flujo principal
+
+    if (insertError) {
+      Logger.error('Error enviando notificación', {
+        scope: 'match-actions.notifyTeamLeaders',
+        teamId,
+        type,
+        recipients: members.length,
+        error: insertError,
+      });
+    }
+  } catch (error) {
+    Logger.error('Error enviando notificación', {
+      scope: 'match-actions.notifyTeamLeaders',
+      teamId,
+      type,
+      error,
+    });
   }
 }
 
@@ -63,6 +110,71 @@ export async function submitProposal(
   if (error) throw error;
 }
 
+// ─── Errores estables de confirm_match_proposal ──────────────────────────────
+// Desde 20260728171000 la RPC rechaza la confirmación si algún plantel no llega
+// al mínimo del formato (E1), si la propuesta no es de ese partido (D7) o si el
+// partido ya no está PENDIENTE (D8). Sin este mapper el usuario veía el
+// fallback genérico de getGenericSupabaseErrorMessage, que se traga el motivo
+// real — justo el dato que necesita para poder actuar.
+
+export const PROPOSAL_ERROR_CODES = [
+  'SQUAD_TOO_SMALL',
+  'PROPOSAL_MATCH_MISMATCH',
+  'INVALID_MATCH_STATUS',
+  'MATCH_NOT_FOUND',
+  // D13 (20260728221000): los emiten el trigger de match_proposals al proponer
+  // y confirm_match_proposal al confirmar. El mismo código en los dos momentos,
+  // porque para el usuario es el mismo problema.
+  'PROPOSAL_DATE_IN_PAST',
+  'PROPOSAL_DATE_REQUIRED',
+  'TEAM_SCHEDULE_CONFLICT',
+] as const;
+
+export type ProposalErrorCode = (typeof PROPOSAL_ERROR_CODES)[number];
+
+const PROPOSAL_ERROR_MESSAGES: Record<ProposalErrorCode, string> = {
+  // El detalle del servidor nombra al equipo corto y el mínimo exigido, así que
+  // se conserva tal cual: es la única forma de saber a quién le falta gente.
+  SQUAD_TOO_SMALL: 'No alcanza el plantel para este formato.',
+  PROPOSAL_MATCH_MISMATCH:
+    'Esta propuesta no corresponde a este partido. Actualizá la pantalla e intentá de nuevo.',
+  INVALID_MATCH_STATUS: 'El partido ya no está pendiente: no se puede confirmar esta propuesta.',
+  MATCH_NOT_FOUND: 'No encontramos el partido. Actualizá la pantalla e intentá de nuevo.',
+  PROPOSAL_DATE_IN_PAST:
+    'La fecha y hora propuestas ya pasaron. Proponé un horario futuro para poder coordinar.',
+  PROPOSAL_DATE_REQUIRED: 'La propuesta necesita fecha y hora.',
+  // El detalle del servidor nombra al equipo comprometido; se conserva igual
+  // que en SQUAD_TOO_SMALL, porque saber cuál de los dos es el del conflicto
+  // es justo lo que permite resolverlo.
+  TEAM_SCHEDULE_CONFLICT: 'Ese horario choca con otro partido confirmado.',
+};
+
+/** Mensaje presentable para un error de confirmación de propuesta. */
+export function getProposalErrorMessage(error: unknown): string {
+  const message =
+    typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message?: unknown }).message ?? '')
+      : '';
+  const [prefix, ...rest] = message.split(':');
+  const code = prefix?.trim();
+
+  if ((PROPOSAL_ERROR_CODES as readonly string[]).includes(code)) {
+    const detail = rest.join(':').trim();
+    // SQUAD_TOO_SMALL trae el nombre del equipo y el mínimo en el detalle;
+    // TEAM_SCHEDULE_CONFLICT, el nombre del equipo ya comprometido.
+    if ((code === 'SQUAD_TOO_SMALL' || code === 'TEAM_SCHEDULE_CONFLICT') && detail) {
+      return `${PROPOSAL_ERROR_MESSAGES[code as ProposalErrorCode]} ${detail.charAt(0).toUpperCase()}${detail.slice(1)}.`;
+    }
+    return PROPOSAL_ERROR_MESSAGES[code as ProposalErrorCode];
+  }
+
+  // Mensajes sin prefijo estable que la RPC ya devolvía en castellano
+  // ("No autorizado…", "La propuesta ya no está pendiente…").
+  if (message.startsWith('No autorizado') || message.startsWith('La propuesta')) return message;
+
+  return getGenericSupabaseErrorMessage(error);
+}
+
 export async function acceptProposal(proposalId: string, matchId: string): Promise<void> {
   const { error } = await supabase.rpc('confirm_match_proposal', {
     p_proposal_id: proposalId,
@@ -88,23 +200,47 @@ export async function cancelProposal(proposalId: string): Promise<void> {
 }
 
 // ─── Check-in ─────────────────────────────────────────────────────────────────
-// Stamps the team's arrival, marks the caller as result-loader, and flips the
-// match to EN_VIVO once both teams are checked in.
+// Registra la llegada INDIVIDUAL del caller y lo habilita como result-loader.
+//
+// D9: el sello de presencia del EQUIPO (`checkin_team_X_at`, que es lo que lee
+// el WO automático del barrido) ya no lo pone un tap suelto: hace falta que el
+// equipo junte `min_players_to_start` check-ins. Por eso la RPC dejó de
+// devolver void — el jugador necesita saber si su llegada alcanzó para
+// presentar al equipo o cuántos faltan todavía.
+
+export interface CheckinTeamResult {
+  checkedInPlayers: number;
+  minPlayers: number;
+  /** El equipo ya está presentado (por quórum ahora o por la lista del capitán antes). */
+  teamSealed: boolean;
+  /** Este check-in fue el que completó el quórum. */
+  justSealed: boolean;
+  matchStatus: string;
+}
 
 export async function doCheckin(
   matchId: string,
   teamId: string,
   coords?: { lat: number; lng: number },
-): Promise<void> {
+): Promise<CheckinTeamResult> {
   // p_lat/p_lng son args opcionales del RPC tipado: undefined = omitidos en el
   // body y toman el DEFAULT NULL del servidor (misma semántica que antes).
-  const { error } = await supabase.rpc('checkin_team', {
+  const { data, error } = await supabase.rpc('checkin_team', {
     p_match_id: matchId,
     p_team_id: teamId,
     p_lat: coords?.lat,
     p_lng: coords?.lng,
   });
   if (error) throw error;
+
+  const raw = (data ?? {}) as Partial<Record<keyof CheckinTeamResult, unknown>>;
+  return {
+    checkedInPlayers: Number(raw.checkedInPlayers ?? 0),
+    minPlayers: Number(raw.minPlayers ?? 0),
+    teamSealed: raw.teamSealed === true,
+    justSealed: raw.justSealed === true,
+    matchStatus: String(raw.matchStatus ?? ''),
+  };
 }
 
 // ─── Result ──────────────────────────────────────────────────────────────────

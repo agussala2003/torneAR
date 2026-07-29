@@ -8,6 +8,7 @@ import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { uploadProfileAvatar } from '@/lib/profile-edit-data';
 import CustomAlert from '@/components/ui/CustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
+import { Logger } from '@/lib/logger';
 
 type ProfileHeaderProps = {
   profile: ProfileRow;
@@ -60,7 +61,11 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
         await uploadAvatar(asset.uri, asset.mimeType ?? 'image/jpeg');
       }
     } catch (error) {
-      console.error('Error picking image:', error);
+      Logger.error('Fallo el selector de imagen del avatar', {
+        scope: 'ProfileHeader.pickImage',
+        profileId: profile.id,
+        error,
+      });
       showAlert('Error', 'No se pudo seleccionar la imagen.');
     }
   };
@@ -82,7 +87,14 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
       onAvatarUpdate?.(filePath);
       showAlert('Exito', 'Foto de perfil actualizada correctamente.');
     } catch (error) {
-      console.error('Upload error:', error);
+      // El bucket `avatars` ya rompió antes por policies de Storage (ver las
+      // migraciones 20260727120000 / 20260727140000): que quede registrado.
+      Logger.error('Fallo la subida del avatar', {
+        scope: 'ProfileHeader.uploadAvatar',
+        profileId: profile.id,
+        mimeType,
+        error,
+      });
       showAlert('Error al subir', getGenericSupabaseErrorMessage(error, 'No se pudo subir la imagen. Revisa conexion y politicas del bucket avatars.'));
     } finally {
       setUploading(false);

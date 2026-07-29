@@ -10,6 +10,7 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { fetchPendingWoClaims, resolveWoClaim, type PendingWoClaim } from '@/lib/wo-admin-data';
+import { Logger } from '@/lib/logger';
 
 const REASON_LABELS: Record<string, string> = {
   NO_PRESENTACION: 'No presentación',
@@ -41,6 +42,10 @@ export default function WoReviewScreen() {
       setLoading(true);
       setClaims(await fetchPendingWoClaims());
     } catch (error) {
+      Logger.error('No se pudieron cargar los reclamos de WO pendientes', {
+        scope: 'admin.wo-review.loadClaims',
+        error,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(error, 'No se pudieron cargar los reclamos.'));
     } finally {
       setLoading(false);
@@ -64,6 +69,12 @@ export default function WoReviewScreen() {
       );
       setDialog(null);
       await loadClaims();
+      Logger.info(dialog.approve ? 'Reclamo de WO aprobado' : 'Reclamo de WO rechazado', {
+        scope: 'admin.wo-review.handleConfirm',
+        claimId: dialog.claim.claimId,
+        approved: dialog.approve,
+        adminProfileId: profile?.id,
+      });
       showAlert(
         dialog.approve ? 'WO aprobado' : 'WO rechazado',
         dialog.approve
@@ -73,6 +84,12 @@ export default function WoReviewScreen() {
         'success',
       );
     } catch (error) {
+      Logger.error('No se pudo resolver el reclamo de WO', {
+        scope: 'admin.wo-review.handleConfirm',
+        claimId: dialog.claim.claimId,
+        approved: dialog.approve,
+        error,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(error, 'No se pudo resolver el reclamo.'));
     } finally {
       setResolving(false);

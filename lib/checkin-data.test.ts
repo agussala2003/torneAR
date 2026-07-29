@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder } from './test-utils/supabase-mock';
+import {
+  fetchFormatRules,
+  submitTeamCheckin,
+  getCheckinErrorMessage,
+  CheckinError,
+} from './checkin-data';
 
 const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: {
@@ -11,13 +17,6 @@ const { supabaseMock } = vi.hoisted(() => ({
 vi.mock('@/lib/supabase', () => ({
   supabase: supabaseMock,
 }));
-
-import {
-  fetchFormatRules,
-  submitTeamCheckin,
-  getCheckinErrorMessage,
-  CheckinError,
-} from './checkin-data';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -109,9 +108,10 @@ describe('getCheckinErrorMessage', () => {
     expect(
       getCheckinErrorMessage({ message: 'SQUAD_LIMIT_EXCEEDED: FUTBOL_5 admite 10 (recibidos: 11)' }),
     ).toMatch(/máximo de convocados/i);
+    // R6: el DT también presenta la lista, así que el mensaje lo nombra.
     expect(
       getCheckinErrorMessage({ message: 'NOT_TEAM_ADMIN: sólo el capitán' }),
-    ).toMatch(/capitán o subcapitán/i);
+    ).toMatch(/capitán, el subcapitán o el DT/i);
     expect(
       getCheckinErrorMessage({ message: 'GEOFENCE_FAILED: estás a 900m' }),
     ).toMatch(/lejos de la cancha/i);

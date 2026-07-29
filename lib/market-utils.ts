@@ -1,4 +1,4 @@
-import type { MarketTeamPost } from './market-api';
+import type { ManagedTeam, MarketTeamPost } from './market-api';
 
 const PITCH_META_RE = /^\[\[pitch:((?:FUTBOL_)?(?:5|6|7|8|9|11)|F(?:5|6|7|8|9|11))\]\]\s*/i;
 
@@ -111,21 +111,61 @@ export function getInitials(name: string): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+/**
+ * ¿La fecha/hora del post sigue en el futuro?
+ * - Con match_date + match_time: vigente si el datetime >= ahora.
+ * - Sólo con match_date: vigente hasta el final de ese día.
+ * - Sin match_date válida: vigente (no hay agenda que vencer).
+ *
+ * M8: esta era la regla que usaba el listado para esconder posts vencidos, pero
+ * vivía enterrada dentro del `filter`. Extraerla permite aplicar exactamente el
+ * mismo criterio en `applyToTeamPost` — si el listado y la postulación usaran
+ * reglas distintas, el usuario vería un post que no puede postularse (o al
+ * revés) sin ninguna explicación.
+ */
+export function isTeamPostScheduleActive(
+  post: { match_date?: string | null; match_time?: string | null },
+  now = new Date(),
+): boolean {
+  const parsed = parseMatchDateTime(post.match_date, post.match_time);
+  if (!parsed) return true;
+
+  if (hasValidMatchTime(post.match_time)) {
+    return parsed.getTime() >= now.getTime();
+  }
+
+  const endOfDay = new Date(parsed);
+  endOfDay.setHours(23, 59, 59, 999);
+  return endOfDay.getTime() >= now.getTime();
+}
+
 // Keeps only active posts relative to current time when they include match date/time metadata.
-// - With match_date + match_time: post is active if datetime >= now.
-// - With only match_date: post is active until end of that day.
-// - Without valid match_date: post is kept (no schedule to expire).
 export function filterActiveTeamPostsBySchedule(posts: MarketTeamPost[], now = new Date()): MarketTeamPost[] {
-  return posts.filter((post) => {
-    const parsed = parseMatchDateTime(post.match_date, post.match_time);
-    if (!parsed) return true;
+  return posts.filter((post) => isTeamPostScheduleActive(post, now));
+}
 
-    if (hasValidMatchTime(post.match_time)) {
-      return parsed.getTime() >= now.getTime();
-    }
-
-    const endOfDay = new Date(parsed);
-    endOfDay.setHours(23, 59, 59, 999);
-    return endOfDay.getTime() >= now.getTime();
-  });
+/**
+ * M7 — Elige con qué equipo se postula el usuario a un post de jugador.
+ *
+ * `managedTeams` ya viene filtrado por `fetchUserManagedTeams` a los equipos
+ * donde es CAPITAN/SUBCAPITAN: es la única lista con la que la policy
+ * `market_player_post_applications_insert` deja insertar. El equipo activo del
+ * store, en cambio, puede ser uno donde el usuario es sólo JUGADOR — usarlo
+ * hacía que el INSERT rebotara por RLS.
+ *
+ * Prioridad: equipo activo (si lo gestiona) → preferido (el que la pantalla ya
+ * venía mostrando) → primero gestionado. `null` = no gestiona ninguno, la
+ * pantalla tiene que bloquear la acción antes de tocar la base.
+ */
+export function resolveApplicantTeam(
+  managedTeams: ManagedTeam[],
+  activeTeamId: string | null,
+  preferredTeamId?: string | null,
+): ManagedTeam | null {
+  if (managedTeams.length === 0) return null;
+  return (
+    managedTeams.find((team) => team.id === activeTeamId) ??
+    managedTeams.find((team) => team.id === preferredTeamId) ??
+    managedTeams[0]
+  );
 }

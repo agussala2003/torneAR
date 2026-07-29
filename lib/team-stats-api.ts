@@ -39,7 +39,7 @@ type MatchRaw = {
   team_b_id: string;
   team_a: { name: string } | null;
   team_b: { name: string } | null;
-  match_results: Array<{ team_id: string; goals_scored: number; goals_against: number }>;
+  match_results: { team_id: string; goals_scored: number; goals_against: number }[];
 };
 
 type MemberRaw = {
@@ -213,7 +213,7 @@ export async function fetchTeamStatsViewData(
     ]);
 
     if (!participantsRes.error) {
-      const rows = participantsRes.data as Array<{ profile_id: string }>;
+      const rows = participantsRes.data as { profile_id: string }[];
       for (const row of rows) {
         const current = participationMap.get(row.profile_id) ?? { matchesPlayed: 0, goals: 0 };
         participationMap.set(row.profile_id, {
@@ -236,7 +236,7 @@ export async function fetchTeamStatsViewData(
         .in('match_id', finishedMatchIds);
 
       if (!resultsRes.error && resultsRes.data) {
-        for (const row of resultsRes.data as Array<{ scorers: Array<{ profile_id: string; goals: number }> }>) {
+        for (const row of resultsRes.data as { scorers: { profile_id: string; goals: number }[] }[]) {
           for (const scorer of row.scorers ?? []) {
             const current = participationMap.get(scorer.profile_id) ?? {
               matchesPlayed: 0,
@@ -300,11 +300,11 @@ export async function fetchTeamBadges(teamId: string): Promise<TeamBadgeItem[]> 
     { p_team_id: teamId },
   );
   if (error) throw error;
-  return ((data ?? []) as Array<{
+  return ((data ?? []) as {
     id: string; slug: string; name: string;
     criteria_description: string; icon_url: string;
     entity_type: string; is_earned: boolean;
-  }>).map((r) => ({
+  }[]).map((r) => ({
     id: r.id,
     slug: r.slug,
     name: r.name,

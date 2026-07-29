@@ -13,6 +13,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import type { CancellationFormData, CancellationReason } from '@/components/matches/types';
+import { Logger } from '@/lib/logger';
 
 interface Props {
   visible: boolean;
@@ -68,8 +69,18 @@ export function CancellationModal({ visible, onClose, onSubmit, isLateWarning }:
     setLoading(true);
     try {
       await onSubmit({ reason, notes: notes.trim() || null });
+      Logger.info('Solicitud de cancelación confirmada desde el modal', {
+        scope: 'CancellationModal.handleSubmit',
+        reason,
+        isLateWarning,
+      });
       onClose();
     } catch (err) {
+      Logger.error('No se pudo enviar la solicitud de cancelación', {
+        scope: 'CancellationModal.handleSubmit',
+        reason,
+        error: err,
+      });
       // Antes no habia catch y el `onSubmit` del caller tampoco lo tenia: un fallo
       // de red terminaba en un unhandled rejection, con el sheet abierto y cero
       // feedback para el usuario.

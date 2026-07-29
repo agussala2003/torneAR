@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { imageIndexFromId, isUrgentPost, filterPostsByDay, sortPostsByNearest, filterActiveTeamPostsBySchedule, getInitials } from './market-utils';
-import type { MarketTeamPost } from './market-api';
+import { imageIndexFromId, isUrgentPost, filterPostsByDay, sortPostsByNearest, filterActiveTeamPostsBySchedule, isTeamPostScheduleActive, resolveApplicantTeam, getInitials } from './market-utils';
+import type { ManagedTeam, MarketTeamPost } from './market-api';
 
 describe('imageIndexFromId', () => {
   it('returns 0, 1, or 2', () => {
@@ -133,5 +133,50 @@ describe('filterActiveTeamPostsBySchedule', () => {
 
     const result = filterActiveTeamPostsBySchedule(posts, now);
     expect(result.map((p) => p.id)).toEqual(['no-date', 'invalid-date', 'invalid-time']);
+  });
+});
+
+describe('resolveApplicantTeam (M7)', () => {
+  const managed: ManagedTeam[] = [
+    { id: 'team-cap', name: 'Los Capitanes' },
+    { id: 'team-sub', name: 'Los Subcapitanes' },
+  ];
+
+  it('usa el equipo activo cuando el usuario lo gestiona', () => {
+    expect(resolveApplicantTeam(managed, 'team-sub')).toEqual(managed[1]);
+  });
+
+  // El caso del hallazgo: el activo del store es uno donde es sólo JUGADOR, así
+  // que no está en managedTeams y la policy de INSERT lo habría rebotado.
+  it('cae en un equipo gestionado cuando el activo no lo es', () => {
+    expect(resolveApplicantTeam(managed, 'team-donde-es-jugador')).toEqual(managed[0]);
+  });
+
+  it('prefiere el equipo preferido de la pantalla antes que el primero', () => {
+    expect(resolveApplicantTeam(managed, 'team-donde-es-jugador', 'team-sub')).toEqual(managed[1]);
+  });
+
+  it('ignora un preferido que tampoco gestiona', () => {
+    expect(resolveApplicantTeam(managed, null, 'team-ajeno')).toEqual(managed[0]);
+  });
+
+  it('devuelve null si no gestiona ningún equipo: la pantalla bloquea la acción', () => {
+    expect(resolveApplicantTeam([], 'team-donde-es-jugador')).toBeNull();
+  });
+});
+
+describe('isTeamPostScheduleActive (M8)', () => {
+  const now = new Date('2026-03-25T18:00:00');
+
+  it('rechaza un partido cuya hora ya pasó hoy', () => {
+    expect(isTeamPostScheduleActive({ match_date: '2026-03-25', match_time: '17:00' }, now)).toBe(false);
+  });
+
+  it('acepta un partido de hoy más tarde', () => {
+    expect(isTeamPostScheduleActive({ match_date: '2026-03-25', match_time: '21:00' }, now)).toBe(true);
+  });
+
+  it('acepta un post sin fecha: no hay agenda que vencer', () => {
+    expect(isTeamPostScheduleActive({ match_date: null, match_time: null }, now)).toBe(true);
   });
 });

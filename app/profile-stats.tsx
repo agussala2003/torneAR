@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchProfileStatsViewData } from '@/lib/profile-stats-api';
+import { Logger } from '@/lib/logger';
 import type { ProfileStatsViewData } from '@/components/profile-stats/types';
 import { StatsHeader } from '@/components/profile-stats/StatsHeader';
 import { StatsOverview } from '@/components/profile-stats/StatsOverview';
@@ -34,6 +35,11 @@ export default function ProfileStatsScreen() {
       setLoading(true);
       setViewData(await fetchProfileStatsViewData(profileId));
     } catch (error) {
+      Logger.error('No se pudo cargar el detalle de estadísticas del perfil', {
+        scope: 'profile-stats.loadData',
+        profileId,
+        error,
+      });
       showAlert(
         'Error al cargar stats',
         getGenericSupabaseErrorMessage(error, 'No se pudo cargar el detalle de estadísticas.'),

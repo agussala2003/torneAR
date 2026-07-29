@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 
 export type UserTeam = {
   id: string;
@@ -112,7 +113,14 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
         isLoading: false,
       });
     } catch (err) {
-      console.error('Error fetching teams for store:', err);
+      // El store queda con los equipos viejos (o vacío en la primera carga).
+      // Vacío es indistinguible de "este usuario no tiene equipos": toda la app
+      // se degrada a la vista de agente libre sin decir por qué.
+      Logger.error('No se pudieron cargar los equipos del usuario', {
+        scope: 'teamStore.fetchMyTeams',
+        profileId,
+        error: err,
+      });
       set({ isLoading: false });
     }
   },

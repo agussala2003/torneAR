@@ -8,6 +8,7 @@ import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { getTeamCategoryLabel, getTeamFormatLabel } from '@/lib/team-options';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { findTeamByCode, sendJoinRequest, TeamPreview } from '@/lib/team-join-data';
+import { Logger } from '@/lib/logger';
 
 export default function TeamJoinScreen() {
   const router = useRouter();
@@ -32,6 +33,10 @@ export default function TeamJoinScreen() {
       const foundTeam = await findTeamByCode(normalizedCode);
 
       if (!foundTeam) {
+        Logger.warn('Código de invitación sin equipo asociado', {
+          scope: 'team-join.handleFindTeam',
+          codeLength: normalizedCode.length,
+        });
         setTeam(null);
         showAlert('No encontrado', 'No existe un equipo con ese codigo.');
         return;
@@ -39,6 +44,10 @@ export default function TeamJoinScreen() {
 
       setTeam(foundTeam);
     } catch (error) {
+      Logger.error('No se pudo validar el código de invitación', {
+        scope: 'team-join.handleFindTeam',
+        error,
+      });
       showAlert('Error al buscar equipo', getGenericSupabaseErrorMessage(error, 'No se pudo validar el codigo de invitacion.'));
     } finally {
       setSearching(false);
@@ -57,15 +66,38 @@ export default function TeamJoinScreen() {
         username: profile.username
       }, team.name);
 
+      Logger.info('Solicitud de unión a equipo enviada', {
+        scope: 'team-join.handleJoinTeam',
+        teamId: team.id,
+        profileId: profile.id,
+      });
+
       showAlert('Solicitud enviada', `Tu solicitud para ${team.name} fue enviada.`, () => {
         router.back();
       });
     } catch (error: any) {
       if (error?.message === 'ALREADY_MEMBER') {
+        Logger.warn('Solicitud de unión rechazada: el usuario ya es miembro', {
+          scope: 'team-join.handleJoinTeam',
+          teamId: team.id,
+          profileId: profile.id,
+        });
         showAlert('Ya sos miembro', 'Ya formas parte de este equipo.');
       } else if (error?.message === 'REQUEST_PENDING') {
+        Logger.warn('Solicitud de unión rechazada: ya hay una pendiente', {
+          scope: 'team-join.handleJoinTeam',
+          teamId: team.id,
+          profileId: profile.id,
+        });
         showAlert('Solicitud pendiente', 'Ya enviaste una solicitud. Espera la respuesta del capitan.');
       } else {
+        Logger.error('No se pudo enviar la solicitud de unión al equipo', {
+          scope: 'team-join.handleJoinTeam',
+          teamId: team.id,
+          profileId: profile.id,
+          code: error?.code,
+          error,
+        });
         const fallbackMessage = error?.code === '42501'
           ? 'No tienes permisos para enviar solicitudes. Revisa las politicas de RLS.'
           : 'No se pudo completar el envio de la solicitud.';

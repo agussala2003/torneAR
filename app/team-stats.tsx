@@ -19,6 +19,7 @@ import { fetchTeamH2H } from '@/lib/team-h2h-data';
 import { TeamH2HSection } from '@/components/team-stats/TeamH2HSection';
 import { ChallengeButton } from '@/components/ranking/ChallengeButton';
 import { getActiveChallengeWithTeam } from '@/lib/challenge-actions';
+import { Logger } from '@/lib/logger';
 
 export default function TeamStatsScreen() {
   const router = useRouter();
@@ -44,18 +45,52 @@ export default function TeamStatsScreen() {
       const data = await fetchTeamStatsViewData(teamId, profile?.id ?? null);
       setViewData(data);
 
-      const badges = await fetchTeamBadges(teamId).catch(() => []);
+      // Los tres `.catch` de abajo degradan a vacío a propósito (una sección
+      // secundaria no debe tumbar la pantalla), pero sin telemetría eran
+      // indistinguibles de "este equipo no tiene insignias / historial".
+      const badges = await fetchTeamBadges(teamId).catch((error: unknown) => {
+        Logger.warn('No se pudieron cargar las insignias del equipo; se muestra vacío', {
+          scope: 'team-stats.loadData',
+          teamId,
+          error,
+        });
+        return [];
+      });
       setTeamBadges(badges);
 
       if (isRival && viewerTeamId) {
         const [h2h, challenged] = await Promise.all([
-          fetchTeamH2H(viewerTeamId, teamId).catch(() => []),
-          getActiveChallengeWithTeam(viewerTeamId, teamId).catch(() => false),
+          fetchTeamH2H(viewerTeamId, teamId).catch((error: unknown) => {
+            Logger.warn('No se pudo cargar el head-to-head; se muestra vacío', {
+              scope: 'team-stats.loadData',
+              teamId,
+              viewerTeamId,
+              error,
+            });
+            return [];
+          }),
+          getActiveChallengeWithTeam(viewerTeamId, teamId).catch((error: unknown) => {
+            // Degradar a `false` habilita el botón de desafío: si ya había uno
+            // activo, el usuario se come el rechazo del servidor sin saber por qué.
+            Logger.warn('No se pudo verificar si ya existe un desafío activo; se asume que no', {
+              scope: 'team-stats.loadData',
+              teamId,
+              viewerTeamId,
+              error,
+            });
+            return false;
+          }),
         ]);
         setH2hMatches(h2h as H2HMatch[]);
         setAlreadyChallenged(challenged as boolean);
       }
     } catch (error) {
+      Logger.error('No se pudo cargar el detalle de stats del equipo', {
+        scope: 'team-stats.loadData',
+        teamId,
+        viewerTeamId,
+        error,
+      });
       showAlert(
         'Error al cargar stats',
         getGenericSupabaseErrorMessage(error, 'No se pudo cargar el detalle del equipo.'),

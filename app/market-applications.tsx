@@ -7,26 +7,18 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { Logger } from '@/lib/logger';
 import {
   fetchApplicationsForPost,
+  markApplicationsAsSeen,
   respondToApplication,
   type MarketApplicationEntry,
   type MarketPostType,
 } from '@/lib/market-applications-api';
-
-const STATUS_LABEL: Record<string, string> = {
-  PENDIENTE: 'Pendiente',
-  VISTA: 'Vista',
-  ACEPTADA: 'Aceptada',
-  RECHAZADA: 'Rechazada',
-};
-
-const STATUS_CLASS: Record<string, string> = {
-  PENDIENTE: 'bg-warning-tertiary/20 text-warning-tertiary',
-  VISTA: 'bg-info-secondary/20 text-info-secondary',
-  ACEPTADA: 'bg-brand-primary/20 text-brand-primary',
-  RECHAZADA: 'bg-danger-error/20 text-danger-error',
-};
+import {
+  APPLICATION_STATUS_CLASS,
+  APPLICATION_STATUS_LABEL,
+} from '@/components/market/applicationStatus';
 
 export default function MarketApplicationsScreen() {
   const router = useRouter();
@@ -37,6 +29,27 @@ export default function MarketApplicationsScreen() {
   const [applications, setApplications] = useState<MarketApplicationEntry[]>([]);
   const [respondingId, setRespondingId] = useState<string | null>(null);
 
+  // M6: abrir esta pantalla ES el acuse de recibo. Es lo único que produce el
+  // estado VISTA, que existía en el CHECK y en la UI pero no se escribía nunca.
+  // Va después de pintar la lista y sin bloquearla: el dueño no pidió esto, así
+  // que no puede costarle ni un spinner ni un cartel de error si falla.
+  const markSeen = useCallback(async (id: string, type: MarketPostType) => {
+    try {
+      const seenIds = await markApplicationsAsSeen(id, type);
+      if (seenIds.length === 0) return;
+      setApplications((prev) =>
+        prev.map((entry) => (seenIds.includes(entry.id) ? { ...entry, status: 'VISTA' } : entry)),
+      );
+    } catch (err) {
+      Logger.warn('No se pudieron marcar las postulaciones como vistas', {
+        scope: 'market-applications.markSeen',
+        postId: id,
+        postType: type,
+        error: err,
+      });
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     if (!postId || !postType) {
       setLoading(false);
@@ -46,21 +59,55 @@ export default function MarketApplicationsScreen() {
       setLoading(true);
       const data = await fetchApplicationsForPost(postId, postType);
       setApplications(data);
+      void markSeen(postId, postType);
     } catch (err) {
+      Logger.error('No se pudieron cargar las postulaciones de la publicación', {
+        scope: 'market-applications.loadData',
+        postId,
+        postType,
+        error: err,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(err, 'No se pudieron cargar las postulaciones.'));
     } finally {
       setLoading(false);
     }
-  }, [postId, postType, showAlert]);
+  }, [postId, postType, showAlert, markSeen]);
 
   useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
 
   async function handleRespond(entry: MarketApplicationEntry, status: 'ACEPTADA' | 'RECHAZADA') {
     setRespondingId(entry.id);
     try {
-      await respondToApplication(entry.id, postType, status, entry.notifyProfileId);
+      await respondToApplication(entry.id, postType, status, entry.notifyProfileId, postId);
       await loadData();
+
+      // El alta NO ocurre acá: aceptar deja una solicitud de unión ACEPTADA y
+      // el jugador confirma el traspaso desde "Mis solicitudes". El mensaje
+      // tiene que decir eso — mismo criterio que la aprobación de solicitudes
+      // en team-manage.tsx, para que el capitán no se quede esperando a alguien
+      // que todavía no aparece en el plantel.
+      //
+      // M5: y tiene que decir además que el aviso se cerró y que el resto quedó
+      // rechazado. Es un efecto irreversible desde la UI (para volver a buscar
+      // hay que publicar de nuevo): enterarse al no encontrar la publicación en
+      // el Mercado no es aceptable.
+      if (status === 'ACEPTADA') {
+        showAlert(
+          'Postulación aceptada',
+          postType === 'TEAM'
+            ? `Le avisamos a ${entry.displayName} que puede sumarse: va a aparecer en el plantel cuando confirme el traspaso desde "Mis solicitudes". Cerramos la publicación y rechazamos las postulaciones que quedaban.`
+            : `Le avisamos a ${entry.displayName}. Cerramos la publicación y rechazamos las postulaciones que quedaban.`,
+        );
+      }
     } catch (err) {
+      Logger.error('No se pudo responder la postulación', {
+        scope: 'market-applications.handleRespond',
+        applicationId: entry.id,
+        postId,
+        postType,
+        status,
+        error: err,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     } finally {
       setRespondingId(null);
@@ -136,9 +183,9 @@ export default function MarketApplicationsScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <View className={`rounded-full px-2.5 py-1 ${STATUS_CLASS[item.status]?.split(' ')[0]}`}>
-                  <Text className={`font-uiBold text-[10px] uppercase ${STATUS_CLASS[item.status]?.split(' ')[1]}`}>
-                    {STATUS_LABEL[item.status] ?? item.status}
+                <View className={`rounded-full px-2.5 py-1 ${APPLICATION_STATUS_CLASS[item.status].bg}`}>
+                  <Text className={`font-uiBold text-[10px] uppercase ${APPLICATION_STATUS_CLASS[item.status].text}`}>
+                    {APPLICATION_STATUS_LABEL[item.status]}
                   </Text>
                 </View>
               </View>

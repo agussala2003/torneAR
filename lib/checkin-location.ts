@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { Logger } from '@/lib/logger';
 
 /**
  * Captura de ubicación para el check-in.
@@ -56,8 +57,16 @@ export async function getCheckinLocation(): Promise<CheckinLocationResult> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
+      Logger.warn('Permiso de ubicación denegado en el check-in', {
+        scope: 'getCheckinLocation',
+        status,
+      });
       return { ok: false, reason: 'PERMISSION_DENIED', message: MESSAGES.PERMISSION_DENIED };
     }
+
+    Logger.info('Permiso de ubicación otorgado para el check-in', {
+      scope: 'getCheckinLocation',
+    });
 
     const position = await withTimeout(
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
@@ -69,7 +78,18 @@ export async function getCheckinLocation(): Promise<CheckinLocationResult> {
     // sin check-in a usuarios legítimos.
     const accuracy = position.coords.accuracy;
     if (accuracy !== null && accuracy > MAX_ACCURACY_M) {
+      Logger.warn('Fix de GPS descartado por imprecisión', {
+        scope: 'getCheckinLocation',
+        accuracy,
+        maxAccuracy: MAX_ACCURACY_M,
+      });
       return { ok: false, reason: 'INACCURATE', message: MESSAGES.INACCURATE };
+    }
+
+    if (position.mocked === true) {
+      Logger.warn('Ubicación reportada como simulada en el check-in', {
+        scope: 'getCheckinLocation',
+      });
     }
 
     return {
@@ -82,8 +102,16 @@ export async function getCheckinLocation(): Promise<CheckinLocationResult> {
     };
   } catch (error) {
     if (error instanceof Error && error.message === 'LOCATION_TIMEOUT') {
+      Logger.warn('El GPS no respondió dentro del timeout del check-in', {
+        scope: 'getCheckinLocation',
+        timeoutMs: LOCATION_TIMEOUT_MS,
+      });
       return { ok: false, reason: 'TIMEOUT', message: MESSAGES.TIMEOUT };
     }
+    Logger.error('No se pudo obtener la ubicación para el check-in', {
+      scope: 'getCheckinLocation',
+      error,
+    });
     return { ok: false, reason: 'UNAVAILABLE', message: MESSAGES.UNAVAILABLE };
   }
 }

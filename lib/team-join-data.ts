@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { TeamCategory, TeamFormat, TeamRole } from '@/lib/team-options';
 
 export type TeamPreview = {
@@ -89,6 +90,14 @@ export async function sendJoinRequest(
       if (notificationsError) throw notificationsError;
     }
   } catch (notificationError) {
-    console.warn('No se pudieron crear notificaciones para solicitud de equipo', notificationError);
+    // R8: la solicitud SÍ quedó creada (el throw de arriba ya pasó). Lo que se
+    // pierde es el aviso al capitán, o sea que la solicitud queda esperando en
+    // una bandeja que nadie sabe que tiene algo.
+    Logger.error('Error enviando notificación: solicitud de unión a equipo', {
+      scope: 'team-join-data.requestToJoinTeam',
+      teamId,
+      requesterProfileId: profile.id,
+      error: notificationError,
+    });
   }
 }

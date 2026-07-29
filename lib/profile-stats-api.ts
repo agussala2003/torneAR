@@ -21,7 +21,7 @@ type ParticipantRaw = {
     team_b_id: string;
     team_a: { name: string } | null;
     team_b: { name: string } | null;
-    match_results: Array<{ team_id: string; goals_scored: number; goals_against: number }>;
+    match_results: { team_id: string; goals_scored: number; goals_against: number }[];
   } | null;
 };
 

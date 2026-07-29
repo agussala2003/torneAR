@@ -1,5 +1,7 @@
-import { View, Text, TouchableOpacity } from 'react-native';
+import { useState } from 'react';
+import { Modal, View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import type { MatchDetailViewData, DisputeState } from '@/components/matches/types';
 
 interface Props {
@@ -10,11 +12,63 @@ interface Props {
   onResolve: () => void;
 }
 
+const CONFIRM_MESSAGE =
+  'Atención: Si hay un empate en los votos (o si nadie votó aún), el partido se resolverá ' +
+  'instantáneamente a favor del equipo con mayor puntaje de Fair Play. Esta acción es ' +
+  'irreversible y sobreescribirá el resultado. ¿Deseas proceder?';
+
+function formatFairPlay(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 export function DisputeSection({ match, profileId, disputeState, onVote, onResolve }: Props) {
+  const [confirming, setConfirming] = useState(false);
+
   const didCheckin = match.participants.some(
     (p) => p.profileId === profileId && p.didCheckin,
   );
   const isCaptainOrSub = match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN';
+
+  // ─── Anticipación del desempate por Fair Play ──────────────────────────────
+  // `resolve_match_dispute` desempata por fair_play_score cuando los votos
+  // están igualados, y el 0-0 es el estado en que nace toda disputa: sin esto,
+  // el botón le ofrecía al capitán del equipo con menos Fair Play una acción
+  // que le regalaba el partido al rival en el acto. Se calcula sobre "votos
+  // empatados" (no sólo 0-0) porque ésa es la condición real de la RPC.
+  const isMyTeamA = match.teamA.id === match.myTeamId;
+  const myFairPlay = disputeState
+    ? isMyTeamA
+      ? disputeState.fairPlayTeamA
+      : disputeState.fairPlayTeamB
+    : null;
+  const opponentFairPlay = disputeState
+    ? isMyTeamA
+      ? disputeState.fairPlayTeamB
+      : disputeState.fairPlayTeamA
+    : null;
+  const opponentName = isMyTeamA ? match.teamB.name : match.teamA.name;
+
+  const votesTied =
+    disputeState !== null && disputeState.votesForTeamA === disputeState.votesForTeamB;
+
+  // Resolver ahora me haría perder por Fair Play.
+  const wouldLoseByFairPlay =
+    votesTied && myFairPlay !== null && opponentFairPlay !== null && myFairPlay < opponentFairPlay;
+
+  // Votos y Fair Play idénticos: la RPC no puede desempatar y lanza
+  // "Empate total … requiere revisión manual del administrador" (hallazgo D2,
+  // todavía abierto). Mostrar el botón acá sólo produce un error crudo.
+  const wouldDeadlock =
+    votesTied && myFairPlay !== null && opponentFairPlay !== null && myFairPlay === opponentFairPlay;
+
+  // Hasta que el estado de la disputa no cargó no sabemos de qué lado cae el
+  // desempate: no ofrecemos la acción a ciegas.
+  const canResolve = isCaptainOrSub && disputeState !== null && !wouldLoseByFairPlay && !wouldDeadlock;
+
+  const confirmMessage =
+    votesTied && myFairPlay !== null && opponentFairPlay !== null
+      ? `${CONFIRM_MESSAGE}\n\nAhora mismo la votación está empatada (${disputeState!.votesForTeamA} a ${disputeState!.votesForTeamB}) y tu equipo tiene el Fair Play más alto: ${formatFairPlay(myFairPlay)} contra ${formatFairPlay(opponentFairPlay)} de ${opponentName}.`
+      : CONFIRM_MESSAGE;
 
   return (
     <View className="mt-4 gap-3">
@@ -95,11 +149,11 @@ export function DisputeSection({ match, profileId, disputeState, onVote, onResol
         </View>
       )}
 
-      {/* ── Captain / sub resolution button ──────────────────────────────── */}
-      {isCaptainOrSub && (
+      {/* ── Captain / sub resolution ─────────────────────────────────────── */}
+      {canResolve && (
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={onResolve}
+          onPress={() => setConfirming(true)}
           className="items-center rounded-xl bg-warning-tertiary py-3"
         >
           <Text className="font-displayBlack text-[13px] uppercase tracking-widest text-surface-base">
@@ -107,6 +161,66 @@ export function DisputeSection({ match, profileId, disputeState, onVote, onResol
           </Text>
         </TouchableOpacity>
       )}
+
+      {/* Resolver ahora sería auto-derrota: se explica en vez de ofrecerlo. */}
+      {isCaptainOrSub && wouldLoseByFairPlay && myFairPlay !== null && opponentFairPlay !== null && (
+        <View className="rounded-xl border border-neutral-outline/20 bg-surface-container px-4 py-3">
+          <View className="mb-1 flex-row items-center gap-2">
+            <AppIcon family="material-community" name="scale-balance" size={16} color="#869585" />
+            <Text className="font-uiBold text-sm text-neutral-on-surface">
+              Resolución no disponible todavía
+            </Text>
+          </View>
+          <Text className="font-ui text-xs leading-5 text-neutral-on-surface-variant">
+            Con la votación empatada ({disputeState!.votesForTeamA} a {disputeState!.votesForTeamB}),
+            resolver ahora le daría el partido a {opponentName} por Fair Play:{' '}
+            {formatFairPlay(opponentFairPlay)} contra {formatFairPlay(myFairPlay)} de tu equipo.
+            Esperá a que voten los jugadores que hicieron check-in.
+          </Text>
+        </View>
+      )}
+
+      {/* Empate total: la RPC no puede desempatar (hallazgo D2, abierto). */}
+      {isCaptainOrSub && wouldDeadlock && (
+        <View className="rounded-xl border border-neutral-outline/20 bg-surface-container px-4 py-3">
+          <View className="mb-1 flex-row items-center gap-2">
+            <AppIcon family="material-community" name="scale-balance" size={16} color="#869585" />
+            <Text className="font-uiBold text-sm text-neutral-on-surface">
+              Resolución no disponible todavía
+            </Text>
+          </View>
+          <Text className="font-ui text-xs leading-5 text-neutral-on-surface-variant">
+            La votación está empatada ({disputeState!.votesForTeamA} a {disputeState!.votesForTeamB})
+            y ambos equipos tienen el mismo Fair Play, así que la resolución automática no puede
+            desempatar. Necesitan que voten los jugadores que hicieron check-in.
+          </Text>
+        </View>
+      )}
+
+      {/* El diálogo va dentro de un Modal nativo: esta sección vive dentro del
+          ScrollView del detalle, y el overlay `absolute inset-0` de
+          ConfirmDialog se dimensionaría contra esta tarjeta en vez de contra la
+          pantalla. Mismo patrón que ResultModal / WoModal / CancellationModal. */}
+      <Modal
+        visible={confirming}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirming(false)}
+      >
+        <ConfirmDialog
+          visible={confirming}
+          title="Resolver disputa"
+          message={confirmMessage}
+          confirmLabel="Sí, resolver"
+          cancelLabel="Volver"
+          confirmTone="danger"
+          onConfirm={() => {
+            setConfirming(false);
+            onResolve();
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      </Modal>
     </View>
   );
 }

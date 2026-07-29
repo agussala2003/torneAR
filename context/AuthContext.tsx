@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { Logger } from '@/lib/logger';
 import { Database } from '../types/supabase';
 import { useTeamStore } from '@/stores/teamStore';
 
@@ -55,9 +56,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return data;
       }
 
+      // Devolver null acá manda al usuario a /onboarding (ver app/_layout.tsx).
+      // Un fallo de red y "este usuario todavía no completó su perfil" producen
+      // la MISMA pantalla, así que sin log no hay forma de distinguir un
+      // onboarding legítimo de una sesión que perdió su perfil.
+      if (error) {
+        Logger.error('No se pudo cargar el perfil del usuario autenticado', {
+          scope: 'AuthContext.fetchProfile',
+          authUserId: userId,
+          error,
+        });
+      }
+
       return null;
     } catch (e) {
-      console.error('Error fetching profile', e);
+      Logger.error('Excepción cargando el perfil del usuario autenticado', {
+        scope: 'AuthContext.fetchProfile',
+        authUserId: userId,
+        error: e,
+      });
       return null;
     }
   }, []);
@@ -119,7 +136,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // Traza de sesión. Es el eje temporal contra el que se leen todos los
+      // demás logs: un TOKEN_REFRESHED fallido o un SIGNED_OUT inesperado
+      // explican de una la ráfaga de errores que viene inmediatamente después.
+      Logger.info('Cambio de estado de autenticación', {
+        scope: 'AuthContext',
+        event,
+        hasSession: nextSession !== null,
+      });
       void syncAuthState(nextSession);
     });
 
@@ -132,7 +157,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [syncAuthState]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      // No se propaga a propósito: el usuario ya decidió salir y la UI local se
+      // limpia igual por el onAuthStateChange. Pero si el token queda vivo del
+      // lado del servidor, conviene que quede asentado.
+      Logger.error('Fallo el cierre de sesión', { scope: 'AuthContext.signOut', error });
+    }
   }, []);
 
   /*

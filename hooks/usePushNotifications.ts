@@ -4,6 +4,7 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { registerForPushNotificationsAsync } from '@/lib/push-notifications';
 import { extractDeepLinkUrl, resolveDeepLink } from '@/lib/deep-linking';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
@@ -114,8 +115,21 @@ export function usePushNotifications(): void {
         .eq('id', profile.id);
 
       if (error) {
-        console.error('No se pudo guardar el expo_push_token:', error.message);
+        // Fallo terminal y mudo: el dispositivo tiene token, el perfil no, y el
+        // usuario deja de recibir pushes sin que nada en pantalla lo indique.
+        Logger.error('No se pudo guardar el expo_push_token del perfil', {
+          scope: 'usePushNotifications',
+          profileId: profile.id,
+          error,
+        });
+        return;
       }
+
+      Logger.info('expo_push_token actualizado', {
+        scope: 'usePushNotifications',
+        profileId: profile.id,
+        wasEmpty: !profile.expo_push_token,
+      });
     })();
 
     return () => {

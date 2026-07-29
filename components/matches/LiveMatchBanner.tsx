@@ -1,19 +1,33 @@
 import { View, Text, TouchableOpacity } from 'react-native';
+import { canLoadResultFromCard } from '@/lib/match-permissions';
 import type { MatchCardEntry } from './types';
 import { TeamShield } from './TeamShield';
 
 interface Props {
   match: MatchCardEntry;
   myTeamId: string;
+  /**
+   * D10: el gating por rol ya no se hace omitiendo `onLoadResult` desde la
+   * pantalla — se decide acá, con la misma regla que el resto de la app.
+   * R6: el banner sólo ofrece cargar el resultado, así que le alcanza con
+   * `isStaff` (incluye al DIRECTOR_TECNICO). No recibe `canManage` porque no
+   * dibuja ninguna acción de coordinación.
+   */
+  isStaff: boolean;
   onPress: (matchId: string) => void;
   onLoadResult?: (matchId: string) => void;
 }
 
-export function LiveMatchBanner({ match, myTeamId, onPress, onLoadResult }: Props) {
+export function LiveMatchBanner({ match, myTeamId, isStaff, onPress, onLoadResult }: Props) {
   const scoreA = match.resultTeamA !== null ? match.resultTeamA : '?';
   const scoreB = match.resultTeamB !== null ? match.resultTeamB : '?';
   const isMyTeamA = match.teamA.id === myTeamId;
   const isMyTeamB = match.teamB.id === myTeamId;
+
+  // D10: antes bastaba con que el banner existiera (siempre es EN_VIVO) para
+  // ofrecer "Cargar resultado", así que el botón seguía ahí después de que mi
+  // equipo ya lo hubiera cargado. El helper mira también eso.
+  const showLoadResult = canLoadResultFromCard(match, myTeamId, isStaff);
 
   return (
     <TouchableOpacity
@@ -60,14 +74,17 @@ export function LiveMatchBanner({ match, myTeamId, onPress, onLoadResult }: Prop
         </View>
       </View>
 
-      {/* Load result button */}
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => onLoadResult?.(match.id)}
-        className="mt-4 items-center rounded-xl border border-danger-error/50 py-3"
-      >
-        <Text className="font-uiBold text-[13px] text-danger-error">→ Cargar resultado</Text>
-      </TouchableOpacity>
+      {/* Load result button — gateado por la regla unificada (D10). Antes se
+          renderizaba siempre y, sin `onLoadResult`, era un botón muerto. */}
+      {showLoadResult && onLoadResult && (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => onLoadResult(match.id)}
+          className="mt-4 items-center rounded-xl border border-danger-error/50 py-3"
+        >
+          <Text className="font-uiBold text-[13px] text-danger-error">→ Cargar resultado</Text>
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 }

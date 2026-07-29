@@ -13,12 +13,21 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { joinMatchAsGuest } from '@/lib/match-actions';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
+import {
+  formatGuestCodeExpiry,
+  getGuestCodeExpiry,
+  getGuestJoinErrorMessage,
+  isGuestCodeExpired,
+} from '@/lib/guest-code';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 
 interface MatchPreview {
   id: string;
   teamAName: string;
   teamBName: string;
+  /** E7 — hasta cuándo vale el código. `null` = sin dato para calcularlo. */
+  expiresAt: Date | null;
 }
 
 interface Props {
@@ -53,12 +62,32 @@ export function GuestJoinModal({ visible, onClose, onJoined }: Props) {
     try {
       const { data, error } = await supabase
         .from('matches')
-        .select('id, team_a:teams!team_a_id(name), team_b:teams!team_b_id(name)')
+        .select(
+          'id, scheduled_at, created_at, team_a:teams!team_a_id(name), team_b:teams!team_b_id(name)',
+        )
         .eq('unique_code', trimmed)
         .single();
 
       if (error || !data) {
+        // Supabase devuelve el fallo como valor: sin esto, un error de RLS se
+        // ve exactamente igual que un código que no existe.
+        Logger.warn('Búsqueda de partido por código de invitado sin resultado', {
+          scope: 'GuestJoinModal.lookupMatch',
+          hasError: error !== null,
+          error,
+        });
         showAlert('Código inválido', 'No se encontró ningún partido con ese código.');
+        return;
+      }
+
+      // E7 — pre-chequeo, no autorización: la guarda real es GUEST_CODE_EXPIRED
+      // en `join_match_as_guest`. Acá sólo se evita que el usuario elija equipo
+      // y toque "Unirse" para recién ahí enterarse de que el código no vale.
+      if (isGuestCodeExpired(data.scheduled_at, data.created_at)) {
+        showAlert(
+          'Código vencido',
+          'Este código ya no admite invitados. Pedile al capitán el código de un partido vigente.',
+        );
         return;
       }
 
@@ -69,8 +98,13 @@ export function GuestJoinModal({ visible, onClose, onJoined }: Props) {
         id: data.id,
         teamAName: teamA?.name ?? 'Equipo A',
         teamBName: teamB?.name ?? 'Equipo B',
+        expiresAt: getGuestCodeExpiry(data.scheduled_at, data.created_at),
       });
     } catch (err) {
+      Logger.error('Fallo la búsqueda del partido por código de invitado', {
+        scope: 'GuestJoinModal.lookupMatch',
+        error: err,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     } finally {
       setLookupLoading(false);
@@ -105,10 +139,23 @@ export function GuestJoinModal({ visible, onClose, onJoined }: Props) {
     setLoading(true);
     try {
       const result = await joinMatchAsGuest(trimmed, teamSide);
+      Logger.info('Invitado sumado a un partido', {
+        scope: 'GuestJoinModal.handleJoin',
+        matchId: result.matchId,
+        teamId: result.teamId,
+        teamSide,
+      });
       handleClose();
       onJoined(result.matchId, result.teamId);
     } catch (err) {
-      showAlert('Error', getGenericSupabaseErrorMessage(err));
+      // E7: el traductor distingue "código vencido" de un error genérico.
+      Logger.error('No se pudo sumar al invitado al partido', {
+        scope: 'GuestJoinModal.handleJoin',
+        matchId: matchPreview.id,
+        teamSide,
+        error: err,
+      });
+      showAlert('No pudimos sumarte', getGuestJoinErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -207,6 +254,17 @@ export function GuestJoinModal({ visible, onClose, onJoined }: Props) {
                 Como invitado podés hacer check-in y cargar el resultado del partido, pero no formás parte del equipo de forma permanente.
               </Text>
             </View>
+
+            {/* E7 — el código tiene fecha de vencimiento; decirlo evita el
+                "lo guardo para la próxima" que ya no va a funcionar. */}
+            {matchPreview?.expiresAt ? (
+              <View className="flex-row items-center gap-2">
+                <AppIcon family="material-community" name="clock-alert-outline" size={14} color="#869585" />
+                <Text className="font-ui flex-1 text-[11px] text-neutral-outline">
+                  Este código vale hasta el {formatGuestCodeExpiry(matchPreview.expiresAt)}.
+                </Text>
+              </View>
+            ) : null}
 
             {/* Submit */}
             <TouchableOpacity

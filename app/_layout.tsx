@@ -15,6 +15,7 @@ import { AppIntroSplash } from '@/components/AppIntroSplash';
 import { Colors } from '@/constants/theme';
 import { isProfileComplete } from '@/lib/auth-utils';
 import { deepLinkToHref, resolveDeepLink } from '@/lib/deep-linking';
+import { initLogger } from '@/lib/logger';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { AuthProvider, useAuth } from '../context/AuthContext';
@@ -163,6 +164,7 @@ function RootNavigation() {
       <Stack.Screen name="team-manage" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="market-chats" />
+      <Stack.Screen name="market-my-applications" />
       <Stack.Screen name="team-stats" />
       <Stack.Screen name="challenge-inbox" />
       <Stack.Screen name="match-detail" />
@@ -183,6 +185,11 @@ export default function RootLayout() {
     BarlowCondensed_800ExtraBold,
     Epilogue_700Bold,
   });
+
+  // Telemetria: engancha excepciones globales y unhandled rejections a app_logs.
+  // Va acá —antes del early return por fuentes— para cubrir también los errores
+  // que ocurren mientras la app todavía no pintó nada.
+  useEffect(() => initLogger(), []);
 
   if (!fontsLoaded) {
     return null;

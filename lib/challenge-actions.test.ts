@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder } from './test-utils/supabase-mock';
+import {
+  sendChallenge,
+  acceptChallengeWithNotification,
+  updateChallengeStatus,
+  cancelChallenge,
+  getActiveChallengeWithTeam,
+  fetchChallengesInbox,
+} from './challenge-actions';
 
 const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: { from: vi.fn(), rpc: vi.fn() },
@@ -15,14 +23,11 @@ vi.mock('@/lib/supabase-storage', () => ({
   getSupabaseStorageUrl: (bucket: string, path: string) => `URL:${bucket}/${path}`,
 }));
 
-import {
-  sendChallenge,
-  acceptChallengeWithNotification,
-  updateChallengeStatus,
-  cancelChallenge,
-  getActiveChallengeWithTeam,
-  fetchChallengesInbox,
-} from './challenge-actions';
+// El módulo real importa `react-native` (Platform), que no existe en el runtime
+// `node` de este proyecto de tests. Se moquea la superficie pública completa.
+vi.mock('@/lib/logger', () => ({
+  Logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();

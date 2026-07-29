@@ -13,6 +13,7 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { ScorerMvpPicker } from '@/components/matches/ScorerMvpPicker';
 import type { WoClaimFormData, WoClaimEntry, ScorerPickerPerson } from '@/components/matches/types';
+import { Logger } from '@/lib/logger';
 
 type WoReason = WoClaimEntry['reason'];
 
@@ -29,6 +30,15 @@ const REASONS: { value: WoReason; label: string; description: string }[] = [
     value: 'NO_PRESENTACION',
     label: 'No presentación',
     description: 'El rival no se presentó al partido',
+  },
+  // E5: el motivo existía en el tipo, en la pantalla de admin y en el enum de
+  // cancelaciones — pero no en este selector, así que nunca se podía registrar
+  // un WO por falta de quórum. Sin esta opción la escala de Fair Play por
+  // motivo sería inalcanzable desde la app.
+  {
+    value: 'FALTA_QUORUM',
+    label: 'Falta de quórum',
+    description: 'El rival avisó que no llegaba a juntar jugadores',
   },
   {
     value: 'ABANDONO',
@@ -129,8 +139,20 @@ export function WoModal({ visible, onClose, onSubmit, myParticipants }: Props) {
         scorers: scorerEntries,
         mvpProfileId: includeScorers ? mvpId : null,
       });
+      Logger.info('Reclamo de WO confirmado desde el modal', {
+        scope: 'WoModal.submitClaim',
+        reason,
+        includeScorers,
+        scorersCount: scorerEntries.length,
+      });
       close();
     } catch (err) {
+      Logger.error('No se pudo enviar el reclamo de WO', {
+        scope: 'WoModal.submitClaim',
+        reason,
+        includeScorers,
+        error: err,
+      });
       // Antes no habia catch y el `onSubmit` del caller tampoco: un fallo de red
       // terminaba en un unhandled rejection con el sheet abierto, la foto cargada
       // y cero feedback. El alert interno ya se renderiza dentro del <Modal>.
@@ -181,6 +203,18 @@ export function WoModal({ visible, onClose, onSubmit, myParticipants }: Props) {
                     Un WO se otorga cuando el equipo rival no cumple sus obligaciones deportivas. La
                     solicitud será revisada por administración. Se requiere evidencia fotográfica.
                     Reclamar falsamente puede resultar en penalización de Fair Play.
+                  </Text>
+                </View>
+
+                {/* E5 — la escala tiene que ser visible ANTES de elegir: el
+                    motivo determina cuánto Fair Play pierde el rival, y quien
+                    reclama es el único que puede reflejar si le avisaron. */}
+                <View className="mb-4 flex-row items-start gap-2 rounded-xl bg-surface-high/60 px-4 py-3">
+                  <AppIcon family="material-community" name="scale-balance" size={16} color="#BCCBB9" />
+                  <Text className="font-ui flex-1 text-xs leading-5 text-neutral-on-surface-variant">
+                    El motivo define la multa: si el rival avisó que no juntaba jugadores
+                    (falta de quórum) pierde 5 puntos de Fair Play; si directamente no se
+                    presentó, pierde 15.
                   </Text>
                 </View>
 

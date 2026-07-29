@@ -14,6 +14,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { fetchMessages, sendMessage, markConversationAsRead } from '@/lib/chat-api';
 import type { MarketMessage } from '@/lib/chat-api';
 
@@ -116,9 +117,23 @@ export default function MatchChatScreen() {
         setMessages(msgs);
 
         // 5. Mark as read
-        try { await markConversationAsRead(conversationId); } catch { /* non-fatal */ }
+        try {
+          await markConversationAsRead(conversationId);
+        } catch (readError) {
+          // No fatal para esta pantalla, pero deja el badge de no leídos
+          // inflado para siempre en la lista de conversaciones.
+          Logger.warn('No se pudo marcar la conversación como leída', {
+            scope: 'chat',
+            conversationId,
+            error: readError,
+          });
+        }
       } catch (err) {
-        console.error('Error loading match chat:', err);
+        Logger.error('No se pudo cargar el chat del partido', {
+          scope: 'chat',
+          conversationId,
+          error: err,
+        });
         setLoadError(true);
       } finally {
         setLoadingInit(false);
@@ -137,7 +152,13 @@ export default function MatchChatScreen() {
           const msg = payload.new as MarketMessage;
           if (msg.sender_profile_id !== profile.id) {
             setMessages((prev) => [...prev, msg]);
-            markConversationAsRead(conversationId).catch(() => {});
+            markConversationAsRead(conversationId).catch((readError: unknown) => {
+              Logger.warn('No se pudo marcar como leído el mensaje entrante', {
+                scope: 'chat.realtime',
+                conversationId,
+                error: readError,
+              });
+            });
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
           }
         },
@@ -169,9 +190,22 @@ export default function MatchChatScreen() {
 
     try {
       const realMsg = await sendMessage(conversationId, text, myTeamId || undefined);
+      Logger.info('Mensaje enviado en el chat del partido', {
+        scope: 'chat.handleSend',
+        conversationId,
+        messageId: realMsg.id,
+        senderTeamId: myTeamId || null,
+      });
       setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? realMsg : m)));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch {
+    } catch (err) {
+      // El mensaje optimista desaparece de la lista sin ningún aviso: desde el
+      // lado del usuario, lo que escribió simplemente se esfumó.
+      Logger.error('No se pudo enviar el mensaje del chat de partido', {
+        scope: 'chat.handleSend',
+        conversationId,
+        error: err,
+      });
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
     } finally {
       setIsSending(false);

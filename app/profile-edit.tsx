@@ -19,6 +19,7 @@ import { ProfileFormFields } from '@/components/profile/ProfileFormFields';
 import { FAVORITE_TEAM_OPTIONS } from '@/lib/favorite-teams';
 import { toDisplayDate } from '@/lib/date-mask';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
+import { Logger } from '@/lib/logger';
 import type { Database } from '@/types/supabase';
 
 type ProfilePos = UserProfileFormData['position'];
@@ -97,6 +98,10 @@ export default function ProfileEditScreen() {
       try {
         await updateProfile(profile.id, data);
         await refreshProfile();
+        Logger.info('Perfil actualizado', {
+          scope: 'profile-edit.onSubmit',
+          profileId: profile.id,
+        });
         showAlert('Éxito', 'Tu perfil se ha actualizado correctamente.');
 
         // Navigate back after a short delay so user sees the success message
@@ -110,8 +115,17 @@ export default function ProfileEditScreen() {
             : undefined;
 
         if (code === '23505') {
+          Logger.warn('Actualización de perfil rechazada por nombre de usuario duplicado', {
+            scope: 'profile-edit.onSubmit',
+            profileId: profile.id,
+          });
           showAlert('Error al actualizar', 'Ese nombre de usuario ya está en uso. Por favor, elige otro.');
         } else {
+          Logger.error('No se pudo actualizar el perfil', {
+            scope: 'profile-edit.onSubmit',
+            profileId: profile.id,
+            error,
+          });
           showAlert('Error al actualizar', getGenericSupabaseErrorMessage(error, 'No pudimos guardar los cambios.'));
         }
       } finally {

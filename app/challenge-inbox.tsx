@@ -8,6 +8,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { fetchChallengesInbox, acceptChallengeWithNotification, updateChallengeStatus, cancelChallenge } from '@/lib/challenge-actions';
 import type { ChallengeInboxEntry } from '@/components/ranking/types';
+import { Logger } from '@/lib/logger';
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
     ACEPTADA: { label: '✓ Aceptado', bg: 'bg-brand-primary/15', text: 'text-brand-primary' },
@@ -16,8 +17,14 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }>
 };
 
 export default function ChallengesInboxScreen() {
-    const { activeTeamId } = useTeamStore();
+    const { activeTeamId, myTeams } = useTeamStore();
     const { showAlert, AlertComponent } = useCustomAlert();
+
+    // R3: `accept_challenge` y las policies de UPDATE sobre `challenges` exigen
+    // CAPITAN/SUBCAPITAN, pero esta pantalla mostraba Aceptar/Rechazar/Cancelar
+    // a todo el plantel. Mismo patrón que Ranking, Partidos y el detalle.
+    const activeRole = myTeams.find((t) => t.id === activeTeamId)?.role;
+    const canManageChallenges = activeRole === 'CAPITAN' || activeRole === 'SUBCAPITAN';
 
     const [loading, setLoading] = useState(true);
     const [challenges, setChallenges] = useState<ChallengeInboxEntry[]>([]);
@@ -31,6 +38,11 @@ export default function ChallengesInboxScreen() {
             const data = await fetchChallengesInbox(activeTeamId);
             setChallenges(data);
         } catch (error: any) {
+            Logger.error('No se pudo cargar la bandeja de desafíos', {
+                scope: 'challenge-inbox.loadInbox',
+                activeTeamId,
+                error,
+            });
             showAlert('Error', error.message || 'No se pudieron cargar los desafíos.');
         } finally {
             setLoading(false);
@@ -43,6 +55,13 @@ export default function ChallengesInboxScreen() {
         try {
             setActionLoading(c.challengeId);
             const { matchId } = await acceptChallengeWithNotification(c.challengeId, c.opponentTeamId);
+            Logger.info('Desafío aceptado', {
+                scope: 'challenge-inbox.handleAccept',
+                challengeId: c.challengeId,
+                opponentTeamId: c.opponentTeamId,
+                activeTeamId,
+                matchId,
+            });
             await loadInbox();
             showAlert(
                 '¡Partido creado!',
@@ -50,6 +69,13 @@ export default function ChallengesInboxScreen() {
                 () => router.push({ pathname: '/match-detail' as never, params: { matchId } }),
             );
         } catch (error: any) {
+            Logger.error('No se pudo aceptar el desafío', {
+                scope: 'challenge-inbox.handleAccept',
+                challengeId: c.challengeId,
+                opponentTeamId: c.opponentTeamId,
+                activeTeamId,
+                error,
+            });
             showAlert('Error', error.message || 'No se pudo aceptar el desafío.');
         } finally {
             setActionLoading(null);
@@ -60,9 +86,20 @@ export default function ChallengesInboxScreen() {
         try {
             setActionLoading(challengeId);
             await updateChallengeStatus(challengeId, 'RECHAZADA');
+            Logger.info('Desafío rechazado', {
+                scope: 'challenge-inbox.handleReject',
+                challengeId,
+                activeTeamId,
+            });
             showAlert('Listo', 'Desafío rechazado.');
             await loadInbox();
         } catch (error: any) {
+            Logger.error('No se pudo rechazar el desafío', {
+                scope: 'challenge-inbox.handleReject',
+                challengeId,
+                activeTeamId,
+                error,
+            });
             showAlert('Error', error.message || 'No se pudo rechazar el desafío.');
         } finally {
             setActionLoading(null);
@@ -73,9 +110,20 @@ export default function ChallengesInboxScreen() {
         try {
             setActionLoading(challengeId);
             await cancelChallenge(challengeId);
+            Logger.info('Desafío cancelado', {
+                scope: 'challenge-inbox.handleCancel',
+                challengeId,
+                activeTeamId,
+            });
             showAlert('Cancelado', 'El desafío fue cancelado.');
             await loadInbox();
         } catch (error: any) {
+            Logger.error('No se pudo cancelar el desafío', {
+                scope: 'challenge-inbox.handleCancel',
+                challengeId,
+                activeTeamId,
+                error,
+            });
             showAlert('Error', error.message || 'No se pudo cancelar el desafío.');
         } finally {
             setActionLoading(null);
@@ -159,31 +207,41 @@ export default function ChallengesInboxScreen() {
                                 <Text className="font-ui text-[11px] text-neutral-on-surface-variant">Rating rival: <Text className="font-uiBold text-neutral-on-surface">{c.opponentElo}</Text></Text>
                             </View>
 
-                            {/* Recibido pendiente: Aceptar / Rechazar */}
+                            {/* Recibido pendiente: Aceptar / Rechazar (sólo capitanía) */}
                             {c.status === 'ENVIADA' && c.direction === 'RECIBIDO' && (
-                                <View className="flex-row gap-2">
-                                    {actionLoading === c.challengeId ? (
-                                        <View className="flex-1 items-center py-2.5">
-                                            <ActivityIndicator color="#53E076" size="small" />
-                                        </View>
-                                    ) : (
-                                        <>
-                                            <TouchableOpacity onPress={() => handleAccept(c)} className="flex-1 items-center rounded-xl bg-brand-primary py-2.5">
-                                                <Text className="font-displayBlack text-[12px] uppercase tracking-widest text-surface-base">✓ Aceptar</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => handleReject(c.challengeId)} className="flex-1 items-center rounded-xl border border-danger-error/30 py-2.5">
-                                                <Text className="font-displayBlack text-[12px] uppercase tracking-widest text-danger-error">✕ Rechazar</Text>
-                                            </TouchableOpacity>
-                                        </>
-                                    )}
-                                </View>
+                                canManageChallenges ? (
+                                    <View className="flex-row gap-2">
+                                        {actionLoading === c.challengeId ? (
+                                            <View className="flex-1 items-center py-2.5">
+                                                <ActivityIndicator color="#53E076" size="small" />
+                                            </View>
+                                        ) : (
+                                            <>
+                                                <TouchableOpacity onPress={() => handleAccept(c)} className="flex-1 items-center rounded-xl bg-brand-primary py-2.5">
+                                                    <Text className="font-displayBlack text-[12px] uppercase tracking-widest text-surface-base">✓ Aceptar</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={() => handleReject(c.challengeId)} className="flex-1 items-center rounded-xl border border-danger-error/30 py-2.5">
+                                                    <Text className="font-displayBlack text-[12px] uppercase tracking-widest text-danger-error">✕ Rechazar</Text>
+                                                </TouchableOpacity>
+                                            </>
+                                        )}
+                                    </View>
+                                ) : (
+                                    // Se muestra el desafío igual: enterarse de que los desafiaron
+                                    // es información útil para todo el plantel.
+                                    <View className="rounded-xl bg-surface-high/40 px-4 py-2.5">
+                                        <Text className="font-ui text-center text-[11px] text-neutral-outline">
+                                            Solo el capitán o subcapitán puede responder este desafío.
+                                        </Text>
+                                    </View>
+                                )
                             )}
 
-                            {/* Enviado pendiente: Esperando + Cancelar */}
+                            {/* Enviado pendiente: Esperando + Cancelar (sólo capitanía) */}
                             {c.status === 'ENVIADA' && c.direction === 'ENVIADO' && (
                                 <View className="flex-row items-center justify-between">
                                     <Text className="font-uiBold text-[10px] text-warning-tertiary">⏳ Esperando respuesta...</Text>
-                                    {actionLoading === c.challengeId ? (
+                                    {!canManageChallenges ? null : actionLoading === c.challengeId ? (
                                         <ActivityIndicator color="#869585" size="small" />
                                     ) : (
                                         <TouchableOpacity onPress={() => handleCancel(c.challengeId)} className="rounded-lg border border-neutral-outline/30 px-3 py-1.5">

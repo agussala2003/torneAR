@@ -4,13 +4,13 @@ export type TeamCategory = Database['public']['Enums']['team_category'];
 export type TeamFormat = Database['public']['Enums']['team_format'];
 export type TeamRole = Database['public']['Enums']['team_role'];
 
-export const TEAM_CATEGORY_OPTIONS: Array<{ value: TeamCategory; label: string }> = [
+export const TEAM_CATEGORY_OPTIONS: { value: TeamCategory; label: string }[] = [
   { value: 'HOMBRES', label: 'Hombres' },
   { value: 'MUJERES', label: 'Mujeres' },
   { value: 'MIXTO', label: 'Mixto' },
 ];
 
-export const TEAM_FORMAT_OPTIONS: Array<{ value: TeamFormat; label: string }> = [
+export const TEAM_FORMAT_OPTIONS: { value: TeamFormat; label: string }[] = [
   { value: 'FUTBOL_5', label: 'Futbol 5' },
   { value: 'FUTBOL_6', label: 'Futbol 6' },
   { value: 'FUTBOL_7', label: 'Futbol 7' },

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder } from './test-utils/supabase-mock';
+import { fetchActiveSeasonInfo, transitionSeason } from './season-admin-data';
 
 const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: { from: vi.fn(), rpc: vi.fn() },
@@ -8,8 +9,6 @@ const { supabaseMock } = vi.hoisted(() => ({
 vi.mock('@/lib/supabase', () => ({
   supabase: supabaseMock,
 }));
-
-import { fetchActiveSeasonInfo, transitionSeason } from './season-admin-data';
 
 beforeEach(() => {
   vi.clearAllMocks();

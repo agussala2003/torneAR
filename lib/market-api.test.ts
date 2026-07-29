@@ -1,17 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder } from './test-utils/supabase-mock';
-
-const { supabaseMock } = vi.hoisted(() => ({
-  supabaseMock: {
-    from: vi.fn(),
-    auth: { getUser: vi.fn() },
-  },
-}));
-
-vi.mock('@/lib/supabase', () => ({
-  supabase: supabaseMock,
-}));
-
 import {
   fetchTeamPosts,
   fetchPlayerPosts,
@@ -23,6 +11,17 @@ import {
   fetchTeamInviteCode,
   togglePostStatus,
 } from './market-api';
+
+const { supabaseMock } = vi.hoisted(() => ({
+  supabaseMock: {
+    from: vi.fn(),
+    auth: { getUser: vi.fn() },
+  },
+}));
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: supabaseMock,
+}));
 
 const AUTH_USER = { id: 'auth-1' };
 const PROFILE = { id: 'profile-1' };

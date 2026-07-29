@@ -13,9 +13,9 @@ import type {
   CancellationRequestEntry,
   DisputeState,
 } from '@/components/matches/types';
+import type { Database } from '@/types/supabase';
 
 export type { DisputeState };
-import type { Database } from '@/types/supabase';
 
 type MatchStatus = Database['public']['Enums']['match_status'];
 type MatchType = Database['public']['Enums']['match_type'];
@@ -195,21 +195,125 @@ export async function fetchDisputeState(
   teamAId: string,
   teamBId: string,
 ): Promise<DisputeState> {
-  const { data, error } = await supabase
-    .from('match_dispute_votes' as Parameters<typeof supabase.from>[0])
-    .select('voted_team_id, profile_id')
-    .eq('match_id', matchId);
-  if (error) throw error;
+  // El Fair Play viaja acá y no en get_match_detail a propósito: sólo lo
+  // necesita la pantalla de disputa, y el contrato de la RPC no cambia. `teams`
+  // es de lectura pública para usuarios autenticados (teams_select_all).
+  const [votesRes, teamsRes] = await Promise.all([
+    supabase
+      .from('match_dispute_votes' as Parameters<typeof supabase.from>[0])
+      .select('voted_team_id, profile_id')
+      .eq('match_id', matchId),
+    supabase.from('teams').select('id, fair_play_score').in('id', [teamAId, teamBId]),
+  ]);
+  if (votesRes.error) throw votesRes.error;
+  if (teamsRes.error) throw teamsRes.error;
 
-  const rows = (data ?? []) as unknown as DisputeVoteRow[];
+  const rows = (votesRes.data ?? []) as unknown as DisputeVoteRow[];
   const myRow = rows.find((r) => r.profile_id === profileId);
+
+  const fairPlayById = new Map(
+    (teamsRes.data ?? []).map((t) => [t.id, Number(t.fair_play_score ?? 100)]),
+  );
 
   return {
     votesForTeamA: rows.filter((r) => r.voted_team_id === teamAId).length,
     votesForTeamB: rows.filter((r) => r.voted_team_id === teamBId).length,
     hasVoted: myRow !== undefined,
     votedForTeamId: myRow?.voted_team_id ?? null,
+    fairPlayTeamA: fairPlayById.get(teamAId) ?? 100,
+    fairPlayTeamB: fairPlayById.get(teamBId) ?? 100,
   };
+}
+
+// ─── R9: qué equipo soy YO en ESTE partido ───────────────────────────────────
+
+export interface MatchTeamCandidates {
+  teamAId: string;
+  teamBId: string;
+  /** Equipos DE ESTE PARTIDO donde el usuario milita o está anotado como invitado. */
+  myTeamIds: string[];
+}
+
+/**
+ * R9 — Elige el equipo con el que el usuario mira un partido.
+ *
+ * El bug: `paramTeamId ?? activeTeamId ?? ''`. El equipo activo del store es
+ * "el último que elegiste en la app", no "el tuyo en este partido". Si militás
+ * en dos clubes y entrás al partido del B con el A activo, `get_match_detail`
+ * respondía por el equipo equivocado: hero invertido, check-in del rival,
+ * permisos del plantel que no juega. Y desde que D11 hizo que las
+ * notificaciones lleven al detalle —sin `myTeamId` en los params
+ * (`app/notifications.tsx:170`, `app/(tabs)/index.tsx:51`)— el fallback al
+ * equipo activo dejó de ser el caso raro.
+ *
+ * Es el mismo error de forma que M7 en el Mercado: usar el equipo activo como
+ * respuesta autoritativa en vez de como preferencia.
+ *
+ * Prioridad: param válido (viene de nuestra propia navegación, incluye al
+ * invitado que acaba de entrar por código) → equipo activo si juega este
+ * partido → cualquier equipo mío que lo juegue → `null`, que significa
+ * "este partido no es tuyo" y la pantalla lo dice, en vez de contestar por otro.
+ */
+export function pickMyTeamId(
+  candidates: MatchTeamCandidates,
+  paramTeamId?: string | null,
+  activeTeamId?: string | null,
+): string | null {
+  const matchTeams = [candidates.teamAId, candidates.teamBId];
+
+  if (paramTeamId && matchTeams.includes(paramTeamId)) return paramTeamId;
+  if (activeTeamId && candidates.myTeamIds.includes(activeTeamId)) return activeTeamId;
+  return candidates.myTeamIds[0] ?? null;
+}
+
+/**
+ * Resuelve contra la base el equipo del usuario en un partido. Corta con una
+ * sola query cuando el `myTeamId` de los params ya es uno de los dos equipos.
+ */
+export async function resolveMyTeamIdForMatch(
+  matchId: string,
+  profileId: string,
+  paramTeamId?: string | null,
+  activeTeamId?: string | null,
+): Promise<string | null> {
+  const { data: match, error: matchError } = await supabase
+    .from('matches')
+    .select('team_a_id, team_b_id')
+    .eq('id', matchId)
+    .maybeSingle();
+  if (matchError) throw matchError;
+  if (!match) return null;
+
+  const matchTeams = [match.team_a_id, match.team_b_id];
+  if (paramTeamId && matchTeams.includes(paramTeamId)) return paramTeamId;
+
+  // Miembro de uno de los dos, o invitado ya registrado en el partido: las dos
+  // formas de "estar" en un partido (join_match_as_guest no crea membresía).
+  const [membershipRes, participantRes] = await Promise.all([
+    supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('profile_id', profileId)
+      .in('team_id', matchTeams),
+    supabase
+      .from('match_participants')
+      .select('team_id')
+      .eq('match_id', matchId)
+      .eq('profile_id', profileId),
+  ]);
+  if (membershipRes.error) throw membershipRes.error;
+  if (participantRes.error) throw participantRes.error;
+
+  const myTeamIds = [
+    ...(membershipRes.data ?? []).map((row) => row.team_id),
+    ...(participantRes.data ?? []).map((row) => row.team_id),
+  ].filter((id, index, all) => matchTeams.includes(id) && all.indexOf(id) === index);
+
+  return pickMyTeamId(
+    { teamAId: match.team_a_id, teamBId: match.team_b_id, myTeamIds },
+    paramTeamId,
+    activeTeamId,
+  );
 }
 
 export async function fetchMatchDetailViewData(

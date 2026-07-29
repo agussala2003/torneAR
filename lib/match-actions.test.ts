@@ -1,5 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder, createStorageMock } from './test-utils/supabase-mock';
+import {
+  submitProposal,
+  acceptProposal,
+  rejectProposal,
+  cancelProposal,
+  getProposalErrorMessage,
+  doCheckin,
+  submitMatchResult,
+  requestCancellation,
+  respondToCancellationRequest,
+  joinMatchAsGuest,
+  submitDisputeVote,
+  resolveMatchDispute,
+  claimWo,
+  ResultAlreadySubmittedError,
+} from './match-actions';
 
 const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: {
@@ -16,21 +32,11 @@ vi.mock('@/lib/supabase', () => ({
   supabase: supabaseMock,
 }));
 
-import {
-  submitProposal,
-  acceptProposal,
-  rejectProposal,
-  cancelProposal,
-  doCheckin,
-  submitMatchResult,
-  requestCancellation,
-  respondToCancellationRequest,
-  joinMatchAsGuest,
-  submitDisputeVote,
-  resolveMatchDispute,
-  claimWo,
-  ResultAlreadySubmittedError,
-} from './match-actions';
+// El módulo real importa `react-native` (Platform), que no existe en el runtime
+// `node` de este proyecto de tests. Se moquea la superficie pública completa.
+vi.mock('@/lib/logger', () => ({
+  Logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
 
 const AUTH_USER = { id: 'auth-1' };
 const PROFILE = { id: 'profile-1' };
@@ -141,6 +147,58 @@ describe('doCheckin', () => {
   it('propaga el error del RPC (ej. fuera del geofence o equipo no autorizado)', async () => {
     supabaseRpcMock.mockResolvedValueOnce({ data: null, error: new Error('Fuera de rango') });
     await expect(doCheckin('m1', 'teamA')).rejects.toThrow('Fuera de rango');
+  });
+
+  // ─── D9: el check-in individual ya no sella al equipo ──────────────────────
+
+  it('mapea el desenlace cuando el check-in completa el quórum', async () => {
+    supabaseRpcMock.mockResolvedValueOnce({
+      data: {
+        checkedInPlayers: 4,
+        minPlayers: 4,
+        teamSealed: true,
+        justSealed: true,
+        matchStatus: 'EN_VIVO',
+      },
+      error: null,
+    });
+
+    await expect(doCheckin('m1', 'teamA')).resolves.toEqual({
+      checkedInPlayers: 4,
+      minPlayers: 4,
+      teamSealed: true,
+      justSealed: true,
+      matchStatus: 'EN_VIVO',
+    });
+  });
+
+  it('mapea el desenlace cuando todavía falta gente: el equipo NO queda presentado', async () => {
+    supabaseRpcMock.mockResolvedValueOnce({
+      data: {
+        checkedInPlayers: 1,
+        minPlayers: 4,
+        teamSealed: false,
+        justSealed: false,
+        matchStatus: 'CONFIRMADO',
+      },
+      error: null,
+    });
+
+    const result = await doCheckin('m1', 'teamA');
+    expect(result.teamSealed).toBe(false);
+    expect(result.minPlayers - result.checkedInPlayers).toBe(3);
+  });
+
+  // Defensivo: si la RPC vieja (RETURNS void) sigue desplegada, `data` viene
+  // null. Sin este default el cliente rompía con "cannot read properties of
+  // null" en vez de degradar a un check-in sin contadores.
+  it('no rompe si la RPC no devuelve payload', async () => {
+    supabaseRpcMock.mockResolvedValueOnce({ data: null, error: null });
+    await expect(doCheckin('m1', 'teamA')).resolves.toMatchObject({
+      checkedInPlayers: 0,
+      teamSealed: false,
+      justSealed: false,
+    });
   });
 });
 
@@ -348,5 +406,60 @@ describe('claimWo', () => {
     ).rejects.toThrow('upload falló');
 
     expect(supabaseRpcMock).not.toHaveBeenCalled(); // nunca llega a la RPC
+  });
+});
+
+// ─── E1/D7/D8: mapper de errores de confirm_match_proposal ────────────────────
+
+describe('getProposalErrorMessage', () => {
+  it('conserva el detalle de SQUAD_TOO_SMALL (nombre del equipo y mínimo)', () => {
+    const msg = getProposalErrorMessage({
+      message: 'SQUAD_TOO_SMALL: Los Pibes tiene 3 jugador(es) y FUTBOL_11 necesita al menos 7 para presentarse',
+    });
+
+    // El detalle es el único lugar donde viaja A QUIÉN le falta gente.
+    expect(msg).toContain('Los Pibes');
+    expect(msg).toContain('7');
+    expect(msg).not.toContain('SQUAD_TOO_SMALL');
+  });
+
+  it('mapea los códigos sin detalle a su mensaje estable', () => {
+    expect(getProposalErrorMessage({ message: 'PROPOSAL_MATCH_MISMATCH: no pertenece' })).toContain(
+      'no corresponde a este partido',
+    );
+    expect(getProposalErrorMessage({ message: 'INVALID_MATCH_STATUS: estado CANCELADO' })).toContain(
+      'ya no está pendiente',
+    );
+  });
+
+  it('deja pasar los mensajes en castellano que la RPC ya devolvía', () => {
+    const autorizacion = 'No autorizado: solo el equipo receptor puede confirmar esta propuesta';
+    expect(getProposalErrorMessage({ message: autorizacion })).toBe(autorizacion);
+  });
+
+  it('cae al genérico ante un error desconocido', () => {
+    expect(getProposalErrorMessage({ message: 'boom' })).toBe(
+      'No se pudo completar la operacion. Intentalo nuevamente.',
+    );
+  });
+
+  // ─── D13: fecha vencida y choque de agenda ────────────────────────────────
+
+  it('traduce PROPOSAL_DATE_IN_PAST', () => {
+    const msg = getProposalErrorMessage({
+      message: 'PROPOSAL_DATE_IN_PAST: la fecha propuesta (2020-01-01 20:00:00+00) ya pasó',
+    });
+    expect(msg).toContain('ya pasaron');
+    expect(msg).not.toContain('PROPOSAL_DATE_IN_PAST');
+  });
+
+  // El nombre del equipo comprometido es lo que permite entender el choque:
+  // sin él, "chocan los horarios" no dice de quién ni con qué.
+  it('conserva el nombre del equipo en TEAM_SCHEDULE_CONFLICT', () => {
+    const msg = getProposalErrorMessage({
+      message: 'TEAM_SCHEDULE_CONFLICT: Los Pibes ya tiene un partido confirmado en ese horario',
+    });
+    expect(msg).toContain('Los Pibes');
+    expect(msg).not.toContain('TEAM_SCHEDULE_CONFLICT');
   });
 });

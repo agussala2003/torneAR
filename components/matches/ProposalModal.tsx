@@ -13,11 +13,12 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
-import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
+import { getProposalErrorMessage } from '@/lib/match-actions';
 import type { MatchProposalFormData } from '@/components/matches/types';
 import type { Database } from '@/types/supabase';
 import { fetchZonesWithVenues, fetchVenuesByZone } from '@/lib/venue-data';
 import type { ZoneEntry, VenueEntry } from '@/lib/venue-data';
+import { Logger } from '@/lib/logger';
 
 type TeamFormat = Database['public']['Enums']['team_format'];
 type MatchType = Database['public']['Enums']['match_type'];
@@ -40,9 +41,17 @@ interface Props {
   onSubmit: (data: MatchProposalFormData) => Promise<void>;
 }
 
+// D13: el default era `new Date()` — es decir, una fecha ya vencida en el
+// instante en que se abre el formulario. Como el servidor ahora rechaza
+// `scheduled_at <= now()`, arrancar en "ahora" habría dejado el sheet bloqueado
+// de entrada. Dos horas es el piso razonable para coordinar un partido.
+function defaultScheduledDate(): Date {
+  return new Date(Date.now() + 2 * 60 * 60 * 1000);
+}
+
 export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmit }: Props) {
   const [format, setFormat] = useState<TeamFormat>('FUTBOL_5');
-  const [scheduledDate, setScheduledDate] = useState(new Date());
+  const [scheduledDate, setScheduledDate] = useState(defaultScheduledDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(60);
@@ -73,7 +82,14 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
     if (!visible || zonesLoaded) return;
     fetchZonesWithVenues()
       .then(setZones)
-      .catch(() => {})
+      .catch((err: unknown) => {
+        // El `catch {}` vacío dejaba el selector de zonas mudo y sin opciones:
+        // desde la UI parecía que no hay ninguna zona con canchas cargadas.
+        Logger.warn('No se pudieron cargar las zonas con canchas; el selector queda vacío', {
+          scope: 'ProposalModal.fetchZones',
+          error: err,
+        });
+      })
       .finally(() => setZonesLoaded(true));
   }, [visible, zonesLoaded]);
 
@@ -88,14 +104,21 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
     setSelectedVenue(null);
     fetchVenuesByZone(selectedZoneId)
       .then(setVenues)
-      .catch(() => setVenues([]))
+      .catch((err: unknown) => {
+        Logger.warn('No se pudieron cargar las canchas de la zona; el selector queda vacío', {
+          scope: 'ProposalModal.fetchVenues',
+          zoneId: selectedZoneId,
+          error: err,
+        });
+        setVenues([]);
+      })
       .finally(() => setLoadingVenues(false));
   }, [selectedZoneId]);
 
   function handleClose() {
     // Reset state
     setFormat('FUTBOL_5');
-    setScheduledDate(new Date());
+    setScheduledDate(defaultScheduledDate());
     setDurationMinutes(60);
     setSignalAmount('');
     setTotalCost('');
@@ -122,13 +145,31 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
         signalAmount: signalAmount ? parseFloat(signalAmount) : null,
         totalCost: totalCost ? parseFloat(totalCost) : null,
       });
+      Logger.info('Propuesta de partido confirmada desde el modal', {
+        scope: 'ProposalModal.handleSubmit',
+        format,
+        matchType,
+        venueId: selectedVenue?.id ?? null,
+        durationMinutes,
+      });
       handleClose();
     } catch (err) {
+      Logger.error('No se pudo enviar la propuesta de partido', {
+        scope: 'ProposalModal.handleSubmit',
+        format,
+        matchType,
+        venueId: selectedVenue?.id ?? null,
+        error: err,
+      });
       // El sheet queda abierto a proposito: el usuario no pierde lo que cargo y
       // puede corregir y reintentar sin volver a completar el formulario.
+      //
+      // D13: con el genérico, "el equipo ya tiene un partido a esa hora" llegaba
+      // como "No se pudo completar la operación" — justo el dato que le permite
+      // corregir la fecha en vez de reintentar igual.
       showAlert(
         'No se pudo enviar',
-        getGenericSupabaseErrorMessage(err, 'No pudimos enviar la propuesta. Intenta de nuevo.'),
+        getProposalErrorMessage(err),
       );
     } finally {
       setLoading(false);
@@ -149,12 +190,18 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
   // sin `venue_id` no hay coordenadas contra las cuales medir, así que la cancha
   // oficial es obligatoria. En AMISTOSO queda opcional, pero si se define tiene
   // que salir igual del catálogo — no hay otra vía de carga.
+  //
+  // D13: la fecha pasada se avisa acá y no después del rechazo del servidor. El
+  // `minimumDate` del picker sólo acota la fecha al abrirlo — no impide dejar
+  // el sheet abierto hasta que la hora elegida quede atrás.
   const blockReason: string | null =
-    matchType === 'RANKING' && !selectedVenue
-      ? zonesLoaded && zones.length === 0
-        ? 'Todavía no hay complejos cargados. Escribinos para sumar tu cancha y poder proponer partidos de ranking.'
-        : 'Elegí zona y complejo: los partidos de ranking necesitan una cancha oficial para validar el check-in.'
-      : null;
+    scheduledDate.getTime() <= Date.now()
+      ? 'La fecha y hora propuestas ya pasaron: elegí un horario futuro.'
+      : matchType === 'RANKING' && !selectedVenue
+        ? zonesLoaded && zones.length === 0
+          ? 'Todavía no hay complejos cargados. Escribinos para sumar tu cancha y poder proponer partidos de ranking.'
+          : 'Elegí zona y complejo: los partidos de ranking necesitan una cancha oficial para validar el check-in.'
+        : null;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>

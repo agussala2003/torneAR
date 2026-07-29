@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 export type MockResult<T = unknown> = { data: T; error: unknown };
 
-const CHAIN_METHODS = ['select', 'eq', 'in', 'or', 'limit', 'update', 'insert', 'upsert', 'order'] as const;
+const CHAIN_METHODS = ['select', 'eq', 'neq', 'in', 'or', 'limit', 'update', 'insert', 'upsert', 'order'] as const;
 
 // Builder chainable mínimo para simular supabase-js: cualquier método de la lista
 // devuelve el propio builder (encadenable indefinidamente), y el builder es

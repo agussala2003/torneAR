@@ -20,11 +20,25 @@ const ENTRIES: AdminEntry[] = [
     subtitle: 'Aprobar o rechazar walkovers pendientes de revisión',
   },
   {
+    route: '/admin/dispute-review',
+    icon: 'scale-balance',
+    color: '#FFB4AB',
+    title: 'Disputas',
+    subtitle: 'Resolver partidos trabados por empate de votos y Fair Play',
+  },
+  {
     route: '/admin/season',
     icon: 'calendar-refresh-outline',
     color: '#8CCDFF',
     title: 'Temporadas',
     subtitle: 'Cerrar la temporada activa y abrir la siguiente',
+  },
+  {
+    route: '/admin/logs',
+    icon: 'text-box-search-outline',
+    color: '#53E076',
+    title: 'Logs de la app',
+    subtitle: 'Telemetría de errores silenciosos reportados por los clientes',
   },
 ];
 

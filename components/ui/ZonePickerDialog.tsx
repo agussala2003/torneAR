@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, TouchableWithoutFeedback, ActivityIndicator, StyleSheet } from 'react-native';
 import { fetchActiveZoneNames } from '@/lib/zones-data';
+import { Logger } from '@/lib/logger';
 
 interface ZonePickerDialogProps {
   visible: boolean;
@@ -21,7 +22,13 @@ export function ZonePickerDialog({ visible, onClose, selectedZone, onSelect }: Z
       setLoadingZones(true);
       try {
         setZones(await fetchActiveZoneNames());
-      } catch {
+      } catch (error) {
+        // El fallback hardcodeado se ve igual que el catálogo real: el usuario
+        // elige una zona de una lista que puede no existir en la base.
+        Logger.warn('No se pudieron cargar las zonas; se usa el listado hardcodeado', {
+          scope: 'ZonePickerDialog.fetchZones',
+          error,
+        });
         setZones(['Buenos Aires Centro', 'GBA Norte', 'GBA Sur', 'GBA Oeste']);
       }
       setLoadingZones(false);

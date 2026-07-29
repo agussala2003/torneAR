@@ -28,6 +28,7 @@ export interface MarketTeamPost {
     name: string;
     zone?: string | null;
     shield_url: string | null;
+    is_active: boolean;
   } | null;
 }
 
@@ -67,18 +68,24 @@ async function getProfileId(): Promise<string> {
  * Obtiene las publicaciones activas de equipos que buscan jugadores.
  */
 export async function fetchTeamPosts(positionFilter?: string, zoneFilter?: string | null): Promise<MarketTeamPost[]> {
+  // E3: `teams!inner` + el filtro sobre el embed descartan las publicaciones de
+  // equipos dados de baja. El `.eq('is_active', true)` suelto sigue siendo el de
+  // `market_team_posts` (tabla base); el del equipo va calificado con el alias.
+  // Sin el `!inner` el embed sería un LEFT JOIN y el post igual aparecería.
   let query = supabase
     .from('market_team_posts')
     .select(`
       *,
-      teams (
+      teams!inner (
         id,
         name,
         zone,
-        shield_url
+        shield_url,
+        is_active
       )
     `)
     .eq('is_active', true)
+    .eq('teams.is_active', true)
     .order('created_at', { ascending: false });
 
   if (positionFilter && positionFilter !== 'CUALQUIERA') {
