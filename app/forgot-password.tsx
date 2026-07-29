@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { sendPasswordReset } from '@/lib/auth-data';
+import { Logger } from '@/lib/logger';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -28,12 +29,20 @@ export default function ForgotPasswordScreen() {
 
       if (error) throw error;
 
+      Logger.info('Correo de recuperación de contraseña enviado', {
+        scope: 'forgot-password.handleResetPassword',
+      });
+
       showAlert(
         'Correo enviado',
         'Revisa tu bandeja de entrada o la carpeta de spam para obtener las instrucciones para restablecer tu contraseña.',
         () => router.back()
       );
     } catch (error) {
+      Logger.error('No se pudo enviar el correo de recuperación de contraseña', {
+        scope: 'forgot-password.handleResetPassword',
+        error,
+      });
       showAlert('Error al enviar', getGenericSupabaseErrorMessage(error, 'No pudimos procesar la solicitud. Inténtalo nuevamente.'));
     } finally {
       setLoading(false);

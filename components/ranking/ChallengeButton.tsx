@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
-import { sendChallenge } from '@/lib/challenge-actions';
+import { sendChallenge, fetchSquadReadiness, type SquadReadiness } from '@/lib/challenge-actions';
+import { Logger } from '@/lib/logger';
+
+const FORMAT_SHORT: Record<string, string> = {
+  FUTBOL_5: 'F5', FUTBOL_6: 'F6', FUTBOL_7: 'F7',
+  FUTBOL_8: 'F8', FUTBOL_9: 'F9', FUTBOL_11: 'F11',
+};
 
 interface Props {
   challengerTeamId: string;
@@ -21,11 +27,15 @@ export function ChallengeButton({
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [readiness, setReadiness] = useState<SquadReadiness | null>(null);
 
   const isRanking = matchType === 'RANKING';
 
-  function handleInitiate() {
+  // El cupo se consulta al abrir la confirmación, no en cada render: así es una
+  // query por tap en vez de una por tarjeta del listado.
+  async function handleInitiate() {
     setConfirming(true);
+    setReadiness(await fetchSquadReadiness(challengerTeamId));
   }
 
   async function handleConfirm() {
@@ -36,8 +46,22 @@ export function ChallengeButton({
       const extra = result.eloDiffWarning
         ? '\n\n⚠️ Diferencia de rating > 400 pts. Bajo impacto en el ranking.'
         : '';
+      Logger.info('Desafío enviado', {
+        scope: 'ChallengeButton.handleConfirm',
+        challengerTeamId,
+        opponentTeamId,
+        matchType,
+        eloDiffWarning: result.eloDiffWarning,
+      });
       showAlert('¡Enviado!', `El desafío fue enviado correctamente al rival.${extra}`, onSuccess);
     } catch (error: unknown) {
+      Logger.error('No se pudo enviar el desafío', {
+        scope: 'ChallengeButton.handleConfirm',
+        challengerTeamId,
+        opponentTeamId,
+        matchType,
+        error,
+      });
       const message =
         (error as { message?: string }).message ?? 'No se pudo enviar el desafío.';
       showAlert('Error', message);
@@ -66,6 +90,20 @@ export function ChallengeButton({
         <Text className="mb-2 text-center font-ui text-xs text-neutral-on-surface-variant">
           ¿Confirmar desafío {isRanking ? 'por el ranking' : 'amistoso'}?
         </Text>
+
+        {/* E1: aviso NO bloqueante. El freno duro está en la confirmación de la
+            propuesta; acá sólo se adelanta para no llegar a esa pared. */}
+        {readiness && !readiness.ok && (
+          <View className="mb-2 rounded-lg border border-warning-tertiary/30 bg-warning-tertiary/10 px-3 py-2">
+            <Text className="font-ui text-[11px] leading-4 text-warning-tertiary">
+              ⚠️ Tenés {readiness.memberCount} jugador{readiness.memberCount === 1 ? '' : 'es'} en el
+              plantel y {FORMAT_SHORT[readiness.format] ?? readiness.format} necesita al menos{' '}
+              {readiness.minRequired} para presentarse. Podés desafiar igual, pero no vas a poder
+              confirmar el partido hasta sumar gente o acordar un formato más chico.
+            </Text>
+          </View>
+        )}
+
         <View className="flex-row gap-2">
           <TouchableOpacity
             activeOpacity={0.7}
@@ -96,7 +134,7 @@ export function ChallengeButton({
     <TouchableOpacity
       activeOpacity={0.8}
       disabled={loading}
-      onPress={handleInitiate}
+      onPress={() => void handleInitiate()}
       className={`items-center rounded-xl py-3 ${isRanking ? 'bg-brand-primary' : 'border border-info-secondary/30 bg-transparent'}`}
     >
       {loading ? (

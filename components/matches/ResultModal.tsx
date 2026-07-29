@@ -11,6 +11,7 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { ScorerMvpPicker } from '@/components/matches/ScorerMvpPicker';
 import type { MatchResultFormData, ScorerPickerPerson } from '@/components/matches/types';
+import { Logger } from '@/lib/logger';
 
 interface Props {
   visible: boolean;
@@ -115,8 +116,21 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
         scorers: scorerEntries,
         mvpProfileId: mvpId,
       });
+      Logger.info('Resultado confirmado desde el modal', {
+        scope: 'ResultModal.handleSubmit',
+        goalsScored,
+        goalsAgainst,
+        scorersCount: scorerEntries.length,
+        hasMvp: mvpId !== null,
+      });
       onClose();
     } catch (err) {
+      Logger.error('No se pudo guardar el resultado del partido', {
+        scope: 'ResultModal.handleSubmit',
+        goalsScored,
+        goalsAgainst,
+        error: err,
+      });
       // El modal queda abierto para que el usuario corrija sin recargar todo, asi
       // que el error tiene que mostrarse ACA: el alert de match-detail vive fuera
       // de este <Modal> nativo y quedaria detras, invisible.

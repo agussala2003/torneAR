@@ -10,6 +10,7 @@ import { TEAM_CATEGORY_OPTIONS, TEAM_FORMAT_OPTIONS, TeamCategory, TeamFormat } 
 import { fetchZones, createTeam } from '@/lib/team-create-data';
 import { ZonePickerModal } from '@/components/team-create/ZonePickerModal';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { Logger } from '@/lib/logger';
 
 export default function TeamCreateScreen() {
   const router = useRouter();
@@ -55,7 +56,14 @@ export default function TeamCreateScreen() {
         setLoadingZones(true);
         const data = await fetchZones();
         setZones(data);
-      } catch {
+      } catch (error) {
+        // El fallback deja el picker con una sola zona: el usuario cree que no
+        // hay más opciones en vez de enterarse de que la carga falló.
+        Logger.warn('No se pudieron cargar las zonas; se usa la zona del perfil como único fallback', {
+          scope: 'team-create.loadZones',
+          fallbackZone: profile?.zone ?? null,
+          error,
+        });
         setZones(profile?.zone ? [profile.zone] : []);
       } finally {
         setLoadingZones(false);
@@ -85,7 +93,16 @@ export default function TeamCreateScreen() {
     try {
       setIsSubmitting(true);
       const teamData = await createTeam(profile.id, sanitizedName, sanitizedZone, category, format);
-      
+
+      Logger.info('Equipo creado', {
+        scope: 'team-create.handleCreateTeam',
+        teamId: teamData.id,
+        captainProfileId: profile.id,
+        zone: sanitizedZone,
+        category,
+        format,
+      });
+
       showAlert('Equipo creado', `Tu equipo ${teamData.name} ya esta listo.`, async () => {
         if (profile?.id) {
           await fetchMyTeams(profile.id);
@@ -93,6 +110,15 @@ export default function TeamCreateScreen() {
         router.replace({ pathname: '/team-manage', params: { teamId: teamData.id } });
       });
     } catch (error: unknown) {
+      Logger.error('No se pudo crear el equipo', {
+        scope: 'team-create.handleCreateTeam',
+        captainProfileId: profile.id,
+        zone: sanitizedZone,
+        category,
+        format,
+        code: (error as { code?: string }).code,
+        error,
+      });
       const fallbackMessage = (error as { code?: string }).code === '42501'
         ? 'No tienes permisos para crear equipos. Revisa las politicas de RLS para teams y team_members.'
         : 'No se pudo crear el equipo. Intentalo nuevamente.';

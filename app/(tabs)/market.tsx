@@ -12,10 +12,17 @@ import { useUI } from '@/context/UIContext';
 import { useTeamStore } from '@/stores/teamStore';
 import { fetchMarketViewData } from '@/lib/market-data';
 import { togglePostStatus } from '@/lib/market-api';
-import { filterPostsByDay } from '@/lib/market-utils';
+import { filterPostsByDay, resolveApplicantTeam } from '@/lib/market-utils';
 import { MarketViewData, TabType } from '@/components/market/types';
 import { getOrCreateMarketChat } from '@/lib/chat-api';
-import { applyToTeamPost, applyToPlayerPost, fetchApplicationCounts } from '@/lib/market-applications-api';
+import { Logger } from '@/lib/logger';
+import {
+  applyToTeamPost,
+  applyToPlayerPost,
+  fetchApplicationCounts,
+  getMarketApplicationErrorMessage,
+  MarketApplicationError,
+} from '@/lib/market-applications-api';
 
 export default function MarketScreen() {
   const { profile } = useAuth();
@@ -62,8 +69,24 @@ export default function MarketScreen() {
         fetchApplicationCounts(ownPlayerPostIds, 'PLAYER'),
       ])
         .then(([teamCounts, playerCounts]) => setApplicationCounts({ ...teamCounts, ...playerCounts }))
-        .catch(() => {}); // no crítico — el botón simplemente no muestra el número
-    } catch {
+        .catch((err: unknown) => {
+          // No crítico — el botón simplemente no muestra el número. Pero un
+          // "Ver postulaciones" sin contador es indistinguible de un post sin
+          // postulaciones, y ése es justo el caso que el capitán no revisa.
+          Logger.warn('No se pudieron cargar los contadores de postulaciones', {
+            scope: 'market.loadData',
+            profileId: profile.id,
+            error: err,
+          });
+        });
+    } catch (err) {
+      Logger.error('No se pudo cargar la información del mercado', {
+        scope: 'market.loadData',
+        profileId: profile.id,
+        filterZone,
+        filterSort,
+        error: err,
+      });
       showAlert('Error', 'No se pudo cargar la informacion del mercado.');
     } finally {
       setLoading(false);
@@ -102,15 +125,71 @@ export default function MarketScreen() {
     });
   };
 
+  // El chat es el paso secundario y se abre SIEMPRE después de la postulación.
+  // Si falla, no se lo trata como error: la postulación ya está registrada y
+  // decirle "no pudimos postularte" a alguien que sí quedó postulado es peor
+  // que no abrirle el chat.
+  const openMarketChat = async (playerProfileId: string, teamId: string) => {
+    try {
+      const chat = await getOrCreateMarketChat(playerProfileId, teamId);
+      router.push(`/market-chats/${chat.id}` as any);
+    } catch (err) {
+      Logger.warn('Postulación registrada pero no se pudo abrir el chat', {
+        scope: 'market.openMarketChat',
+        playerProfileId,
+        teamId,
+        error: err,
+      });
+    }
+  };
+
+  const showApplyError = (err: unknown) => {
+    // Los errores de dominio (post vencido/cerrado) traen un texto propio y no
+    // son un fallo del usuario: merecen otro título. Todo se muestra con el
+    // CustomAlert del UIContext — nunca con Alert.alert del sistema.
+    showAlert(
+      err instanceof MarketApplicationError ? 'Publicación no disponible' : 'No pudimos postularte',
+      getMarketApplicationErrorMessage(err),
+    );
+  };
+
+  // M3: la postulación se disparaba con `void` — sin await y sin catch. El botón
+  // dice "Postularme" pero lo único que se esperaba era la apertura del chat: si
+  // el INSERT fallaba (RLS, red, sesión vencida) el usuario veía el chat abierto
+  // y creía haberse postulado, mientras el capitán nunca recibía nada.
+  // M8: además, deja de correr en paralelo con el chat. Primero se registra la
+  // postulación —que ahora puede rechazarse por post vencido o cerrado— y recién
+  // después se abre la conversación. En paralelo, un post vencido igual dejaba
+  // una conversación viva sobre un partido que ya se jugó.
   const handleContactTeam = async (teamId: string, postId: string) => {
     if (!profile) return;
-    showLoader('Abriendo chat...');
+    showLoader('Enviando postulación...');
     try {
-      const chat = await getOrCreateMarketChat(profile.id, teamId);
-      void applyToTeamPost(postId, teamId);
-      router.push(`/market-chats/${chat.id}` as any);
-    } catch {
-      showAlert('Error', 'No se pudo abrir el chat. Intenta de nuevo.');
+      const applyResult = await applyToTeamPost(postId, teamId);
+      Logger.info('Postulación a publicación de equipo registrada', {
+        scope: 'market.handleContactTeam',
+        postId,
+        teamId,
+        profileId: profile.id,
+        applyResult,
+      });
+      await openMarketChat(profile.id, teamId);
+
+      showAlert(
+        applyResult === 'DUPLICADA' ? 'Ya te habías postulado' : '¡Postulación enviada!',
+        applyResult === 'DUPLICADA'
+          ? 'Tu postulación a esta publicación ya estaba registrada. Podés seguir la conversación por el chat.'
+          : 'El equipo ya la ve en su lista de postulaciones. Aprovechá el chat para coordinar.',
+      );
+    } catch (err) {
+      Logger.error('No se pudo postular a la publicación de equipo', {
+        scope: 'market.handleContactTeam',
+        postId,
+        teamId,
+        profileId: profile.id,
+        error: err,
+      });
+      showApplyError(err);
     } finally {
       hideLoader();
     }
@@ -119,20 +198,56 @@ export default function MarketScreen() {
   const handleContactPlayer = async (playerProfileId: string, postId: string) => {
     if (!profile || !viewData) return;
 
-    if (viewData.managedTeams.length === 0) {
+    // M7: el `activeTeamId ?? activeCaptainTeamId ?? managedTeams[0]` de antes
+    // podía devolver un equipo donde el usuario es sólo JUGADOR — el activo del
+    // store no está filtrado por rol. La policy de INSERT exige
+    // CAPITAN/SUBCAPITAN, así que el INSERT rebotaba. Ahora el equipo sale
+    // siempre de `managedTeams`, que es exactamente esa lista.
+    const applicantTeam = resolveApplicantTeam(viewData.managedTeams, activeTeamId, activeCaptainTeamId);
+
+    if (!applicantTeam) {
+      // No se resolvió ningún equipo gestionado: la postulación no se intenta.
+      Logger.warn('No se pudo resolver el equipo postulante', {
+        scope: 'market.handleContactPlayer',
+        postId,
+        activeTeamId,
+        activeCaptainTeamId,
+        managedTeamsCount: viewData.managedTeams.length,
+      });
       showAlert('Sin equipos', 'Debes ser Capitan o Subcapitan de un equipo para contactar jugadores.');
       return;
     }
 
-    const teamId = activeTeamId ?? activeCaptainTeamId ?? viewData.managedTeams[0].id;
-
-    showLoader('Abriendo chat...');
+    showLoader('Enviando postulación...');
     try {
-      const chat = await getOrCreateMarketChat(playerProfileId, teamId);
-      void applyToPlayerPost(postId, teamId, playerProfileId);
-      router.push(`/market-chats/${chat.id}` as any);
-    } catch {
-      showAlert('Error', 'No se pudo abrir el chat. Intenta de nuevo.');
+      const applyResult = await applyToPlayerPost(postId, applicantTeam.id, playerProfileId);
+      Logger.info('Postulación a publicación de jugador registrada', {
+        scope: 'market.handleContactPlayer',
+        postId,
+        applicantTeamId: applicantTeam.id,
+        playerProfileId,
+        applyResult,
+      });
+      await openMarketChat(playerProfileId, applicantTeam.id);
+
+      // El nombre del equipo va en el mensaje porque puede no ser el activo: si
+      // el activo es uno que no gestiona, se postula con otro, y tiene que
+      // enterarse acá y no cuando el rival le pregunte quiénes son.
+      showAlert(
+        applyResult === 'DUPLICADA' ? 'Ya te habías postulado' : '¡Postulación enviada!',
+        applyResult === 'DUPLICADA'
+          ? `${applicantTeam.name} ya estaba postulado a esta publicación. Podés seguir la conversación por el chat.`
+          : `Te postulaste con ${applicantTeam.name}. El jugador ya la ve en su lista de postulaciones y podés coordinar por el chat.`,
+      );
+    } catch (err) {
+      Logger.error('No se pudo postular a la publicación de jugador', {
+        scope: 'market.handleContactPlayer',
+        postId,
+        applicantTeamId: applicantTeam.id,
+        playerProfileId,
+        error: err,
+      });
+      showApplyError(err);
     } finally {
       hideLoader();
     }
@@ -177,7 +292,13 @@ export default function MarketScreen() {
         };
       });
       setPostPendingDelete(null);
-    } catch {
+    } catch (err) {
+      Logger.error('No se pudo cancelar la publicación del mercado', {
+        scope: 'market.cancelPost',
+        postId: postPendingDelete.id,
+        isTeamPost: postPendingDelete.isTeamPost,
+        error: err,
+      });
       showAlert('Error', 'No se pudo cancelar la publicación.');
     } finally {
       hideLoader();
@@ -228,6 +349,17 @@ export default function MarketScreen() {
           <View className="flex-1">
             <MarketTabs activeTab={activeTab} onTabChange={setActiveTab} />
           </View>
+          {/* M4 — Entrada a "Mis postulaciones". El postulante no tenía dónde
+              ver el estado de lo que mandó: el estado se escribía bien desde
+              M5/M6 pero moría en la notificación. */}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => router.push('/market-my-applications')}
+            accessibilityLabel="Mis postulaciones"
+            className="h-[48px] w-[48px] items-center justify-center rounded-xl border border-transparent bg-surface-low"
+          >
+            <AppIcon family="material-community" name="send-check-outline" size={20} color="#BCCBB9" />
+          </TouchableOpacity>
           {/* Botón Filtro Cuadrado */}
           <TouchableOpacity
             activeOpacity={0.8}

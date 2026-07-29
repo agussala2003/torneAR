@@ -7,7 +7,8 @@ import { HomeSkeleton } from '@/components/home/HomeSkeleton';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchHomeViewData } from '@/lib/home-data';
-import type { HomeViewData, PendingActionType } from '@/components/home/types';
+import { Logger } from '@/lib/logger';
+import type { HomeViewData, PendingAction } from '@/components/home/types';
 import { HomeOnboardingState } from '@/components/home/HomeOnboardingState';
 import { PendingActionsCard } from '@/components/home/PendingActionsCard';
 import { UpcomingMatchesSection } from '@/components/home/UpcomingMatchesSection';
@@ -30,6 +31,11 @@ export default function HomeScreen() {
       const data = await fetchHomeViewData(profile.id);
       setViewData(data);
     } catch (error) {
+      Logger.error('No se pudo cargar la pantalla de inicio', {
+        scope: 'tabs.index.loadData',
+        profileId: profile.id,
+        error,
+      });
       showAlert(
         'Error al cargar inicio',
         getGenericSupabaseErrorMessage(error, 'No se pudo cargar la pantalla de inicio.'),
@@ -75,12 +81,31 @@ export default function HomeScreen() {
     router.push('/(tabs)/profile');
   };
 
-  const handlePendingAction = (type: PendingActionType) => {
-    if (type === 'DISPUTE' || type === 'CHALLENGE_RECEIVED') {
-      router.push('/(tabs)/ranking');
-    } else {
-      // TEAM_REQUEST → profile has the team management section
-      router.push('/(tabs)/profile');
+  // D12 — cada señal lleva al lugar donde SE RESUELVE. Las que apuntan a un
+  // partido concreto (`matchId`, que sólo viene cuando hay uno solo) entran
+  // directo al detalle; con varias, a la lista de partidos.
+  const handlePendingAction = (action: PendingAction) => {
+    switch (action.type) {
+      case 'DISPUTE':
+      case 'LIVE_RESULT':
+      case 'MATCH_PROPOSAL':
+      case 'CANCELLATION_REQUEST':
+        if (action.matchId) {
+          router.push({ pathname: '/match-detail', params: { matchId: action.matchId } });
+        } else {
+          router.push('/(tabs)/matches');
+        }
+        break;
+      case 'CHALLENGE_RECEIVED':
+        router.push('/challenge-inbox');
+        break;
+      case 'MARKET_APPLICATION':
+        router.push('/(tabs)/market');
+        break;
+      case 'TEAM_REQUEST':
+        // El perfil es donde vive la gestión de equipos.
+        router.push('/(tabs)/profile');
+        break;
     }
   };
 

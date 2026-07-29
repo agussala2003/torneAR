@@ -23,6 +23,7 @@ import { ProfileFormFields } from '@/components/profile/ProfileFormFields';
 import { FAVORITE_TEAM_OPTIONS } from '@/lib/favorite-teams';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
 import { saveOnboardingProfile } from '@/lib/onboarding-data';
+import { Logger } from '@/lib/logger';
 
 const STEP_WIDTH = ['w-1/3', 'w-2/3', 'w-full'] as const;
 
@@ -92,12 +93,25 @@ export default function OnboardingScreen() {
     try {
       await saveOnboardingProfile(user.id, data);
       await refreshProfile();
+      Logger.info('Onboarding completado', {
+        scope: 'onboarding.onSubmit',
+        userId: user.id,
+      });
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string } | null;
       if (err?.code === '23505' && err?.message?.includes('username')) {
+        Logger.warn('Onboarding rechazado por nombre de usuario duplicado', {
+          scope: 'onboarding.onSubmit',
+          userId: user.id,
+        });
         setStep(1);
         showAlert('Error', 'Ese nombre de usuario ya está en uso. Por favor, elige otro.');
       } else {
+        Logger.error('No se pudo guardar el perfil del onboarding', {
+          scope: 'onboarding.onSubmit',
+          userId: user.id,
+          error,
+        });
         showAlert(
           'Error al guardar',
           getGenericSupabaseErrorMessage(

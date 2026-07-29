@@ -87,14 +87,20 @@ select results_eq(
      from teams where id = 'c3c3c3c3-0000-0000-0000-000000000002' $$,
   $$ values (1, 3, 980) $$, 'WA-7b: ausente suma derrota, 3 GC y ELO -20');
 
--- ── WA-8/9. Rechazar claim2: el partido no cambia ───────────────────────────
+-- ── WA-8/9. Rechazar claim2: el partido se cierra ───────────────────────────
+-- ⚠️ Conducta CAMBIADA a propósito por D5 (`20260728180000`). Antes el rechazo
+-- sólo marcaba el claim y dejaba el partido en CONFIRMADO — pero el
+-- `unique (match_id)` impedía volver a reclamar, así que el partido quedaba
+-- vivo para siempre y sus convocados bloqueados por ACTIVE_MATCH. Ahora el
+-- rechazo sobre un CONFIRMADO lo cancela y cierra el ciclo. Esta aserción
+-- afirmaba la conducta vieja y se actualizó al desplegar el Bloque 9.
 select resolve_wo_claim('c3c3c3c3-0000-0000-0000-0000000000d2', false, 'evidencia insuficiente');
 select results_eq(
   $$ select status::text from wo_claims where id = 'c3c3c3c3-0000-0000-0000-0000000000d2' $$,
   array['RECHAZADO'], 'WA-8: el claim rechazado queda en RECHAZADO');
 select results_eq(
   $$ select status::text from matches where id = 'c3c3c3c3-0000-0000-0000-0000000000c2' $$,
-  array['CONFIRMADO'], 'WA-9: el partido del claim rechazado sigue CONFIRMADO');
+  array['CANCELADO'], 'WA-9: el rechazo cancela el partido CONFIRMADO (D5, anti callejón sin salida)');
 
 -- ── WA-10. get_pending deja de mostrar lo resuelto ──────────────────────────
 select is_empty(

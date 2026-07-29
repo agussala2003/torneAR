@@ -10,6 +10,7 @@ import { HeroButton } from '@/components/ui/HeroButton';
 import { GoogleAuthButton } from '@/components/ui/GoogleAuthButton';
 import { router } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { Logger } from '@/lib/logger';
 import {
   signInSchema,
   signUpSchema,
@@ -53,11 +54,15 @@ export default function LoginScreen() {
     try {
       if (isLogin) {
         const { error: signInError } = await signIn(data.email, data.password);
+        if (!signInError) {
+          Logger.info('Login con email exitoso', { scope: 'login.onSubmit' });
+        }
         error = signInError;
       } else {
         const { error: signUpError } = await signUp(data.email, data.password);
 
         if (!signUpError) {
+          Logger.info('Cuenta creada con email', { scope: 'login.onSubmit' });
           showAlert('Exito', 'Cuenta creada. Revisa tu correo o inicia sesion.');
           setIsLogin(true);
         }
@@ -65,6 +70,11 @@ export default function LoginScreen() {
         error = signUpError;
       }
     } catch (unexpectedError) {
+      Logger.error('Excepción inesperada en el formulario de autenticación', {
+        scope: 'login.onSubmit',
+        mode: isLogin ? 'login' : 'signup',
+        error: unexpectedError,
+      });
       error = {
         name: 'AuthError',
         message: String(unexpectedError),
@@ -75,6 +85,14 @@ export default function LoginScreen() {
     }
 
     if (error) {
+      // Supabase devuelve el fallo de credenciales como valor, no como throw: sin
+      // esto, un login rechazado no dejaría ninguna huella en telemetría.
+      Logger.warn('Autenticación rechazada', {
+        scope: 'login.onSubmit',
+        mode: isLogin ? 'login' : 'signup',
+        status: error.status,
+        reason: error.message,
+      });
       showAlert('Error de autenticacion', getAuthErrorMessage(error, isLogin ? 'login' : 'signup'));
     }
     // NOTA: No hacemos router.replace aca. El guard de app/_layout.tsx atrapa el
@@ -98,9 +116,23 @@ export default function LoginScreen() {
       // Cerrar la ventana de Google es una decision del usuario, no un fallo:
       // volvemos al formulario sin alerta.
       if (!cancelled && error) {
+        Logger.warn('Autenticación con Google rechazada', {
+          scope: 'login.onGooglePress',
+          reason: error instanceof Error ? error.message : String(error),
+        });
         showAlert('Error de autenticacion', getAuthErrorMessage(error, 'login'));
+      } else if (cancelled) {
+        Logger.info('El usuario canceló el consentimiento de Google', {
+          scope: 'login.onGooglePress',
+        });
+      } else {
+        Logger.info('Login con Google exitoso', { scope: 'login.onGooglePress' });
       }
     } catch (unexpectedError) {
+      Logger.error('Excepción inesperada en el login con Google', {
+        scope: 'login.onGooglePress',
+        error: unexpectedError,
+      });
       showAlert('Error de autenticacion', getAuthErrorMessage(unexpectedError, 'login'));
     } finally {
       setGoogleLoading(false);

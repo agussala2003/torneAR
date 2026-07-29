@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "tornear",
+    "name": "TorneAR",
     "slug": "tornear",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tornear",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
+    "primaryColor": "#53E076",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
@@ -18,14 +19,11 @@
     "android": {
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#0F0F0F",
+        "backgroundColor": "#131313",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
@@ -34,20 +32,6 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "autoVerify": true,
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ],
-          "data": [
-            {
-              "scheme": "tornear"
-            }
-          ]
-        },
-        {
-          "action": "VIEW",
-          "autoVerify": true,
           "category": [
             "BROWSABLE",
             "DEFAULT"
@@ -76,11 +60,11 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#0F0F0F",
+          "backgroundColor": "#131313",
           "dark": {
-            "backgroundColor": "#0F0F0F"
+            "backgroundColor": "#131313"
           }
         }
       ],

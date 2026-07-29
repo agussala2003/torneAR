@@ -6,6 +6,7 @@ import type {
   HomeTeamSnapshot,
   HomeMatchEntry,
   PendingAction,
+  PendingActionType,
 } from '@/components/home/types';
 
 type TeamRole = Database['public']['Enums']['team_role'];
@@ -46,12 +47,109 @@ type TeamSnapshotRow = {
   elo_rating: number;
 };
 
+// ─── D12: filas de las señales nuevas de la bandeja ───────────────────────────
+
+type OpenMatchRow = {
+  id: string;
+  status: MatchStatus;
+  team_a_id: string;
+  team_b_id: string;
+};
+
+type ProposalRow = { id: string; match_id: string; from_team_id: string };
+
+type CancellationRow = { id: string; match_id: string; requested_by_team_id: string };
+
+type ResultRow = { match_id: string; team_id: string };
+
 // Status order for client-side sort: EN_VIVO always first
 const STATUS_PRIORITY: Partial<Record<MatchStatus, number>> = {
   EN_VIVO: 0,
   CONFIRMADO: 1,
   PENDIENTE: 2,
 };
+
+/** Estados de un partido "vivo": los únicos sobre los que queda algo por hacer. */
+const OPEN_MATCH_STATUSES: MatchStatus[] = ['PENDIENTE', 'CONFIRMADO', 'EN_VIVO'];
+
+/** Una postulación sigue esperando respuesta mientras no la respondan (M6: `VISTA` cuenta). */
+const OPEN_APPLICATION_STATUSES = ['PENDIENTE', 'VISTA'];
+
+// ─── D12: armado de la bandeja ────────────────────────────────────────────────
+
+/**
+ * Entrada cruda de la bandeja: un conteo y, si la acción es única, el partido.
+ * `buildPendingActions` se encarga del texto.
+ */
+export interface PendingActionInput {
+  type: PendingActionType;
+  count: number;
+  matchId?: string | null;
+}
+
+/**
+ * Singular/plural de cada señal, en un solo lugar y sin tocar la base.
+ *
+ * Está exportado a propósito: es la única parte de `fetchHomeViewData` que se
+ * puede probar sin fabricar seis respuestas de Supabase encadenadas, y es la
+ * que concentra las decisiones de producto (qué se muestra, con qué palabras y
+ * en qué orden).
+ *
+ * **El orden del array es el de la pantalla**, y es deliberado: primero lo que
+ * está ocurriendo o a punto de vencer (partido en vivo, disputa), después lo
+ * que espera una respuesta mía, y al final lo que puede esperar.
+ */
+export function buildPendingActions(inputs: PendingActionInput[]): PendingAction[] {
+  const label = (type: PendingActionType, n: number): string => {
+    switch (type) {
+      case 'LIVE_RESULT':
+        return n === 1
+          ? '1 partido en vivo sin resultado cargado'
+          : `${n} partidos en vivo sin resultado cargado`;
+      case 'DISPUTE':
+        return n === 1 ? '1 partido en disputa' : `${n} partidos en disputa`;
+      case 'MATCH_PROPOSAL':
+        return n === 1
+          ? '1 propuesta de partido esperando tu respuesta'
+          : `${n} propuestas de partido esperando tu respuesta`;
+      case 'CANCELLATION_REQUEST':
+        return n === 1
+          ? '1 pedido de cancelación esperando tu respuesta'
+          : `${n} pedidos de cancelación esperando tu respuesta`;
+      case 'CHALLENGE_RECEIVED':
+        return n === 1 ? '1 desafío recibido' : `${n} desafíos recibidos`;
+      case 'TEAM_REQUEST':
+        return n === 1
+          ? '1 solicitud de ingreso pendiente'
+          : `${n} solicitudes de ingreso pendientes`;
+      case 'MARKET_APPLICATION':
+        return n === 1
+          ? '1 postulación sin responder en el Mercado'
+          : `${n} postulaciones sin responder en el Mercado`;
+    }
+  };
+
+  const ORDER: PendingActionType[] = [
+    'LIVE_RESULT',
+    'DISPUTE',
+    'MATCH_PROPOSAL',
+    'CANCELLATION_REQUEST',
+    'CHALLENGE_RECEIVED',
+    'TEAM_REQUEST',
+    'MARKET_APPLICATION',
+  ];
+
+  return inputs
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type))
+    .map((entry) => ({
+      type: entry.type,
+      count: entry.count,
+      label: label(entry.type, entry.count),
+      // El atajo directo sólo tiene sentido cuando no hay ambigüedad.
+      matchId: entry.count === 1 ? (entry.matchId ?? null) : null,
+    }));
+}
 
 // ─── Main fetch ───────────────────────────────────────────────────────────────
 
@@ -102,23 +200,33 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
   const teamInFilter = teamIds.join(',');
   const matchOrFilter = `team_a_id.in.(${teamInFilter}),team_b_id.in.(${teamInFilter})`;
 
+  // El equipo del que soy CAPITAN/SUBCAPITAN es el único que puede responder
+  // propuestas, cancelaciones, desafíos y disputas. Sin este filtro la bandeja
+  // le pedía acciones imposibles a los jugadores (D12).
+  const captainInFilter = captainTeamIds.join(',');
+  const captainMatchOrFilter = `team_a_id.in.(${captainInFilter}),team_b_id.in.(${captainInFilter})`;
+
   // Step 2 — parallel queries that only depend on team IDs
   const parallelQueries = [
     // A: upcoming active matches
     supabase
       .from('matches')
       .select('id, status, match_type, scheduled_at, format, team_a_id, team_b_id')
-      .in('status', ['PENDIENTE', 'CONFIRMADO', 'EN_VIVO'])
+      .in('status', OPEN_MATCH_STATUSES)
       .or(matchOrFilter)
       .order('scheduled_at', { ascending: true, nullsFirst: false })
       .limit(10),
 
     // B: matches in dispute
-    supabase
-      .from('matches')
-      .select('id')
-      .eq('status', 'EN_DISPUTA')
-      .or(matchOrFilter),
+    // D12: sólo los de equipos que gestiono. La disputa la resuelve un capitán;
+    // mostrarle la tarjeta a un jugador era pedirle algo que la RPC le rechaza.
+    captainTeamIds.length > 0
+      ? supabase
+          .from('matches')
+          .select('id')
+          .eq('status', 'EN_DISPUTA')
+          .or(captainMatchOrFilter)
+      : Promise.resolve({ data: [], error: null }),
 
     // C: received challenges (ENVIADA → requires captain action)
     supabase
@@ -135,11 +243,128 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
           .in('team_id', captainTeamIds)
           .eq('status', 'PENDIENTE')
       : Promise.resolve({ data: [], error: null }),
+
+    // E (D12): todos los partidos abiertos de los equipos que gestiono —sin el
+    // `limit(10)` de A, que es para pintar la sección de próximos partidos y no
+    // sirve como universo de acciones pendientes.
+    captainTeamIds.length > 0
+      ? supabase
+          .from('matches')
+          .select('id, status, team_a_id, team_b_id')
+          .in('status', OPEN_MATCH_STATUSES)
+          .or(captainMatchOrFilter)
+      : Promise.resolve({ data: [], error: null }),
+
+    // F (D12): mis avisos abiertos en el Mercado — de equipo (los gestiono) y
+    // propios. Sus postulaciones sin responder son la cuarta señal que faltaba.
+    captainTeamIds.length > 0
+      ? supabase
+          .from('market_team_posts')
+          .select('id')
+          .in('team_id', captainTeamIds)
+          .eq('is_active', true)
+      : Promise.resolve({ data: [], error: null }),
+
+    supabase
+      .from('market_player_posts')
+      .select('id')
+      .eq('profile_id', profileId)
+      .eq('is_active', true),
   ] as const;
 
-  const [matchesRes, disputesRes, challengesRes, requestsRes] = await Promise.all(
-    parallelQueries,
+  const [
+    matchesRes,
+    disputesRes,
+    challengesRes,
+    requestsRes,
+    openMatchesRes,
+    myTeamPostsRes,
+    myPlayerPostsRes,
+  ] = await Promise.all(parallelQueries);
+
+  // ─── Step 2b (D12) — señales que dependen de los partidos abiertos ─────────
+  const captainTeamIdSet = new Set(captainTeamIds);
+
+  const openMatchRows = ((openMatchesRes.data ?? []) as unknown as OpenMatchRow[]);
+  const openMatchIds = openMatchRows.map((m) => m.id);
+  // `myTeamId` por partido: es contra ESE equipo que se mide "ya cargué el
+  // resultado" y "la propuesta la mandó el rival". Mismo criterio que R9 en el
+  // detalle del partido: nunca se infiere del equipo activo del store.
+  const myTeamByMatch = new Map<string, string>(
+    openMatchRows.map((m) => [m.id, captainTeamIdSet.has(m.team_a_id) ? m.team_a_id : m.team_b_id]),
   );
+  const liveMatchIds = openMatchRows.filter((m) => m.status === 'EN_VIVO').map((m) => m.id);
+
+  const myPostIds = {
+    TEAM: ((myTeamPostsRes.data ?? []) as { id: string }[]).map((p) => p.id),
+    PLAYER: ((myPlayerPostsRes.data ?? []) as { id: string }[]).map((p) => p.id),
+  };
+
+  const [proposalsRes, cancellationsRes, liveResultsRes, teamAppsRes, playerAppsRes] =
+    await Promise.all([
+      // Propuestas que mandó el rival y todavía nadie respondió.
+      openMatchIds.length > 0
+        ? supabase
+            .from('match_proposals')
+            .select('id, match_id, from_team_id')
+            .eq('status', 'PENDIENTE')
+            .in('match_id', openMatchIds)
+        : Promise.resolve({ data: [], error: null }),
+
+      // Pedidos de cancelación del rival esperando mi respuesta (doble consentimiento).
+      openMatchIds.length > 0
+        ? supabase
+            .from('cancellation_requests')
+            .select('id, match_id, requested_by_team_id')
+            .eq('status', 'PENDIENTE')
+            .in('match_id', openMatchIds)
+        : Promise.resolve({ data: [], error: null }),
+
+      // Resultados ya cargados en los partidos EN_VIVO: lo que falta es la señal.
+      liveMatchIds.length > 0
+        ? supabase.from('match_results').select('match_id, team_id').in('match_id', liveMatchIds)
+        : Promise.resolve({ data: [], error: null }),
+
+      myPostIds.TEAM.length > 0
+        ? supabase
+            .from('market_team_post_applications')
+            .select('id')
+            .in('post_id', myPostIds.TEAM)
+            .in('status', OPEN_APPLICATION_STATUSES)
+        : Promise.resolve({ data: [], error: null }),
+
+      myPostIds.PLAYER.length > 0
+        ? supabase
+            .from('market_player_post_applications')
+            .select('id')
+            .in('post_id', myPostIds.PLAYER)
+            .in('status', OPEN_APPLICATION_STATUSES)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+  // Una propuesta propia no requiere mi respuesta: la espero yo del rival.
+  const incomingProposals = ((proposalsRes.data ?? []) as unknown as ProposalRow[]).filter(
+    (p) => !captainTeamIdSet.has(p.from_team_id),
+  );
+
+  const incomingCancellations = (
+    (cancellationsRes.data ?? []) as unknown as CancellationRow[]
+  ).filter((c) => !captainTeamIdSet.has(c.requested_by_team_id));
+
+  // "Sin resultado cargado por MI equipo": el del rival no me libera de cargar
+  // el mío — es justamente lo que evita que el partido termine en disputa.
+  const loadedByMe = new Set(
+    ((liveResultsRes.data ?? []) as unknown as ResultRow[]).map(
+      (r) => `${r.match_id}:${r.team_id}`,
+    ),
+  );
+  const liveWithoutMyResult = liveMatchIds.filter(
+    (matchId) => !loadedByMe.has(`${matchId}:${myTeamByMatch.get(matchId)}`),
+  );
+
+  const marketApplicationCount =
+    ((teamAppsRes.data ?? []) as { id: string }[]).length +
+    ((playerAppsRes.data ?? []) as { id: string }[]).length;
 
   // Step 3 — fetch team details for all teams referenced in upcoming matches
   // (needed for opponent names/shields that aren't in my team list)
@@ -200,38 +425,29 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
     };
   });
 
-  const pendingActions: PendingAction[] = [];
+  const disputeRows = (disputesRes.data ?? []) as { id: string }[];
 
-  const disputeCount = (disputesRes.data ?? []).length;
-  if (disputeCount > 0) {
-    pendingActions.push({
-      type: 'DISPUTE',
-      count: disputeCount,
-      label: disputeCount === 1 ? '1 partido en disputa' : `${disputeCount} partidos en disputa`,
-    });
-  }
-
-  const challengeCount = (challengesRes.data ?? []).length;
-  if (challengeCount > 0) {
-    pendingActions.push({
-      type: 'CHALLENGE_RECEIVED',
-      count: challengeCount,
-      label:
-        challengeCount === 1 ? '1 desafío recibido' : `${challengeCount} desafíos recibidos`,
-    });
-  }
-
-  const requestCount = (requestsRes.data ?? []).length;
-  if (requestCount > 0) {
-    pendingActions.push({
-      type: 'TEAM_REQUEST',
-      count: requestCount,
-      label:
-        requestCount === 1
-          ? '1 solicitud de ingreso pendiente'
-          : `${requestCount} solicitudes de ingreso pendientes`,
-    });
-  }
+  const pendingActions = buildPendingActions([
+    {
+      type: 'LIVE_RESULT',
+      count: liveWithoutMyResult.length,
+      matchId: liveWithoutMyResult[0] ?? null,
+    },
+    { type: 'DISPUTE', count: disputeRows.length, matchId: disputeRows[0]?.id ?? null },
+    {
+      type: 'MATCH_PROPOSAL',
+      count: incomingProposals.length,
+      matchId: incomingProposals[0]?.match_id ?? null,
+    },
+    {
+      type: 'CANCELLATION_REQUEST',
+      count: incomingCancellations.length,
+      matchId: incomingCancellations[0]?.match_id ?? null,
+    },
+    { type: 'CHALLENGE_RECEIVED', count: (challengesRes.data ?? []).length },
+    { type: 'TEAM_REQUEST', count: (requestsRes.data ?? []).length },
+    { type: 'MARKET_APPLICATION', count: marketApplicationCount },
+  ]);
 
   const myTeams: HomeTeamSnapshot[] = memberRows.map((r) => ({
     id: r.teams!.id,

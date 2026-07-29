@@ -28,12 +28,36 @@ export interface HomeMatchEntry {
   myTeamId: string;
 }
 
-export type PendingActionType = 'TEAM_REQUEST' | 'CHALLENGE_RECEIVED' | 'DISPUTE';
+/**
+ * D12 — Las señales de la bandeja "Requieren tu atención".
+ *
+ * Las tres primeras son las originales. Las cuatro siguientes son las que
+ * faltaban, y no por casualidad: **todas tienen vencimiento real**. Una
+ * propuesta sin responder termina cancelada por `sweep_stale_matches`, una
+ * solicitud de cancelación sin responder deja el partido comprometido, un
+ * `EN_VIVO` sin resultado se cierra sin computar a las 24 h, y una postulación
+ * sin mirar envejece hasta que el aviso se cierra. Eran justo las acciones que
+ * más caro salía no ver.
+ */
+export type PendingActionType =
+  | 'TEAM_REQUEST'
+  | 'CHALLENGE_RECEIVED'
+  | 'DISPUTE'
+  | 'MATCH_PROPOSAL'
+  | 'CANCELLATION_REQUEST'
+  | 'LIVE_RESULT'
+  | 'MARKET_APPLICATION';
 
 export interface PendingAction {
   type: PendingActionType;
   count: number;
   label: string;
+  /**
+   * Partido al que apunta la tarjeta, cuando la acción es de UNO solo. Con
+   * varios queda `null` y la navegación cae en la lista. Sin esto, "1 propuesta
+   * esperando tu respuesta" obligaba a buscar cuál a mano.
+   */
+  matchId?: string | null;
 }
 
 export interface HomeViewData {

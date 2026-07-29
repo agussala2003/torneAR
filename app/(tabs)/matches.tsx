@@ -8,7 +8,9 @@ import { useTeamStore } from '@/stores/teamStore';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { useTeamMatchesRealtime } from '@/hooks/useTeamMatchesRealtime';
 import { fetchMatchesViewData } from '@/lib/matches-data';
-import { acceptProposal, rejectProposal, cancelProposal } from '@/lib/match-actions';
+import { acceptProposal, rejectProposal, cancelProposal, getProposalErrorMessage } from '@/lib/match-actions';
+import { isTeamMatchAdmin, isTeamMatchStaff } from '@/lib/match-permissions';
+import { Logger } from '@/lib/logger';
 import { MatchCard } from '@/components/matches/MatchCard';
 import { LiveMatchBanner } from '@/components/matches/LiveMatchBanner';
 import { MatchSectionHeader } from '@/components/matches/MatchSectionHeader';
@@ -18,6 +20,18 @@ import type { MatchesViewData } from '@/components/matches/types';
 export default function MatchesScreen() {
   const { activeTeamId, activeTeamName, myTeams, setActiveTeam } = useTeamStore();
   const { showAlert, AlertComponent } = useCustomAlert();
+
+  // R2: `get_my_matches` no devuelve el rol, así que las tarjetas mostraban
+  // acciones de gestión a todo el plantel y el servidor las rechazaba después
+  // del tap. El rol ya vive en el store; mismo patrón que `canChallenge` en la
+  // pestaña Ranking (app/(tabs)/ranking.tsx).
+  const activeRole = myTeams.find((t) => t.id === activeTeamId)?.role;
+  // D10: el predicado de rol también se unificó — los mismos que usa la regla
+  // de "cargar resultado" en el detalle y en las tarjetas.
+  // R6: son DOS. `canManageMatches` coordina el partido (proponer, aceptar,
+  // cancelar); `isMatchStaff` carga el resultado e incluye al DIRECTOR_TECNICO.
+  const canManageMatches = isTeamMatchAdmin(activeRole);
+  const isMatchStaff = isTeamMatchStaff(activeRole);
 
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<MatchesViewData | null>(null);
@@ -34,7 +48,11 @@ export default function MatchesScreen() {
       const data = await fetchMatchesViewData(activeTeamId);
       setViewData(data);
     } catch (err) {
-      console.error('[matches] fetchMatchesViewData error:', err);
+      Logger.error('No se pudieron cargar los partidos del equipo', {
+        scope: 'matches.loadData',
+        teamId: activeTeamId,
+        error: err,
+      });
       const msg =
         err instanceof Error
           ? err.message
@@ -85,12 +103,20 @@ export default function MatchesScreen() {
   async function handleAcceptProposal(proposalId: string, matchId: string) {
     try {
       await acceptProposal(proposalId, matchId);
+      Logger.info('Propuesta aceptada desde la lista', { scope: 'matches', matchId, proposalId });
       await loadData();
       showAlert('¡Propuesta aceptada!', 'El partido ha sido confirmado.');
     } catch (err) {
       await loadData();
-      const msg = err instanceof Error ? err.message : 'No se pudo aceptar la propuesta.';
-      showAlert('Error', msg);
+      // Mismo mapper que el detalle: acá se mostraba `err.message` crudo, que
+      // ahora expondría el prefijo estable de la RPC (SQUAD_TOO_SMALL: …).
+      Logger.error('Fallo la confirmación de una propuesta', {
+        scope: 'matches',
+        matchId,
+        proposalId,
+        error: err,
+      });
+      showAlert('No se pudo confirmar', getProposalErrorMessage(err));
     }
   }
 
@@ -102,6 +128,14 @@ export default function MatchesScreen() {
       showAlert('Propuesta rechazada', 'Se notificará al equipo rival.');
     } catch (err) {
       await loadData();
+      // El rechazo se pintó optimista (clearProposalOptimistically): si falla,
+      // el usuario ve la propuesta volver sin explicación.
+      Logger.error('Fallo el rechazo de una propuesta', {
+        scope: 'matches',
+        matchId,
+        proposalId,
+        error: err,
+      });
       const msg = err instanceof Error ? err.message : 'No se pudo rechazar la propuesta.';
       showAlert('Error', msg);
     }
@@ -115,6 +149,12 @@ export default function MatchesScreen() {
       showAlert('Propuesta cancelada', 'Tu propuesta fue cancelada.');
     } catch (err) {
       await loadData();
+      Logger.error('Fallo la cancelación de una propuesta', {
+        scope: 'matches',
+        matchId,
+        proposalId,
+        error: err,
+      });
       const msg = err instanceof Error ? err.message
         : typeof err === 'object' && err !== null && 'message' in err
           ? String((err as { message: unknown }).message)
@@ -198,6 +238,7 @@ export default function MatchesScreen() {
             <LiveMatchBanner
               match={viewData.liveMatch}
               myTeamId={activeTeamId}
+              isStaff={isMatchStaff}
               onPress={handleCardPress}
               onLoadResult={handleLoadResult}
             />
@@ -216,6 +257,8 @@ export default function MatchesScreen() {
                   entry={entry}
                   index={index}
                   myTeamId={activeTeamId}
+                  canManage={canManageMatches}
+                  isStaff={isMatchStaff}
                   onPress={handleCardPress}
                   onProposePress={handleProposePress}
                   onAcceptProposal={(pId, mId) => void handleAcceptProposal(pId, mId)}

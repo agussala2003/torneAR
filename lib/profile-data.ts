@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { Database } from '@/types/supabase';
 import { BadgeItem, ProfileStats, ProfileViewData, TeamItem } from '@/components/profile/types';
 
@@ -99,16 +100,31 @@ export async function fetchProfileViewData(profile: ProfileRow): Promise<Profile
     ),
   ]);
 
+  // Los tres tramos degradan a vacío en vez de tirar: el perfil se ve igual,
+  // sólo que sin stats, sin equipos o sin insignias. Justamente por eso el log
+  // importa — en pantalla, un perfil recién creado y uno roto son idénticos.
   if (statsRes.error) {
-    console.error('Profile global stats RPC failed', statsRes.error);
+    Logger.error('Fallo el RPC de stats globales del perfil', {
+      scope: 'profile-data.fetchProfileViewData',
+      profileId: profile.id,
+      error: statsRes.error,
+    });
   }
 
   if (teamsRes.error) {
-    console.error('Profile teams query failed', teamsRes.error);
+    Logger.error('Fallo la consulta de equipos del perfil', {
+      scope: 'profile-data.fetchProfileViewData',
+      profileId: profile.id,
+      error: teamsRes.error,
+    });
   }
 
   if (badgesRpcRes.error) {
-    console.error('Profile badges RPC failed', badgesRpcRes.error);
+    Logger.error('Fallo el RPC de insignias del perfil', {
+      scope: 'profile-data.fetchProfileViewData',
+      profileId: profile.id,
+      error: badgesRpcRes.error,
+    });
   }
 
   return {

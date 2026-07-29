@@ -17,11 +17,13 @@ import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection'
 import { ProfileTeamsSection } from '@/components/profile/ProfileTeamsSection';
 import { CareerTimeline } from '@/components/profile/CareerTimeline';
 import { ProfileSettingsSection } from '@/components/profile/ProfileSettingsSection';
+import { ProfileFeedbackCard } from '@/components/profile/ProfileFeedbackCard';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { Logger } from '@/lib/logger';
 
 export default function ProfileScreen() {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, user } = useAuth();
   const { fetchMyTeams } = useTeamStore();
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<ProfileViewData | null>(null);
@@ -44,6 +46,11 @@ export default function ProfileScreen() {
       const data = await fetchProfileViewData(profile);
       setViewData(data);
     } catch (error) {
+      Logger.error('No se pudo cargar la pantalla de perfil', {
+        scope: 'tabs.profile.loadProfileData',
+        profileId: profile.id,
+        error,
+      });
       showAlert('Error al cargar perfil', getGenericSupabaseErrorMessage(error, 'No se pudo cargar la informacion de perfil.'));
     } finally {
       setLoading(false);
@@ -64,9 +71,20 @@ export default function ProfileScreen() {
       await fetchMyTeams(profile.id);
       await loadProfileData();
       setTeamToLeave(null);
+      Logger.info('El usuario abandonó el equipo desde el perfil', {
+        scope: 'tabs.profile.handleConfirmLeaveTeam',
+        teamId: teamToLeave.id,
+        profileId: profile.id,
+      });
       showAlert('Saliste del equipo', `Tu ciclo en ${teamToLeave.name} quedó cerrado en tu trayectoria.`);
     } catch (error) {
       // CAPTAIN_MUST_TRANSFER / ACTIVE_MATCH llegan tipados desde la RPC.
+      Logger.error('No se pudo abandonar el equipo desde el perfil', {
+        scope: 'tabs.profile.handleConfirmLeaveTeam',
+        teamId: teamToLeave.id,
+        profileId: profile.id,
+        error,
+      });
       setTeamToLeave(null);
       showAlert('No pudimos sacarte del equipo', getTeamActionErrorMessage(error, 'No se pudo abandonar el equipo.'));
     } finally {
@@ -78,7 +96,14 @@ export default function ProfileScreen() {
     try {
       setIsSigningOut(true);
       await signOut();
+      Logger.info('Sesión cerrada desde el perfil', {
+        scope: 'tabs.profile.handleSignOut',
+      });
     } catch (error) {
+      Logger.error('Fallo el cierre de sesión desde el perfil', {
+        scope: 'tabs.profile.handleSignOut',
+        error,
+      });
       showAlert('Error al cerrar sesion', getAuthErrorMessage(error, 'login'));
     } finally {
       setIsSigningOut(false);
@@ -144,6 +169,10 @@ export default function ProfileScreen() {
             </Text>
           </TouchableOpacity>
         )}
+        <ProfileFeedbackCard
+          email={user?.email}
+          onError={(message) => showAlert('No pudimos abrir el formulario', message)}
+        />
         <ProfileSettingsSection isSigningOut={isSigningOut} onSignOut={handleSignOut} />
       </ScrollView>
 

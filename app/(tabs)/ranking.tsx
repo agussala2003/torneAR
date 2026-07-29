@@ -11,6 +11,7 @@ import {
   fetchActiveSeason, fetchActiveTeamRankingInfo,
 } from '@/lib/ranking-data';
 import { fetchActiveZoneNames } from '@/lib/zones-data';
+import { Logger } from '@/lib/logger';
 import type { RankingFiltersState, RankingMode, LeaderboardStat, RankingTeamEntry, RivalTeamEntry, PlayerLeaderboardEntry } from '@/components/ranking/types';
 
 import { RankingFilterModal } from '@/components/ranking/RankingFilterModal';
@@ -112,6 +113,13 @@ export default function RankingScreen() {
           if (team) {
             elo = team.eloRating;
             defaults = { zone: team.zone, category: team.category, format: team.format, rivalesIdeales: false };
+          } else {
+            // Hay equipo activo seleccionado pero no se resolvió su info: el
+            // ranking arranca con filtros vacíos y parece "mal ordenado".
+            Logger.warn('No se pudo resolver la info de ranking del equipo activo', {
+              scope: 'tabs.ranking.bootstrap',
+              activeTeamId,
+            });
           }
         }
 
@@ -120,6 +128,11 @@ export default function RankingScreen() {
         setBootstrapped(true);
       } catch (error: any) {
         if (cancelled) return;
+        Logger.error('Fallo el bootstrap del ranking', {
+          scope: 'tabs.ranking.bootstrap',
+          activeTeamId,
+          error,
+        });
         // Liberamos el guard para poder reintentar en el proximo focus.
         bootstrappedTeamRef.current = null;
         setLoading(false);
@@ -147,6 +160,11 @@ export default function RankingScreen() {
         if (cancelled) return;
         setRankingEntries(ranking);
       } catch (error: any) {
+        Logger.error('No se pudo cargar el ranking de equipos', {
+          scope: 'tabs.ranking.loadRanking',
+          filters,
+          error,
+        });
         if (!cancelled) showAlert('Error', error?.message || 'No se pudo cargar el ranking.');
       } finally {
         if (!cancelled) setLoading(false);
@@ -180,6 +198,12 @@ export default function RankingScreen() {
         if (cancelled) return;
         setLeaderboardEntries(players);
       } catch (error: any) {
+        Logger.error('No se pudo cargar el leaderboard de jugadores', {
+          scope: 'tabs.ranking.loadLeaderboard',
+          leaderboardStat,
+          zone: filters.zone,
+          error,
+        });
         if (!cancelled) showAlert('Error', error?.message || 'Error al cargar jugadores.');
       } finally {
         if (!cancelled) setLeaderboardLoading(false);
@@ -221,6 +245,11 @@ export default function RankingScreen() {
         if (isStale()) return;
         setSearchResults(results);
       } catch (error: any) {
+        Logger.error('Fallo la búsqueda de rivales', {
+          scope: 'tabs.ranking.runSearch',
+          query,
+          error,
+        });
         if (isStale()) return;
         showAlert('Error', error?.message || 'Error en la búsqueda.');
       } finally {

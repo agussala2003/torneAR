@@ -11,6 +11,8 @@ export type TeamDetailRow = {
   matches_played: number;
   fair_play_score: number;
   shield_url: string | null;
+  /** false = equipo dado de baja: fuera del ranking, mercado y desafíos (E3). */
+  is_active: boolean;
 };
 
 export type TeamMemberRow = {

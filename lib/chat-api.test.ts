@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder } from './test-utils/supabase-mock';
+import {
+  getOrCreateMarketChat,
+  fetchInbox,
+  fetchMessages,
+  markConversationAsRead,
+  fetchUnreadChatCount,
+  sendMessage,
+  fetchConfirmedMatchForTeam,
+} from './chat-api';
 
 const { supabaseMock } = vi.hoisted(() => ({
   supabaseMock: {
@@ -12,16 +21,6 @@ const { supabaseMock } = vi.hoisted(() => ({
 vi.mock('@/lib/supabase', () => ({
   supabase: supabaseMock,
 }));
-
-import {
-  getOrCreateMarketChat,
-  fetchInbox,
-  fetchMessages,
-  markConversationAsRead,
-  fetchUnreadChatCount,
-  sendMessage,
-  fetchConfirmedMatchForTeam,
-} from './chat-api';
 
 const AUTH_USER = { id: 'auth-1' };
 const PROFILE = { id: 'profile-1' };

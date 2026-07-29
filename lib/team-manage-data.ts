@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { TeamManageViewData, TeamDetailRow, TeamMemberRow, TeamJoinRequestRow } from '@/components/team-manage/types';
 import { sendPushNotification } from '@/lib/push-notifications';
 import { TeamCategory, TeamFormat, TeamRole, getTeamRoleLabel } from '@/lib/team-options';
@@ -86,7 +87,7 @@ export async function fetchTeamManageViewData(teamId: string, profileId: string 
   const [teamRes, membersRes, pendingRes, historyRes] = await Promise.all([
     supabase
       .from('teams')
-      .select('id, name, zone, category, preferred_format, invite_code, elo_rating, matches_played, fair_play_score, shield_url')
+      .select('id, name, zone, category, preferred_format, invite_code, elo_rating, matches_played, fair_play_score, shield_url, is_active')
       .eq('id', teamId)
       .maybeSingle(),
     supabase
@@ -312,35 +313,29 @@ export async function transferToTeam(
 
 // Transfiere la capitanía y deja al capitán actual en el equipo como SUBCAPITÁN.
 // Usar cuando el capitán cede el rol sin abandonar el equipo.
-export async function grantCaptainRole(
-  teamId: string,
-  currentCaptainId: string,
-  newCaptainId: string,
-  newCaptainPreviousRole: TeamRole
-): Promise<void> {
-  const { error: promoteError } = await supabase
-    .from('team_members')
-    .update({ role: 'CAPITAN' })
-    .eq('team_id', teamId)
-    .eq('profile_id', newCaptainId);
+//
+// R5: ahora es UNA transacción del lado del servidor (`grant_captain_role`,
+// migración 20260728211000). La versión anterior hacía dos UPDATE secuenciales
+// desde el cliente con rollback manual, y entre ambos el equipo tenía DOS
+// CAPITANES: si el segundo fallaba y el rollback también (red caída, app
+// cerrada), ese estado se volvía permanente — y no es cosmético, porque con dos
+// capitanes `leave_team_as_member` deja irse a cualquiera de los dos sin exigir
+// la cesión. Por eso ya no hace falta `newCaptainPreviousRole`.
+//
+// El perfil del capitán saliente lo resuelve la RPC desde auth.uid(), así que
+// tampoco se pasa `currentCaptainId`: nadie puede ceder la capitanía de otro.
+export async function grantCaptainRole(teamId: string, newCaptainId: string): Promise<void> {
+  const { error } = await supabase.rpc('grant_captain_role', {
+    p_team_id: teamId,
+    p_new_captain_profile_id: newCaptainId,
+  });
 
-  if (promoteError) throw promoteError;
-
-  const { error: demoteError } = await supabase
-    .from('team_members')
-    .update({ role: 'SUBCAPITAN' })
-    .eq('team_id', teamId)
-    .eq('profile_id', currentCaptainId);
-
-  if (demoteError) {
-    // Rollback: restaurar rol previo del nuevo capitán
-    await supabase
-      .from('team_members')
-      .update({ role: newCaptainPreviousRole })
-      .eq('team_id', teamId)
-      .eq('profile_id', newCaptainId);
-    throw demoteError;
+  if (error) {
+    Logger.error('No se pudo ceder la capitanía', { teamId, newCaptainId, error });
+    throwTeamActionError(error);
   }
+
+  Logger.info('Capitanía cedida', { teamId, newCaptainId });
 }
 
 // Transfiere la capitanía Y el capitán actual abandona el equipo.
@@ -357,6 +352,38 @@ export async function transferCaptain(teamId: string, toProfileId: string): Prom
   });
 
   if (error) throwTeamActionError(error);
+}
+
+// Baja lógica del equipo (E3). Es la salida real para el callejón sin salida
+// del capitán único de un equipo con historial: no puede irse (necesita ceder
+// la capitanía y no hay a quién), y `deleteTeam` rebota con 23503 porque los FK
+// del historial deportivo son NO ACTION a propósito.
+//
+// `is_active = false` NO borra nada: el equipo conserva ELO, partidos y ledger,
+// pero sale del ranking, de la búsqueda, del Mercado y de los desafíos
+// (migración 20260728170000). Es reversible con el mismo llamado.
+//
+// ⚠️ El `.select()` verifica FILAS AFECTADAS, igual que en deleteTeam: un
+// UPDATE que RLS filtra no es un error en Postgres —PostgREST responde 204 sin
+// `error`— así que mirando sólo `error` cantaríamos éxito sin haber cambiado
+// nada. La escritura la habilitan `teams_update_by_captain` (quién) y el
+// GRANT UPDATE (is_active) de la migración (qué columna).
+export async function setTeamActive(teamId: string, isActive: boolean): Promise<void> {
+  const { data, error } = await supabase
+    .from('teams')
+    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq('id', teamId)
+    .select('id');
+
+  if (error) throw error;
+
+  if (!data || data.length === 0) {
+    throw new Error(
+      isActive
+        ? 'No se pudo reactivar el equipo: verificá que seas capitán o subcapitán.'
+        : 'No se pudo dar de baja el equipo: verificá que seas capitán o subcapitán.',
+    );
+  }
 }
 
 // Elimina el equipo completo. Solo debe llamarse cuando el capitán es el último miembro.

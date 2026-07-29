@@ -24,6 +24,10 @@ function formatDate(iso: string): string {
 interface Props {
   entry: MatchCardEntry;
   myTeamId: string;
+  /** CAPITAN/SUBCAPITAN del equipo activo: habilita coordinar el partido (R2). */
+  canManage?: boolean;
+  /** CAPITAN/SUBCAPITAN/DIRECTOR_TECNICO: habilita cargar el resultado (R6). */
+  isStaff?: boolean;
   onPress: (matchId: string) => void;
   onProposePress?: (matchId: string) => void;
   onAcceptProposal?: (proposalId: string, matchId: string) => void;
@@ -36,6 +40,8 @@ interface Props {
 export function MatchCard({
   entry,
   myTeamId,
+  canManage = false,
+  isStaff = false,
   onPress,
   onProposePress,
   onAcceptProposal,
@@ -136,6 +142,8 @@ export function MatchCard({
       <MatchCardFooter
         entry={entry}
         myTeamId={myTeamId}
+        canManage={canManage}
+        isStaff={isStaff}
         onProposePress={onProposePress}
         onAcceptProposal={onAcceptProposal}
         onRejectProposal={onRejectProposal}

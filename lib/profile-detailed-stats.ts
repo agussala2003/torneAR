@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { Database } from '@/types/supabase';
 
 type PlayerStatsRow = Database['public']['Views']['v_player_stats']['Row'];
@@ -54,15 +55,23 @@ export async function fetchDetailedProfileStats(profileId: string): Promise<Deta
   ]);
 
   if (statsRes.error) {
-    console.error('Detailed stats query failed', statsRes.error);
+    Logger.error('Fallo la consulta de stats detalladas', {
+      scope: 'profile-detailed-stats',
+      profileId,
+      error: statsRes.error,
+    });
   }
 
   if (participantsRes.error) {
-    console.error('Detailed participation query failed', participantsRes.error);
+    Logger.error('Fallo la consulta de participaciones del jugador', {
+      scope: 'profile-detailed-stats',
+      profileId,
+      error: participantsRes.error,
+    });
   }
 
   const stats = (statsRes.data as PlayerStatsRow | null) ?? null;
-  const participants = ((participantsRes.data as Array<MatchParticipantRow & { matches: MatchRow | null }>) ?? [])
+  const participants = ((participantsRes.data as (MatchParticipantRow & { matches: MatchRow | null })[]) ?? [])
     .filter((row) => !!row.matches);
 
   const uniqueTeamIds = Array.from(new Set(participants.map((row) => row.team_id)));
@@ -75,7 +84,14 @@ export async function fetchDetailedProfileStats(profileId: string): Promise<Deta
       .in('id', uniqueTeamIds);
 
     if (teamsRes.error) {
-      console.error('Detailed teams query failed', teamsRes.error);
+      // Sin el mapa, cada partido queda con el nombre de equipo en blanco: la
+      // pantalla se dibuja igual y el hueco pasa desapercibido.
+      Logger.warn('No se pudieron resolver los nombres de equipo del historial', {
+        scope: 'profile-detailed-stats',
+        profileId,
+        teamCount: uniqueTeamIds.length,
+        error: teamsRes.error,
+      });
     } else {
       teamMap = new Map((teamsRes.data as TeamRow[]).map((team) => [team.id, team.name]));
     }

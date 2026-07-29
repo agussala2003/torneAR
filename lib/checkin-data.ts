@@ -44,7 +44,9 @@ const CHECKIN_ERROR_MESSAGES: Record<CheckinErrorCode, string> = {
   INVALID_MATCH_STATUS: 'La lista solo se puede presentar con el partido confirmado.',
   FORMAT_NOT_SET: 'El partido todavía no tiene formato definido. Acordalo con el rival primero.',
   PROFILE_NOT_FOUND: 'No pudimos identificar tu perfil. Cerrá sesión y volvé a entrar.',
-  NOT_TEAM_ADMIN: 'Solo el capitán o subcapitán puede presentar la lista del equipo.',
+  // R6: el DT también presenta la lista. El texto tiene que nombrarlo, si no
+  // el mensaje niega un permiso que el servidor sí concede.
+  NOT_TEAM_ADMIN: 'Solo el capitán, el subcapitán o el DT puede presentar la lista del equipo.',
   INVALID_PAYLOAD: 'La lista tiene datos inválidos. Rearmala e intentá de nuevo.',
   DUPLICATE_PLAYER: 'Hay jugadores repetidos en la lista.',
   FORMAT_RULES_MISSING: 'No hay reglas cargadas para este formato. Contactá al equipo de torneAR.',

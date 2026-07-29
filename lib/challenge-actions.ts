@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { Logger } from '@/lib/logger';
 import type { ChallengeInboxEntry } from '@/components/ranking/types';
 import type { Database } from '@/types/supabase';
 
@@ -76,6 +77,10 @@ export async function getActiveChallengeWithTeam(
   return (data?.length ?? 0) > 0;
 }
 
+// R8: silencioso para el usuario, observable para nosotros. Un desafío que
+// llega a la base pero cuyo aviso no se inserta es indistinguible, desde la
+// pantalla del rival, de un desafío que nunca se mandó — y con el `catch {}`
+// vacío original no quedaba rastro de la diferencia.
 async function notifyTeamLeaders(
   teamId: string,
   type: NotificationType,
@@ -84,20 +89,102 @@ async function notifyTeamLeaders(
   data: Record<string, string>,
 ) {
   try {
-    const { data: members } = await supabase
+    const { data: members, error: membersError } = await supabase
       .from('team_members')
       .select('profile_id')
       .eq('team_id', teamId)
       .in('role', ['CAPITAN', 'SUBCAPITAN']);
 
-    if (!members || members.length === 0) return;
+    if (membersError) {
+      Logger.error('Error enviando notificación: no se pudo leer el plantel', {
+        scope: 'challenge-actions.notifyTeamLeaders',
+        teamId,
+        type,
+        error: membersError,
+      });
+      return;
+    }
 
-    await supabase.from('notifications').insert(
+    if (!members || members.length === 0) {
+      Logger.warn('Notificación sin destinatarios: el equipo no tiene capitán ni subcapitán', {
+        scope: 'challenge-actions.notifyTeamLeaders',
+        teamId,
+        type,
+      });
+      return;
+    }
+
+    const { error: insertError } = await supabase.from('notifications').insert(
       members.map((m) => ({ profile_id: m.profile_id, type, title, body, data })),
     );
-  } catch {
-    // Silenciamos errores de notificación para no bloquear el flujo principal
+
+    if (insertError) {
+      Logger.error('Error enviando notificación', {
+        scope: 'challenge-actions.notifyTeamLeaders',
+        teamId,
+        type,
+        recipients: members.length,
+        error: insertError,
+      });
+    }
+  } catch (error) {
+    Logger.error('Error enviando notificación', {
+      scope: 'challenge-actions.notifyTeamLeaders',
+      teamId,
+      type,
+      error,
+    });
   }
+}
+
+// ─── E1: aviso temprano de cupo ───────────────────────────────────────────────
+// `confirm_match_proposal` ahora rechaza la confirmación si algún plantel no
+// llega a `format_rules.min_players_to_start` del formato acordado. Enterarse
+// recién ahí es tarde: ya se mandó el desafío, el rival lo aceptó y se negoció
+// la cancha. Esto anticipa el freno en el momento de desafiar.
+//
+// El desafío NO lleva formato (eso se acuerda después, en la propuesta), así que
+// se evalúa contra el `preferred_format` del equipo, que es el que va a proponer
+// por defecto. Es una ADVERTENCIA, no un bloqueo: el capitán puede desafiar
+// igual y sumar gente antes de confirmar, o acordar un formato más chico.
+
+export interface SquadReadiness {
+  ok: boolean;
+  memberCount: number;
+  minRequired: number;
+  format: Database['public']['Enums']['team_format'];
+}
+
+export async function fetchSquadReadiness(teamId: string): Promise<SquadReadiness | null> {
+  const { data: team, error: teamError } = await supabase
+    .from('teams')
+    .select('preferred_format')
+    .eq('id', teamId)
+    .single();
+  if (teamError || !team) return null;
+
+  const [{ count, error: countError }, { data: rules, error: rulesError }] = await Promise.all([
+    supabase
+      .from('team_members')
+      .select('profile_id', { count: 'exact', head: true })
+      .eq('team_id', teamId),
+    supabase
+      .from('format_rules')
+      .select('min_players_to_start')
+      .eq('format', team.preferred_format)
+      .maybeSingle(),
+  ]);
+
+  // Ante cualquier hueco devolvemos null: el aviso se omite, pero nunca se
+  // bloquea ni se miente con un número inventado.
+  if (countError || rulesError || !rules || count === null) return null;
+
+  return {
+    ok: count >= rules.min_players_to_start,
+    memberCount: count,
+    minRequired: rules.min_players_to_start,
+    format: team.preferred_format,
+  };
 }
 
 // type (no interface): habilita el cast directo desde el Json tipado del RPC.

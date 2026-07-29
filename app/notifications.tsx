@@ -11,6 +11,7 @@ import { fetchNotificationsViewData, markAllNotificationsAsRead, markNotificatio
 import { NotificationsViewData, NotificationItem } from '@/components/notifications/types';
 import { NotificationsListSection } from '@/components/notifications/NotificationsListSection';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { Logger } from '@/lib/logger';
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -36,6 +37,11 @@ export default function NotificationsScreen() {
       const data = await fetchNotificationsViewData(profile.id);
       setViewData(data);
     } catch (error) {
+      Logger.error('No se pudieron cargar las notificaciones', {
+        scope: 'notifications.loadNotificationsData',
+        profileId: profile.id,
+        error,
+      });
       showAlert(
         'Error al cargar',
         getGenericSupabaseErrorMessage(error, 'No se pudieron cargar las notificaciones.')
@@ -91,6 +97,12 @@ export default function NotificationsScreen() {
         notifications: viewData.notifications.map((item) => ({ ...item, is_read: true })),
       });
     } catch (error) {
+      Logger.error('No se pudieron marcar todas las notificaciones como leídas', {
+        scope: 'notifications.markAllAsRead',
+        profileId: profile.id,
+        unreadCount,
+        error,
+      });
       showAlert('No se pudo marcar', getGenericSupabaseErrorMessage(error, 'No se pudieron marcar como leidas.'));
     } finally {
       setMarkingAllRead(false);
@@ -116,13 +128,28 @@ export default function NotificationsScreen() {
       // incluida SOLICITUD_UNION_ACEPTADA, que justamente le pide al jugador
       // confirmar el traspaso — se marcaba como leída y no hacía nada, dejando
       // al usuario sin forma de llegar a la acción que la notificación pedía.
-      const maybeData = (item.data ?? {}) as { team_id?: unknown };
+      const maybeData = (item.data ?? {}) as { team_id?: unknown; match_id?: unknown };
       const teamId = typeof maybeData.team_id === 'string' ? maybeData.team_id : null;
+      const matchId = typeof maybeData.match_id === 'string' ? maybeData.match_id : null;
+
+      // M2: una postulación ACEPTADA a un post de EQUIPO ahora deja una
+      // solicitud de unión que el jugador tiene que confirmar (ver M1), y el
+      // payload trae el `team_id` justamente en ese caso. El resto de las
+      // respuestas —rechazos, y las de posts de JUGADOR, donde el aceptado es
+      // el equipo y no hay traspaso que confirmar— siguen yendo al chat.
+      const isAcceptedTeamApplication = item.type === 'POSTULACION_RESPONDIDA' && teamId !== null;
 
       switch (item.type) {
         case 'SOLICITUD_UNION_EQUIPO':
           // Capitán: la solicitud se modera desde la gestión del equipo.
           if (teamId) router.push({ pathname: '/team-manage', params: { teamId } });
+          // Sin `team_id` en el payload la notificación es un callejón sin
+          // salida: se marca como leída y no navega a ningún lado.
+          else Logger.warn('Notificación sin team_id: no se pudo resolver el destino', {
+            scope: 'notifications.openNotification',
+            notificationId: item.id,
+            type: item.type,
+          });
           break;
 
         case 'SOLICITUD_UNION_ACEPTADA':
@@ -140,18 +167,50 @@ export default function NotificationsScreen() {
         case 'ROL_ACTUALIZADO':
         case 'EXPULSADO_EQUIPO':
           if (teamId) router.push({ pathname: '/team-manage', params: { teamId } });
+          else Logger.warn('Notificación sin team_id: no se pudo resolver el destino', {
+            scope: 'notifications.openNotification',
+            notificationId: item.id,
+            type: item.type,
+          });
+          break;
+
+        case 'POSTULACION_RESPONDIDA':
+          // Te aceptaron en el Mercado: el destino es donde se confirma el
+          // traspaso, no la bandeja de chats. Ahí es donde la postulación
+          // aceptada se convierte en un alta real al plantel.
+          //
+          // M4: el resto ya no cae en el chat. Un rechazo —o una aceptación de
+          // post de JUGADOR— se explica en "Mis postulaciones", que es la
+          // pantalla que muestra el estado y qué significa. `/market-chats` sólo
+          // tenía sentido cuando ese estado no se podía ver en ningún lado.
+          router.push(isAcceptedTeamApplication ? '/team-requests' : '/market-my-applications');
           break;
 
         case 'POSTULACION_RECIBIDA':
-        case 'POSTULACION_RESPONDIDA':
           router.push('/market-chats');
           break;
 
         default:
-          // Partidos, disputas, WO y temporada: sin destino específico todavía.
+          // D11: todo evento de partido —confirmación, cancelación, disputa,
+          // WO aprobado/rechazado/automático, recordatorio de 24h— viaja con
+          // `match_id` en el payload. Antes caían todas acá y se marcaban como
+          // leídas sin llevar a ningún lado: justo las que piden una respuesta
+          // en las próximas horas eran las que no accionaban.
+          if (matchId) router.push({ pathname: '/match-detail', params: { matchId } });
+          else Logger.warn('Notificación sin destino: tipo no ruteado y sin match_id', {
+            scope: 'notifications.openNotification',
+            notificationId: item.id,
+            type: item.type,
+          });
           break;
       }
     } catch (error) {
+      Logger.error('No se pudo abrir la notificación', {
+        scope: 'notifications.openNotification',
+        notificationId: item.id,
+        type: item.type,
+        error,
+      });
       showAlert('No se pudo abrir', getGenericSupabaseErrorMessage(error, 'No se pudo abrir la notificacion.'));
     } finally {
       setOpeningNotificationId(null);

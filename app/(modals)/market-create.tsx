@@ -13,6 +13,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useUI } from '@/context/UIContext';
 import { useTeamStore } from '@/stores/teamStore';
 
+import { Logger } from '@/lib/logger';
 import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
 import { TEAM_FORMAT_OPTIONS, TeamFormat } from '@/lib/team-options';
 import { fetchVenuesByZoneName, VenueEntry } from '@/lib/venue-data';
@@ -62,7 +63,15 @@ export default function MarketCreateModal() {
       .then((teams) => {
         setManagedTeams(teams);
       })
-      .catch((err) => console.error('Error fetching managed teams', err))
+      .catch((err: unknown) => {
+        // Sin equipos gestionados el formulario sólo deja publicar como
+        // jugador. Un fallo acá se ve igual que "no sos capitán de nadie".
+        Logger.error('No se pudieron cargar los equipos que gestiona el usuario', {
+          scope: 'market-create',
+          authUserId: user.id,
+          error: err,
+        });
+      })
       .finally(() => setIsLoadingTeams(false));
   }, [user]);
 
@@ -85,7 +94,16 @@ export default function MarketCreateModal() {
     setComplex('');
     fetchVenuesByZoneName(zone)
       .then(setVenues)
-      .catch(() => setVenues([]))
+      .catch((err: unknown) => {
+        // Vaciar la lista es indistinguible de "esta zona no tiene canchas":
+        // el usuario publica sin sede y nadie se entera de que la carga falló.
+        Logger.warn('No se pudieron cargar las canchas de la zona; se muestra la lista vacía', {
+          scope: 'market-create.fetchVenues',
+          zone,
+          error: err,
+        });
+        setVenues([]);
+      })
       .finally(() => setLoadingVenues(false));
   }, [zone]);
 
@@ -119,6 +137,12 @@ export default function MarketCreateModal() {
         const canPostWithSelectedTeam = !!selectedTeamId && managedTeams.some((team) => team.id === selectedTeamId);
 
         if (!canPostWithSelectedTeam || !selectedTeamId) {
+          Logger.warn('No se pudo resolver un equipo gestionado para publicar', {
+            scope: 'market-create',
+            activeTeamId,
+            selectedTeamId: selectedTeamId ?? null,
+            managedTeamsCount: managedTeams.length,
+          });
           showAlert('Error', 'Seleccioná en el header un equipo donde seas Capitán o Subcapitán.');
           setIsSubmitting(false);
           hideLoader();
@@ -144,6 +168,11 @@ export default function MarketCreateModal() {
         }
 
         await createTeamPost(teamPostPayload);
+        Logger.info('Publicación de equipo creada en el mercado', {
+          scope: 'market-create',
+          teamId: teamPostPayload.teamId,
+          zone,
+        });
         showAlert('¡Éxito!', 'La publicación del equipo ha sido creada.');
         router.back();
       } else {
@@ -161,11 +190,23 @@ export default function MarketCreateModal() {
         }
 
         await createPlayerPost(playerPostPayload);
+        Logger.info('Publicación de jugador creada en el mercado', {
+          scope: 'market-create',
+          postType: playerPostType,
+          profileId: profile?.id,
+        });
         showAlert('¡Éxito!', 'Has publicado tu búsqueda correctamente.');
         router.back();
       }
 
-    } catch {
+    } catch (err) {
+      // El alert genérico no dice nada: sin log, un fallo de RLS y uno de red
+      // producen el mismo mensaje y no hay forma de saber cuál fue.
+      Logger.error('No se pudo crear la publicación del mercado', {
+        scope: 'market-create',
+        creationType,
+        error: err,
+      });
       showAlert('Error', 'Hubo un problema al crear la publicación.');
     } finally {
       setIsSubmitting(false);

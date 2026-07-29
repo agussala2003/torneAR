@@ -11,6 +11,7 @@ import { TeamManageSkeleton } from '@/components/team-manage/TeamManageSkeleton'
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
+import { Logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import { TEAM_CATEGORY_OPTIONS, TEAM_FORMAT_OPTIONS, getTeamRoleLabel, TeamCategory, TeamFormat, TeamRole } from '@/lib/team-options';
 import { allowedRolesToAssign, canManageMember } from '@/lib/team-helpers';
@@ -33,6 +34,7 @@ import {
   transferCaptain,
   grantCaptainRole,
   deleteTeam,
+  setTeamActive,
   getTeamActionErrorMessage,
 } from '@/lib/team-manage-data';
 
@@ -89,6 +91,8 @@ export default function TeamManageScreen() {
 
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
   const [showDeleteTeamModal, setShowDeleteTeamModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [togglingActive, setTogglingActive] = useState(false);
 
   const myRole = useMemo(() => {
     if (!profile) return null;
@@ -114,7 +118,14 @@ export default function TeamManageScreen() {
 
       if (error) throw error;
       setZones((data ?? []).map((zoneRow) => zoneRow.name));
-    } catch {
+    } catch (error) {
+      // Degradar a la zona actual deja el selector casi vacío sin avisar a
+      // nadie: el usuario cree que no hay más zonas disponibles.
+      Logger.warn('No se pudieron cargar las zonas; se usa la zona actual como único fallback', {
+        scope: 'team-manage.loadZoneOptions',
+        fallbackZone: editZone ?? team?.zone ?? null,
+        error,
+      });
       setZones(editZone ? [editZone] : team?.zone ? [team.zone] : []);
     } finally {
       setLoadingZones(false);
@@ -127,6 +138,12 @@ export default function TeamManageScreen() {
       const data = await fetchTeamManageViewData(teamId, profile?.id);
       setViewData(data);
     } catch (error) {
+      Logger.error('No se pudo cargar la gestión del equipo', {
+        scope: 'team-manage.loadTeamData',
+        teamId,
+        profileId: profile?.id,
+        error,
+      });
       showAlert('Error al cargar equipo', getGenericSupabaseErrorMessage(error, 'No se pudo cargar la gestion del equipo.'));
     }
   }, [teamId, profile?.id, showAlert]);
@@ -173,8 +190,18 @@ export default function TeamManageScreen() {
       await uploadTeamShield(teamId, base64, mimeType);
 
       await loadTeamData();
+      Logger.info('Escudo del equipo actualizado', {
+        scope: 'team-manage.handleUploadShield',
+        teamId,
+        mimeType,
+      });
       showAlert('Escudo actualizado', 'El escudo del equipo se actualizo correctamente.');
     } catch (error) {
+      Logger.error('Fallo la subida del escudo del equipo', {
+        scope: 'team-manage.handleUploadShield',
+        teamId,
+        error,
+      });
       showAlert('Error al subir escudo', getGenericSupabaseErrorMessage(error, 'No se pudo subir el escudo del equipo.'));
     } finally {
       setUploadingShield(false);
@@ -184,6 +211,10 @@ export default function TeamManageScreen() {
   const openEditTeamModal = useCallback(async () => {
     if (!team) return;
     if (!canEditTeam) {
+      Logger.warn('Intento de editar el equipo sin permisos', {
+        scope: 'team-manage.openEditTeamModal',
+        teamId: team.id,
+      });
       showAlert('Sin permisos', 'Solo capitan y subcapitan pueden editar los datos del equipo.');
       return;
     }
@@ -222,8 +253,19 @@ export default function TeamManageScreen() {
 
       await loadTeamData();
       setShowEditTeamModal(false);
+      Logger.info('Datos del equipo actualizados', {
+        scope: 'team-manage.handleSaveTeam',
+        teamId,
+        category: editCategory,
+        format: editFormat,
+      });
       showAlert('Equipo actualizado', 'Los datos principales del equipo fueron actualizados.');
     } catch (error) {
+      Logger.error('No se pudieron actualizar los datos del equipo', {
+        scope: 'team-manage.handleSaveTeam',
+        teamId,
+        error,
+      });
       showAlert('Error al guardar', getGenericSupabaseErrorMessage(error, 'No se pudieron actualizar los datos del equipo.'));
     } finally {
       setSavingTeam(false);
@@ -244,11 +286,23 @@ export default function TeamManageScreen() {
       // su ciclo anterior como TRANSFERENCIA en vez de ABANDONO. El mensaje tiene
       // que decir eso — antes afirmaba "El jugador fue agregado al plantel", que
       // era falso y hacía parecer que el alta se había roto.
+      Logger.info('Solicitud de unión aprobada', {
+        scope: 'team-manage.handleApproveRequest',
+        teamId,
+        requestId: request.id,
+        applicantProfileId: request.profile_id,
+      });
       showAlert(
         'Solicitud aprobada',
         `Le avisamos a ${request.profiles?.full_name ?? 'el jugador'} que puede sumarse. Va a aparecer en el plantel cuando confirme el traspaso desde "Mis solicitudes".`,
       );
     } catch (error) {
+      Logger.error('No se pudo aprobar la solicitud de unión', {
+        scope: 'team-manage.handleApproveRequest',
+        teamId,
+        requestId: request.id,
+        error,
+      });
       showAlert('Error al aprobar', getGenericSupabaseErrorMessage(error, 'No se pudo aprobar la solicitud.'));
     } finally {
       setProcessingRequestId(null);
@@ -261,8 +315,18 @@ export default function TeamManageScreen() {
       await rejectJoinRequest(request.id);
       
       await loadTeamData();
+      Logger.info('Solicitud de unión rechazada', {
+        scope: 'team-manage.handleRejectRequest',
+        requestId: request.id,
+        applicantProfileId: request.profile_id,
+      });
       showAlert('Solicitud rechazada', 'La solicitud fue rechazada.');
     } catch (error) {
+      Logger.error('No se pudo rechazar la solicitud de unión', {
+        scope: 'team-manage.handleRejectRequest',
+        requestId: request.id,
+        error,
+      });
       showAlert('Error al rechazar', getGenericSupabaseErrorMessage(error, 'No se pudo rechazar la solicitud.'));
     } finally {
       setProcessingRequestId(null);
@@ -271,6 +335,13 @@ export default function TeamManageScreen() {
 
   const openRoleModal = (member: TeamMemberRow, isSelf: boolean) => {
     if (!canManageMember(myRole, member.role, isSelf)) {
+      Logger.warn('Intento de cambiar el rol de un miembro sin permisos', {
+        scope: 'team-manage.openRoleModal',
+        teamId,
+        myRole,
+        memberProfileId: member.profile_id,
+        memberRole: member.role,
+      });
       showAlert('Sin permisos', 'No tienes permisos para cambiar el rol de este miembro.');
       return;
     }
@@ -287,12 +358,19 @@ export default function TeamManageScreen() {
       setProcessingMemberId(memberForRoleUpdate.profile_id);
 
       if (selectedRoleToAssign === 'CAPITAN') {
-        // Ceder capitanía: el capitán actual queda como SUBCAPITÁN
-        await grantCaptainRole(teamId, profile.id, memberForRoleUpdate.profile_id, memberForRoleUpdate.role);
+        // Ceder capitanía: el capitán actual queda como SUBCAPITÁN.
+        // R5: una sola RPC atómica; el capitán saliente lo deriva el servidor
+        // de auth.uid(), por eso ya no se pasan `profile.id` ni el rol previo.
+        await grantCaptainRole(teamId, memberForRoleUpdate.profile_id);
         await loadTeamData();
         if (profile?.id) await fetchMyTeams(profile.id);
         setShowRoleModal(false);
         setMemberForRoleUpdate(null);
+        Logger.info('Capitanía cedida desde la gestión del equipo', {
+          scope: 'team-manage.handleConfirmRoleChange',
+          teamId,
+          newCaptainProfileId: memberForRoleUpdate.profile_id,
+        });
         showAlert('Capitanía cedida', `${memberForRoleUpdate.profiles?.full_name ?? 'El jugador'} es el nuevo Capitán. Vos quedás como Subcapitán.`);
       } else {
         await updateMemberRole(
@@ -305,10 +383,25 @@ export default function TeamManageScreen() {
         await loadTeamData();
         setShowRoleModal(false);
         setMemberForRoleUpdate(null);
+        Logger.info('Rol de miembro actualizado', {
+          scope: 'team-manage.handleConfirmRoleChange',
+          teamId,
+          memberProfileId: memberForRoleUpdate.profile_id,
+          newRole: selectedRoleToAssign,
+        });
         showAlert('Rol actualizado', `Nuevo rol: ${getTeamRoleLabel(selectedRoleToAssign)}.`);
       }
     } catch (error) {
-      showAlert('Error al cambiar rol', getGenericSupabaseErrorMessage(error, 'No se pudo actualizar el rol del miembro.'));
+      // getTeamActionErrorMessage (y no el genérico): la cesión de capitanía
+      // pasa por `grant_captain_role`, que devuelve los mismos códigos con
+      // prefijo estable que el resto de las RPCs de membresía (R5).
+      Logger.error('Fallo el cambio de rol de un miembro', {
+        teamId,
+        memberProfileId: memberForRoleUpdate.profile_id,
+        targetRole: selectedRoleToAssign,
+        error,
+      });
+      showAlert('Error al cambiar rol', getTeamActionErrorMessage(error, 'No se pudo actualizar el rol del miembro.'));
     } finally {
       setProcessingMemberId(null);
     }
@@ -337,8 +430,19 @@ export default function TeamManageScreen() {
       await loadTeamData();
       setShowRemoveConfirmModal(false);
       setMemberForRemove(null);
+      Logger.info('Miembro removido del plantel', {
+        scope: 'team-manage.handleConfirmRemoveMember',
+        teamId,
+        memberProfileId: memberForRemove.profile_id,
+      });
       showAlert('Miembro removido', 'El jugador fue removido del plantel.');
     } catch (error) {
+      Logger.error('No se pudo remover al miembro del plantel', {
+        scope: 'team-manage.handleConfirmRemoveMember',
+        teamId,
+        memberProfileId: memberForRemove.profile_id,
+        error,
+      });
       showAlert('Error al remover', getTeamActionErrorMessage(error, 'No se pudo remover al miembro.'));
     } finally {
       setProcessingMemberId(null);
@@ -358,11 +462,23 @@ export default function TeamManageScreen() {
 
       setShowLeaveConfirmModal(false);
       if (profile?.id) await fetchMyTeams(profile.id);
+      Logger.info('El usuario abandonó el equipo', {
+        scope: 'team-manage.handleConfirmLeaveTeam',
+        teamId,
+        profileId: profile.id,
+        role: myRole,
+      });
       showAlert('Equipo abandonado', 'Saliste del equipo correctamente.', () => {
         router.replace('/(tabs)/profile');
       });
     } catch (error) {
       // CAPTAIN_MUST_TRANSFER / ACTIVE_MATCH llegan tipados desde la RPC.
+      Logger.error('No se pudo abandonar el equipo', {
+        scope: 'team-manage.handleConfirmLeaveTeam',
+        teamId,
+        profileId: profile.id,
+        error,
+      });
       showAlert('No pudimos sacarte del equipo', getTeamActionErrorMessage(error, 'No se pudo abandonar el equipo.'));
     } finally {
       setProcessingMemberId(null);
@@ -391,15 +507,66 @@ export default function TeamManageScreen() {
       await deleteTeam(teamId);
       setShowDeleteTeamModal(false);
       if (profile?.id) await fetchMyTeams(profile.id);
+      Logger.info('Equipo eliminado', {
+        scope: 'team-manage.handleConfirmDeleteTeam',
+        teamId,
+        profileId: profile.id,
+      });
       showAlert('Equipo eliminado', 'El equipo fue eliminado correctamente.', () => {
         router.replace('/(tabs)/profile');
       });
     } catch (error) {
-      showAlert('Error al eliminar', getGenericSupabaseErrorMessage(error, 'No se pudo eliminar el equipo.'));
+      Logger.error('No se pudo eliminar el equipo; se ofrece la baja lógica', {
+        scope: 'team-manage.handleConfirmDeleteTeam',
+        teamId,
+        profileId: profile.id,
+        error,
+      });
+      // El caso más común acá NO es un fallo técnico: es el equipo con historial
+      // deportivo (23503), que por diseño no se puede borrar. Antes eso era un
+      // callejón sin salida — el mensaje sugería "dejalo inactivo" y esa opción
+      // no existía. Ahora se ofrece la baja lógica en el mismo lugar.
+      setShowDeleteTeamModal(false);
+      setShowDeactivateModal(true);
+      showAlert('No se puede eliminar', getGenericSupabaseErrorMessage(error, 'No se pudo eliminar el equipo.'));
     } finally {
       setProcessingMemberId(null);
     }
   }, [teamId, profile, fetchMyTeams, router, showAlert]);
+
+  // E3: baja lógica. No borra nada — saca al equipo del ranking, la búsqueda,
+  // el Mercado y los desafíos, conservando historial y ELO. Reversible.
+  const handleToggleTeamActive = useCallback(async (nextActive: boolean) => {
+    if (!teamId) return;
+    try {
+      setTogglingActive(true);
+      await setTeamActive(teamId, nextActive);
+      setShowDeactivateModal(false);
+      await loadTeamData();
+      if (profile?.id) await fetchMyTeams(profile.id);
+      Logger.info(nextActive ? 'Equipo reactivado' : 'Equipo dado de baja', {
+        scope: 'team-manage.handleToggleTeamActive',
+        teamId,
+        nextActive,
+      });
+      showAlert(
+        nextActive ? 'Equipo reactivado' : 'Equipo dado de baja',
+        nextActive
+          ? 'Tu equipo vuelve a aparecer en el ranking, el mercado y los desafíos.'
+          : 'El equipo ya no aparece en el ranking, el mercado ni los desafíos. Su historial y su rating quedan intactos, y podés reactivarlo cuando quieras.',
+      );
+    } catch (error) {
+      Logger.error('No se pudo cambiar el estado activo del equipo', {
+        scope: 'team-manage.handleToggleTeamActive',
+        teamId,
+        nextActive,
+        error,
+      });
+      showAlert('No pudimos actualizar el equipo', getGenericSupabaseErrorMessage(error));
+    } finally {
+      setTogglingActive(false);
+    }
+  }, [teamId, profile, loadTeamData, fetchMyTeams, showAlert]);
 
   const handleConfirmTransferCaptainAndLeave = useCallback(async () => {
     if (!teamId || !profile || !transferCaptainToProfileId) return;
@@ -417,10 +584,23 @@ export default function TeamManageScreen() {
 
       setShowTransferCaptainModal(false);
       if (profile?.id) await fetchMyTeams(profile.id);
+      Logger.info('Capitanía transferida y salida del equipo', {
+        scope: 'team-manage.handleConfirmTransferCaptainAndLeave',
+        teamId,
+        profileId: profile.id,
+        newCaptainProfileId: transferCaptainToProfileId,
+      });
       showAlert('Capitania transferida', 'Transferiste la capitania y saliste del equipo correctamente.', () => {
         router.replace('/(tabs)/profile');
       });
     } catch (error) {
+      Logger.error('No se pudo transferir la capitanía ni abandonar el equipo', {
+        scope: 'team-manage.handleConfirmTransferCaptainAndLeave',
+        teamId,
+        profileId: profile.id,
+        newCaptainProfileId: transferCaptainToProfileId,
+        error,
+      });
       showAlert('Error al transferir', getTeamActionErrorMessage(error, 'No se pudo transferir la capitania y abandonar el equipo.'));
     } finally {
       setProcessingMemberId(null);
@@ -432,6 +612,11 @@ export default function TeamManageScreen() {
     try {
       await Share.share({ message: `Unite a ${team.name} en TorneAR\nCodigo de invitacion: ${team.invite_code}` });
     } catch (error) {
+      Logger.error('No se pudo compartir la invitación del equipo', {
+        scope: 'team-manage.handleShareInvite',
+        teamId,
+        error,
+      });
       showAlert('No se pudo compartir', getGenericSupabaseErrorMessage(error, 'Intenta nuevamente en unos segundos.'));
     }
   };
@@ -442,6 +627,11 @@ export default function TeamManageScreen() {
       await Clipboard.setStringAsync(team.invite_code);
       showAlert('Codigo copiado', 'El codigo de invitacion fue copiado al portapapeles.');
     } catch (error) {
+      Logger.error('No se pudo copiar el código de invitación', {
+        scope: 'team-manage.handleCopyInviteCode',
+        teamId,
+        error,
+      });
       showAlert('No se pudo copiar', getGenericSupabaseErrorMessage(error, 'Intenta nuevamente en unos segundos.'));
     }
   };
@@ -490,6 +680,19 @@ export default function TeamManageScreen() {
           onShareInvite={handleShareInvite}
         />
 
+        {!team.is_active && (
+          <View className="mt-4 flex-row items-start gap-2 rounded-xl border border-warning-tertiary/30 bg-warning-tertiary/10 p-4">
+            <AppIcon family="material-community" name="archive-outline" size={18} color="#FABD32" />
+            <View className="flex-1">
+              <Text className="font-uiBold text-sm text-warning-tertiary">Equipo dado de baja</Text>
+              <Text className="font-ui mt-1 text-xs text-neutral-on-surface-variant">
+                No aparece en el ranking, el mercado ni los desafíos. Su historial y su rating
+                están intactos{myRole === 'CAPITAN' ? '; podés reactivarlo desde el plantel.' : '.'}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {canModerateRequests && (
           <TeamManagePendingRequests
             requests={pendingRequests}
@@ -526,6 +729,35 @@ export default function TeamManageScreen() {
                 <Text className={`font-display ml-1.5 text-[11px] uppercase tracking-wide ${myRole === 'CAPITAN' ? 'text-info-secondary' : 'text-danger-error'}`}>
                   {myRole === 'CAPITAN' ? 'Transferir capitania y salir' : 'Abandonar equipo'}
                 </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* E3: baja lógica. Decisión de capitán — la RLS también deja al
+              subcapitán, pero cerrar el club no es una acción de segunda línea. */}
+          {myRole === 'CAPITAN' && (
+            <View className="mt-2">
+              <TouchableOpacity
+                onPress={() => (team.is_active ? setShowDeactivateModal(true) : void handleToggleTeamActive(true))}
+                disabled={togglingActive}
+                activeOpacity={0.9}
+                className="flex-row items-center justify-center rounded-lg border border-neutral-outline/30 py-3"
+              >
+                {togglingActive ? (
+                  <ActivityIndicator size="small" color="#BCCBB9" />
+                ) : (
+                  <>
+                    <AppIcon
+                      family="material-community"
+                      name={team.is_active ? 'archive-arrow-down-outline' : 'archive-arrow-up-outline'}
+                      size={16}
+                      color="#BCCBB9"
+                    />
+                    <Text className="font-display ml-1.5 text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">
+                      {team.is_active ? 'Dar de baja el equipo' : 'Reactivar equipo'}
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           )}
@@ -793,6 +1025,39 @@ export default function TeamManageScreen() {
                     {processingMemberId === profile?.id
                       ? <ActivityIndicator size="small" color="#1A0E0D" />
                       : <Text className="font-display text-[11px] uppercase tracking-wide text-[#1A0E0D]">Eliminar</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* E3 — Baja lógica del equipo */}
+      <Modal visible={showDeactivateModal} transparent animationType="fade" onRequestClose={() => setShowDeactivateModal(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowDeactivateModal(false)}>
+          <View className="flex-1 items-center justify-center bg-black/70 px-6">
+            <TouchableWithoutFeedback>
+              <View className="w-full max-w-sm rounded-2xl border border-neutral-outline-variant/15 bg-surface-high p-5">
+                <Text className="font-display mb-2 text-lg text-neutral-on-surface">Dar de baja el equipo</Text>
+                <Text className="font-ui text-sm text-neutral-on-surface-variant">
+                  El equipo deja de aparecer en el ranking, en el mercado y como rival desafiable.
+                  No se borra nada: su historial, sus partidos y su rating quedan intactos, y podés
+                  reactivarlo cuando quieras.
+                </Text>
+                <View className="mt-5 flex-row gap-2">
+                  <TouchableOpacity activeOpacity={0.9} onPress={() => setShowDeactivateModal(false)} className="flex-1 items-center rounded-lg bg-surface-low py-3">
+                    <Text className="font-display text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">Volver</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    disabled={togglingActive}
+                    onPress={() => void handleToggleTeamActive(false)}
+                    className={`flex-1 items-center rounded-lg py-3 ${togglingActive ? 'bg-warning-tertiary/35' : 'bg-warning-tertiary/80'}`}
+                  >
+                    {togglingActive
+                      ? <ActivityIndicator size="small" color="#1A0E0D" />
+                      : <Text className="font-display text-[11px] uppercase tracking-wide text-[#1A0E0D]">Dar de baja</Text>}
                   </TouchableOpacity>
                 </View>
               </View>

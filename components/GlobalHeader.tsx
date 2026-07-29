@@ -8,6 +8,7 @@ import { useTeamStore } from '@/stores/teamStore';
 import { ActiveTeamSelector } from './ui/ActiveTeamSelector';
 import { fetchUnreadChatCount } from '@/lib/chat-api';
 import { fetchChallengesInbox } from '@/lib/challenge-actions'; // NUEVO
+import { Logger } from '@/lib/logger';
 
 type GlobalHeaderProps = {
   onNotificationPress?: () => void;
@@ -43,6 +44,15 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
     // Un badge es informacion accesoria: si el conteo falla lo llevamos a 0 para
     // que desaparezca, en vez de dejar colgado un numero viejo que ya no
     // corresponde. El header se renderiza igual — nunca lo bloqueamos por esto.
+    if (error) {
+      // Supabase devuelve el fallo como valor: sin esto, un badge en 0 por RLS
+      // es indistinguible de "no tenés notificaciones sin leer".
+      Logger.warn('No se pudo contar las notificaciones sin leer; el badge queda en 0', {
+        scope: 'GlobalHeader.loadUnreadNotificationsCount',
+        profileId: profile.id,
+        error,
+      });
+    }
     setInternalNotificationCount(error ? 0 : (count ?? 0));
   }, [profile?.id]);
 
@@ -80,8 +90,13 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
     try {
       const count = await fetchUnreadChatCount();
       setChatCount(count);
-    } catch {
+    } catch (error) {
       // Mismo criterio que las notificaciones: ocultamos el badge y seguimos.
+      Logger.warn('No se pudo contar los chats sin leer; el badge queda en 0', {
+        scope: 'GlobalHeader.loadChatCount',
+        profileId: profile.id,
+        error,
+      });
       setChatCount(0);
     }
   }, [profile?.id]);
@@ -107,7 +122,12 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
     try {
       const inbox = await fetchChallengesInbox(activeTeamId);
       setChallengeCount(inbox.filter(c => c.direction === 'RECIBIDO' && c.status === 'ENVIADA').length);
-    } catch {
+    } catch (error) {
+      Logger.warn('No se pudo contar los desafíos recibidos; el badge queda en 0', {
+        scope: 'GlobalHeader.loadChallengeCount',
+        activeTeamId,
+        error,
+      });
       setChallengeCount(0);
     }
   }, [activeTeamId]);

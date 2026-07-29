@@ -17,6 +17,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { useAuth } from '@/context/AuthContext';
 import { getInitials } from '@/lib/market-utils';
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import {
   fetchMessages,
@@ -83,7 +84,11 @@ export default function MarketChatScreen() {
         try {
           await markConversationAsRead(id);
         } catch (e) {
-          console.error('markConversationAsRead failed:', e);
+          Logger.warn('No se pudo marcar la conversación de mercado como leída', {
+            scope: 'market-chat',
+            conversationId: id,
+            error: e,
+          });
         }
 
         if (currentChat) {
@@ -106,7 +111,13 @@ export default function MarketChatScreen() {
           }
         }
       } catch (error) {
-        console.error('Error fetching chat', error);
+        // Sin re-throw ni estado de error: la pantalla queda con el chat vacío
+        // y es indistinguible de una conversación sin mensajes.
+        Logger.error('No se pudo cargar la conversación del mercado', {
+          scope: 'market-chat',
+          conversationId: id,
+          error,
+        });
       } finally {
         setIsLoading(false);
       }
@@ -131,7 +142,13 @@ export default function MarketChatScreen() {
           if (newMessage.sender_profile_id !== profile.id) {
             setMessages((prev) => [...prev, newMessage]);
             // Marcamos como leído si tenemos el chat abierto
-            markConversationAsRead(id).catch(console.error);
+            markConversationAsRead(id).catch((readError: unknown) => {
+              Logger.warn('No se pudo marcar como leído el mensaje entrante', {
+                scope: 'market-chat.realtime',
+                conversationId: id,
+                error: readError,
+              });
+            });
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
           }
         }
@@ -171,11 +188,23 @@ export default function MarketChatScreen() {
 
     try {
       const realMsg = await sendMessage(id, textToSend, senderTeamId, messageType);
+      Logger.info('Mensaje enviado en el chat del mercado', {
+        scope: 'market-chat.handleSend',
+        conversationId: id,
+        messageId: realMsg.id,
+        messageType,
+        senderTeamId: senderTeamId ?? null,
+      });
       setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? realMsg : m)));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error) {
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
-      console.error('Error sending message:', error);
+      Logger.error('No se pudo enviar el mensaje del chat de mercado', {
+        scope: 'market-chat.handleSend',
+        conversationId: id,
+        messageType,
+        error,
+      });
     } finally {
       setIsSending(false);
     }

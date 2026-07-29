@@ -9,6 +9,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { CheckinSquadCounters } from '@/components/matches/CheckinSquadCounters';
 import { CheckinRosterItem } from '@/components/matches/CheckinRosterItem';
 import type { CheckinViewData, CheckinLineupState } from '@/components/matches/types';
+import { Logger } from '@/lib/logger';
 
 // Orden de la lista: cuerpo de capitanía primero, invitados al final.
 const ROLE_ORDER: Record<string, number> = {
@@ -50,6 +51,12 @@ export default function MatchCheckinScreen() {
       }
       setLineup(initial);
     } catch (err) {
+      Logger.error('No se pudo cargar la convocatoria del check-in', {
+        scope: 'match-checkin.loadData',
+        matchId,
+        myTeamId,
+        error: err,
+      });
       showAlert('Error', getCheckinErrorMessage(err));
     } finally {
       setLoading(false);
@@ -107,6 +114,12 @@ export default function MatchCheckinScreen() {
       if (viewData.venueId) {
         const location = await getCheckinLocation();
         if (!location.ok) {
+          Logger.warn('Presentación de lista abortada por fallo de geolocalización', {
+            scope: 'match-checkin.handleSubmit',
+            matchId: viewData.matchId,
+            myTeamId,
+            reason: location.reason,
+          });
           showAlert('No pudimos validar tu ubicación', location.message);
           return;
         }
@@ -118,6 +131,14 @@ export default function MatchCheckinScreen() {
         .map(([profileId, state]) => ({ profileId, lineupRole: state as 'TITULAR' | 'SUPLENTE' }));
 
       const summary = await submitTeamCheckin(viewData.matchId, myTeamId, players, coords);
+      Logger.info('Lista presentada', {
+        scope: 'match-checkin.handleSubmit',
+        matchId: viewData.matchId,
+        myTeamId,
+        starters: summary.starters,
+        substitutes: summary.substitutes,
+        matchStatus: summary.matchStatus,
+      });
       showAlert(
         '¡Lista presentada!',
         summary.matchStatus === 'EN_VIVO'
@@ -127,6 +148,14 @@ export default function MatchCheckinScreen() {
         'success',
       );
     } catch (err) {
+      Logger.error('Fallo la presentación de la lista', {
+        scope: 'match-checkin.handleSubmit',
+        matchId: viewData.matchId,
+        myTeamId,
+        starters,
+        substitutes,
+        error: err,
+      });
       showAlert('Error', getCheckinErrorMessage(err));
     } finally {
       setSubmitting(false);

@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { canLoadResultFromDetail } from '@/lib/match-permissions';
 import type { MatchDetailViewData, MatchResultEntry } from '@/components/matches/types';
 
 interface Props {
@@ -61,7 +62,7 @@ function ResultCard({
 }
 
 export function ResultSection({ match, onLoadResult }: Props) {
-  const { status, teamA, teamB, myTeamId, myResult, opponentResult, isResultLoader } = match;
+  const { status, teamA, teamB, myTeamId, myResult, opponentResult } = match;
 
   const isMyTeamA = teamA.id === myTeamId;
   const myTeam = isMyTeamA ? teamA : teamB;
@@ -69,7 +70,10 @@ export function ResultSection({ match, onLoadResult }: Props) {
   const myRes = myResult;
   const opponentRes = opponentResult;
 
-  const canLoad = status === 'EN_VIVO' && isResultLoader && myRes === null;
+  // D10: misma regla que usa la pantalla contenedora para habilitar el botón
+  // "Finalizar Partido". Antes exigía `isResultLoader` a secas, así que el
+  // capitán que no había hecho check-in veía un botón y no el otro.
+  const canLoad = canLoadResultFromDetail(match);
 
   return (
     <View className="mt-4 rounded-2xl bg-surface-container p-4">

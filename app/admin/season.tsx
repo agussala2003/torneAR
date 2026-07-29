@@ -12,6 +12,7 @@ import {
   transitionSeason,
   type ActiveSeasonInfo,
 } from '@/lib/season-admin-data';
+import { Logger } from '@/lib/logger';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -49,6 +50,10 @@ export default function SeasonAdminScreen() {
       setLoading(true);
       setActiveSeason(await fetchActiveSeasonInfo());
     } catch (error) {
+      Logger.error('No se pudo cargar la temporada activa', {
+        scope: 'admin.season.loadSeason',
+        error,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(error, 'No se pudo cargar la temporada activa.'));
     } finally {
       setLoading(false);
@@ -79,6 +84,13 @@ export default function SeasonAdminScreen() {
     setTransitioning(true);
     try {
       await transitionSeason(name.trim(), startsAt, endsAt);
+      Logger.info('Transición de temporada ejecutada', {
+        scope: 'admin.season.handleConfirmTransition',
+        newSeasonName: name.trim(),
+        startsAt,
+        endsAt,
+        adminProfileId: profile?.id,
+      });
       setConfirmVisible(false);
       setName('');
       setStartsAt('');
@@ -91,6 +103,13 @@ export default function SeasonAdminScreen() {
         'success',
       );
     } catch (error) {
+      Logger.error('No se pudo ejecutar la transición de temporada', {
+        scope: 'admin.season.handleConfirmTransition',
+        newSeasonName: name.trim(),
+        startsAt,
+        endsAt,
+        error,
+      });
       setConfirmVisible(false);
       showAlert('Error', getGenericSupabaseErrorMessage(error, 'No se pudo ejecutar la transición.'));
     } finally {

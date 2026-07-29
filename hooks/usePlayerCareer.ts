@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { fetchPlayerCareer, PlayerCareer } from '@/lib/career-data';
+import { Logger } from '@/lib/logger';
 
 type UsePlayerCareerResult = {
   career: PlayerCareer | null;
@@ -26,7 +27,11 @@ export function usePlayerCareer(profileId: string | null): UsePlayerCareerResult
       setError(false);
       setCareer(await fetchPlayerCareer(profileId));
     } catch (err) {
-      console.error('Player career fetch failed', err);
+      Logger.error('No se pudo cargar la trayectoria del jugador', {
+        scope: 'usePlayerCareer',
+        profileId,
+        error: err,
+      });
       setError(true);
     } finally {
       setLoading(false);

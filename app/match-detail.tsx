@@ -5,12 +5,12 @@ import { useTeamStore } from '@/stores/teamStore';
 import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
-import { fetchMatchDetailViewData, fetchDisputeState } from '@/lib/match-detail-data';
+import { fetchMatchDetailViewData, fetchDisputeState, resolveMyTeamIdForMatch } from '@/lib/match-detail-data';
 import type { DisputeState } from '@/lib/match-detail-data';
 // El check-in simple comparte los códigos de error de la RPC de convocatoria
 // (GEOFENCE_FAILED, LOCATION_REQUIRED): con el mapper el usuario lee el motivo
 // real en vez del mensaje genérico de Supabase.
-import { getCheckinErrorMessage } from '@/lib/checkin-data';
+import { getCheckinErrorMessage, fetchFormatRules } from '@/lib/checkin-data';
 import { getCheckinLocation } from '@/lib/checkin-location';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -26,7 +26,15 @@ import {
   submitDisputeVote,
   resolveMatchDispute,
   ResultAlreadySubmittedError,
+  getProposalErrorMessage,
 } from '@/lib/match-actions';
+import { canLoadResultFromDetail, isTeamMatchStaff } from '@/lib/match-permissions';
+import {
+  formatGuestCodeExpiry,
+  getGuestCodeExpiry,
+  isGuestCodeExpired,
+} from '@/lib/guest-code';
+import { Logger } from '@/lib/logger';
 import { useMatchRealtime } from '@/hooks/useMatchRealtime';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { MatchDetailSkeleton } from '@/components/matches/MatchDetailSkeleton';
@@ -51,10 +59,16 @@ export default function MatchDetailScreen() {
     openResultModal?: string;
   }>();
   const { activeTeamId } = useTeamStore();
-  const myTeamId = paramTeamId ?? activeTeamId ?? '';
   const { profile } = useAuth();
 
   const { showAlert, AlertComponent } = useCustomAlert();
+
+  // R9: el equipo ya no se infiere del store. `activeTeamId` es "el último que
+  // elegiste en la app", no "el tuyo en este partido" — y las notificaciones de
+  // D11 entran acá sin `myTeamId` en los params. Se resuelve contra el partido
+  // (ver resolveMyTeamIdForMatch); hasta entonces la pantalla no consulta nada.
+  const [myTeamId, setMyTeamId] = useState<string>('');
+  const [teamResolved, setTeamResolved] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [match, setMatch] = useState<MatchDetailViewData | null>(null);
@@ -66,8 +80,39 @@ export default function MatchDetailScreen() {
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [showWoModal, setShowWoModal] = useState(false);
 
+  useEffect(() => {
+    if (!matchId || !profile?.id) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const resolved = await resolveMyTeamIdForMatch(matchId, profile.id, paramTeamId, activeTeamId);
+        if (!cancelled) setMyTeamId(resolved ?? '');
+      } catch (err) {
+        // Sin equipo resuelto la pantalla muestra "Partido no encontrado". Es
+        // preferible a contestar por un equipo que no juega este partido, que
+        // es exactamente lo que hacía el fallback al equipo activo.
+        Logger.error('No se pudo resolver el equipo del usuario en el partido', {
+          scope: 'match-detail.resolveTeam',
+          matchId,
+          profileId: profile.id,
+          error: err,
+        });
+        if (!cancelled) setMyTeamId('');
+      } finally {
+        if (!cancelled) setTeamResolved(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [matchId, profile?.id, paramTeamId, activeTeamId]);
+
   const loadData = useCallback(async () => {
-    if (!matchId || !myTeamId) {
+    // Mientras no sepamos con qué equipo mira el usuario, no se consulta: pedir
+    // el detalle con un teamId equivocado devuelve un partido equivocado.
+    if (!matchId || !teamResolved) return;
+    if (!myTeamId) {
+      setMatch(null);
       setLoading(false);
       return;
     }
@@ -82,13 +127,47 @@ export default function MatchDetailScreen() {
         setDisputeState(null);
       }
     } catch (err) {
+      Logger.error('No se pudo cargar el detalle del partido', {
+        scope: 'match-detail.loadData',
+        matchId,
+        myTeamId,
+        error: err,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [matchId, myTeamId, profile?.id, showAlert]);
+  }, [matchId, myTeamId, teamResolved, profile?.id, showAlert]);
 
   useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
+
+  // D9: el mínimo para dar por presentado al equipo sale de `format_rules`, la
+  // misma tabla que usan submit_team_checkin y confirm_match_proposal. No se
+  // hardcodea un mapa por formato acá: sería una cuarta fuente de verdad del
+  // mismo número, y el catálogo es configurable sin desplegar.
+  const [minPlayersToStart, setMinPlayersToStart] = useState<number | null>(null);
+
+  useEffect(() => {
+    const format = match?.format;
+    if (!format) {
+      setMinPlayersToStart(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchFormatRules(format)
+      .then((rules) => { if (!cancelled) setMinPlayersToStart(rules.minPlayersToStart); })
+      .catch((err: unknown) => {
+        // No crítico: sin el número la sección muestra "N llegaron" en vez de
+        // "N/M". El check-in sigue funcionando — el quórum lo aplica el servidor.
+        Logger.warn('No se pudieron cargar las reglas del formato', {
+          scope: 'match-detail.formatRules',
+          matchId,
+          format,
+          error: err,
+        });
+      });
+    return () => { cancelled = true; };
+  }, [match?.format, matchId]);
 
   // Realtime: cuando el rival carga su resultado, el partido pasa a FINALIZADO
   // o EN_DISPUTA y esta pantalla se entera sin salir y volver a entrar.
@@ -114,11 +193,23 @@ export default function MatchDetailScreen() {
     if (!match?.activeProposal) return;
     try {
       await acceptProposal(match.activeProposal.id, match.id);
+      Logger.info('Partido confirmado', {
+        scope: 'match-detail',
+        matchId: match.id,
+        proposalId: match.activeProposal.id,
+      });
       await loadData();
       showAlert('¡Propuesta aceptada!', 'El partido ha sido confirmado.');
     } catch (err) {
       await loadData();
-      showAlert('Error', getGenericSupabaseErrorMessage(err));
+      // E1: el motivo puede ser "no llegás al cupo del formato". Con el mensaje
+      // genérico el capitán no tenía forma de saber qué corregir.
+      Logger.error('Fallo la confirmación del partido', {
+        scope: 'match-detail',
+        matchId: match.id,
+        error: err,
+      });
+      showAlert('No se pudo confirmar', getProposalErrorMessage(err));
     }
   }
 
@@ -127,8 +218,19 @@ export default function MatchDetailScreen() {
     try {
       await rejectProposal(match.activeProposal.id);
       await loadData();
+      Logger.info('Propuesta rechazada', {
+        scope: 'match-detail.handleRejectProposal',
+        matchId: match.id,
+        proposalId: match.activeProposal.id,
+      });
       showAlert('Propuesta rechazada', 'Se notificará al equipo rival.');
     } catch (err) {
+      Logger.error('Fallo el rechazo de la propuesta', {
+        scope: 'match-detail.handleRejectProposal',
+        matchId: match.id,
+        proposalId: match.activeProposal.id,
+        error: err,
+      });
       await loadData();
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
@@ -139,8 +241,19 @@ export default function MatchDetailScreen() {
     try {
       await cancelProposal(match.activeProposal.id);
       await loadData();
+      Logger.info('Propuesta cancelada', {
+        scope: 'match-detail.handleCancelProposal',
+        matchId: match.id,
+        proposalId: match.activeProposal.id,
+      });
       showAlert('Propuesta cancelada', 'Tu propuesta fue cancelada.');
     } catch (err) {
+      Logger.error('Fallo la cancelación de la propuesta', {
+        scope: 'match-detail.handleCancelProposal',
+        matchId: match.id,
+        proposalId: match.activeProposal.id,
+        error: err,
+      });
       await loadData();
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
@@ -172,11 +285,48 @@ export default function MatchDetailScreen() {
         coords = location.coords;
       }
 
-      await doCheckin(match.id, myTeamId, coords);
+      const result = await doCheckin(match.id, myTeamId, coords);
+      // D9: el check-in registra MI llegada; la presencia del EQUIPO se sella
+      // sólo con quórum. Si después hay una disputa de WO por no presentación,
+      // este log y su timestamp son la evidencia de qué pasó y cuándo.
+      Logger.info('Check-in registrado', {
+        scope: 'match-detail',
+        matchId: match.id,
+        teamId: myTeamId,
+        withGeofence: coords !== undefined,
+        checkedInPlayers: result.checkedInPlayers,
+        minPlayers: result.minPlayers,
+        teamSealed: result.teamSealed,
+      });
       await loadData();
-      showAlert('¡Check-in realizado!', 'Marcaste tu llegada al partido.');
+
+      // El mensaje tiene que decir en cuál de los dos estados quedó el equipo.
+      // Antes decía siempre "marcaste tu llegada" y el casillero del equipo
+      // seguía en "Pendiente" sin ninguna explicación posible.
+      if (result.justSealed) {
+        showAlert(
+          '¡Equipo presentado!',
+          `Con tu llegada son ${result.checkedInPlayers}: tu equipo queda presentado para este partido.`,
+        );
+      } else if (result.teamSealed) {
+        showAlert('¡Check-in realizado!', 'Marcaste tu llegada. Tu equipo ya estaba presentado.');
+      } else {
+        const missing = Math.max(result.minPlayers - result.checkedInPlayers, 0);
+        showAlert(
+          '¡Check-in realizado!',
+          `Marcaste tu llegada (${result.checkedInPlayers}/${result.minPlayers}). ` +
+            `Faltan ${missing} compañero(s) para dar por presentado al equipo.`,
+        );
+      }
     } catch (err) {
       await loadData();
+      Logger.error('Fallo el check-in', {
+        scope: 'match-detail',
+        matchId: match.id,
+        teamId: myTeamId,
+        hasVenue: match.venueId !== null,
+        error: err,
+      });
       showAlert('Error', getCheckinErrorMessage(err));
     }
   }
@@ -185,10 +335,21 @@ export default function MatchDetailScreen() {
     if (!match) return;
     try {
       await submitDisputeVote(match.id, teamId);
+      Logger.info('Voto de disputa registrado', {
+        scope: 'match-detail',
+        matchId: match.id,
+        votedTeamId: teamId,
+      });
       await loadData();
       showAlert('¡Voto registrado!', 'Tu voto fue enviado correctamente.');
     } catch (err) {
       await loadData();
+      Logger.error('Fallo el voto de disputa', {
+        scope: 'match-detail',
+        matchId: match.id,
+        votedTeamId: teamId,
+        error: err,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
@@ -197,6 +358,17 @@ export default function MatchDetailScreen() {
     if (!match) return;
     try {
       const result = await resolveMatchDispute(match.id);
+      // Acción irreversible: adopta el marcador del ganador y dispara el ELO
+      // (ver D1/R7). Queda registrado el método de desempate porque es
+      // exactamente lo que se discute cuando alguien reclama el resultado.
+      Logger.info('Disputa resuelta', {
+        scope: 'match-detail',
+        matchId: match.id,
+        winnerTeamId: result.winnerTeamId,
+        resolutionMethod: result.resolutionMethod,
+        votesA: result.votesA,
+        votesB: result.votesB,
+      });
       const winnerName =
         result.winnerTeamId === match.teamA.id ? match.teamA.name : match.teamB.name;
       const method =
@@ -208,6 +380,11 @@ export default function MatchDetailScreen() {
       );
     } catch (err) {
       await loadData();
+      Logger.error('Fallo la resolución de la disputa', {
+        scope: 'match-detail',
+        matchId: match.id,
+        error: err,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
@@ -226,6 +403,12 @@ export default function MatchDetailScreen() {
         accept,
         match.cancellationRequest.requestedByTeamId,
       );
+      Logger.info('Solicitud de cancelación respondida', {
+        scope: 'match-detail',
+        matchId: match.id,
+        accepted: accept,
+        isLate: match.cancellationRequest.isLate,
+      });
       await loadData();
       showAlert(
         accept ? 'Cancelación aceptada' : 'Solicitud rechazada',
@@ -233,6 +416,12 @@ export default function MatchDetailScreen() {
       );
     } catch (err) {
       await loadData();
+      Logger.error('Fallo la respuesta a la solicitud de cancelación', {
+        scope: 'match-detail',
+        matchId: match.id,
+        accepted: accept,
+        error: err,
+      });
       showAlert('Error', getGenericSupabaseErrorMessage(err));
     }
   }
@@ -260,20 +449,50 @@ export default function MatchDetailScreen() {
   const opponentTeam = isMyTeamA ? match.teamB : match.teamA;
   const hasPendingCancellation = match.cancellationRequest?.status === 'PENDIENTE';
 
+  // D5: mientras el reclamo está en revisión la pantalla se veía idéntica a
+  // antes de reclamar — el partido seguía "Confirmado" y el botón WO volvía a
+  // estar disponible, así que el segundo tap chocaba con el unique(match_id) y
+  // salía un error crudo de Supabase.
+  const hasPendingWoClaim = match.woClaim?.status === 'PENDIENTE_REVISION';
+
+  // R1/R2: definición ÚNICA de "puedo gestionar este partido".
+  //
+  // El servidor ya lo exigía —RLS de match_proposals, confirm_match_proposal,
+  // request_match_cancellation—, pero la pantalla ofrecía igual los botones y
+  // el JUGADOR se enteraba de que no podía DESPUÉS de completar el formulario.
+  // El rol ya viajaba en el payload de get_match_detail; sólo faltaba mirarlo.
+  //
+  // Deliberadamente NO cubre la carga de resultado: ahí la regla del servidor
+  // es "CAPITAN/SUBCAPITAN **o** is_result_loader", así que un JUGADOR que hizo
+  // el check-in sí puede cargarlo (ver canSubmitResult más abajo). Tampoco
+  // cubre el reclamo de WO, que claim_wo habilita a cualquier jugador con
+  // check-in.
+  const canManageMatch = match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN';
+
+  // R6: el cuerpo técnico —capitán, subcapitán y DIRECTOR_TECNICO— presenta la
+  // lista y carga el resultado. `canManageMatch` sigue reservado para lo que
+  // compromete al club frente al rival: proponer, confirmar y cancelar.
+  const isMatchStaff = isTeamMatchStaff(match.myRole);
+
   // Bug 4: el selector de goleadores/MVP se alimenta del PLANTEL (team_roster),
   // no de la convocatoria (match_participants). Un gol puede ser de alguien que
   // entró sin figurar en la lista de buena fe, y un partido iniciado con la RPC
   // legacy checkin_team deja un solo participante por equipo.
   const myTeamParticipants = match.teamRoster;
 
-  // Bug 8: definición ÚNICA de "puedo cargar resultado". Antes el botón
-  // "Finalizar Partido" abría el modal sin mirar myResult, así que se podía
-  // reenviar un resultado ya cargado (ResultSection sí lo chequeaba, pero ese
-  // botón paralelo no).
-  const canSubmitResult =
-    status === 'EN_VIVO' &&
-    match.myResult === null &&
-    (match.isResultLoader || match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN');
+  // D10: la regla vive en lib/match-permissions.ts y es la misma que aplican
+  // ResultSection (dentro de esta pantalla), LiveMatchBanner y MatchCardFooter.
+  // Antes estaba escrita acá y otras dos veces distinta: un capitán sin
+  // check-in veía "Finalizar Partido" pero no "Cargar resultado", en la misma
+  // pantalla y para la misma acción.
+  const canSubmitResult = canLoadResultFromDetail(match);
+
+  // E7: el vencimiento se calcula desde `scheduledAt` — el mismo ancla que usa
+  // `match_guest_code_expires_at` en el servidor. Sin fecha pactada no hay nada
+  // que mostrar: el partido tampoco está CONFIRMADO, así que el código no se
+  // puede usar igual.
+  const guestCodeExpiry = getGuestCodeExpiry(match.scheduledAt);
+  const guestCodeExpired = isGuestCodeExpired(match.scheduledAt);
 
   function renderStatusBadge() {
     const colors: Record<string, string> = {
@@ -346,6 +565,16 @@ export default function MatchDetailScreen() {
               </Text>
             </View>
           </View>
+
+          {/* E7 — el código caduca. Quien lo comparte tiene que saber hasta
+              cuándo sirve; antes habilitaba invitados para siempre. */}
+          {guestCodeExpiry ? (
+            <Text className="font-ui mt-2 text-[10px] text-neutral-on-surface-variant">
+              {guestCodeExpired
+                ? 'Este código ya venció: no admite invitados nuevos.'
+                : `Admite invitados hasta el ${formatGuestCodeExpiry(guestCodeExpiry)}.`}
+            </Text>
+          ) : null}
         </TouchableOpacity>
 
         {/* ─── PENDIENTE ─── */}
@@ -355,6 +584,7 @@ export default function MatchDetailScreen() {
               <ProposalSection
                 proposal={match.activeProposal}
                 myTeamId={myTeamId}
+                canManage={canManageMatch}
                 onAccept={() => void handleAcceptProposal()}
                 onReject={() => void handleRejectProposal()}
                 onCounterPropose={() => setShowProposalModal(true)}
@@ -363,17 +593,21 @@ export default function MatchDetailScreen() {
             ) : (
               <View className="mt-4 rounded-2xl bg-surface-container p-4">
                 <Text className="font-ui text-center text-sm text-neutral-on-surface-variant">
-                  Sin propuesta activa. Enviá una propuesta para coordinar el partido.
+                  {canManageMatch
+                    ? 'Sin propuesta activa. Enviá una propuesta para coordinar el partido.'
+                    : 'Sin propuesta activa. Tu capitán o subcapitán tiene que coordinar la fecha, el formato y la cancha con el rival.'}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setShowProposalModal(true)}
-                  activeOpacity={0.8}
-                  className="mt-3 rounded-xl bg-brand-primary py-3"
-                >
-                  <Text className="font-uiBold text-center text-sm text-[#003914]">
-                    Proponer detalles
-                  </Text>
-                </TouchableOpacity>
+                {canManageMatch && (
+                  <TouchableOpacity
+                    onPress={() => setShowProposalModal(true)}
+                    activeOpacity={0.8}
+                    className="mt-3 rounded-xl bg-brand-primary py-3"
+                  >
+                    <Text className="font-uiBold text-center text-sm text-[#003914]">
+                      Proponer detalles
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
             {hasPendingCancellation && match.cancellationRequest && (
@@ -388,7 +622,7 @@ export default function MatchDetailScreen() {
             )}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
-              onCancel={hasPendingCancellation ? undefined : () => setShowCancellationModal(true)}
+              onCancel={hasPendingCancellation || !canManageMatch ? undefined : () => setShowCancellationModal(true)}
             />
           </>
         )}
@@ -400,8 +634,10 @@ export default function MatchDetailScreen() {
             <CheckinSection
               match={match}
               onCheckin={() => void handleCheckin()}
+              myProfileId={profile?.id ?? null}
+              minPlayers={minPlayersToStart}
               onOpenSquadList={
-                match.myRole === 'CAPITAN' || match.myRole === 'SUBCAPITAN'
+                isMatchStaff
                   ? () =>
                       router.push({
                         pathname: '/match-checkin' as never,
@@ -420,10 +656,11 @@ export default function MatchDetailScreen() {
                 onReject={() => void handleRespondToCancellation(false)}
               />
             )}
+            {hasPendingWoClaim && <WoClaimPendingBanner match={match} myTeamId={myTeamId} />}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
-              onWo={myCheckinAt !== null ? () => setShowWoModal(true) : undefined}
-              onCancel={hasPendingCancellation ? undefined : () => setShowCancellationModal(true)}
+              onWo={myCheckinAt !== null && !match.woClaim ? () => setShowWoModal(true) : undefined}
+              onCancel={hasPendingCancellation || !canManageMatch ? undefined : () => setShowCancellationModal(true)}
             />
           </>
         )}
@@ -460,9 +697,10 @@ export default function MatchDetailScreen() {
                 </Text>
               </View>
             ) : null}
+            {hasPendingWoClaim && <WoClaimPendingBanner match={match} myTeamId={myTeamId} />}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
-              onWo={() => setShowWoModal(true)}
+              onWo={match.woClaim ? undefined : () => setShowWoModal(true)}
             />
           </>
         )}
@@ -547,6 +785,17 @@ export default function MatchDetailScreen() {
         onSubmit={async (data) => {
           try {
             await submitMatchResult(match.id, myTeamId, data);
+            // El resultado dispara el trigger resolve_match (FINALIZADO /
+            // EN_DISPUTA / ELO). Es la mutación más consecuente de la app.
+            Logger.info('Resultado cargado', {
+              scope: 'match-detail',
+              matchId: match.id,
+              teamId: myTeamId,
+              goalsScored: data.goalsScored,
+              goalsAgainst: data.goalsAgainst,
+              scorers: data.scorers.length,
+              hasMvp: data.mvpProfileId !== null,
+            });
             // Recarga SINCRÓNICA antes del alert. Antes el loadData vivía en el
             // callback del alert, así que la pantalla mostraba el estado viejo
             // hasta que el usuario cerraba el mensaje: ésa era la ventana en la
@@ -561,9 +810,25 @@ export default function MatchDetailScreen() {
             if (err instanceof ResultAlreadySubmittedError) {
               // Caso terminal: no hay nada que corregir, el modal se cierra y por
               // eso este alert (fuera del <Modal>) si es visible.
+              //
+              // warn y no error: es un doble envío, no una falla. Interesa
+              // medirlo — si aparece seguido, el botón se está ofreciendo
+              // cuando no debería (justamente lo que D10 vino a arreglar).
+              Logger.warn('Intento de recargar un resultado ya enviado', {
+                scope: 'match-detail',
+                matchId: match.id,
+                teamId: myTeamId,
+              });
               showAlert('Resultado ya cargado', err.message);
               return;
             }
+
+            Logger.error('Fallo la carga del resultado', {
+              scope: 'match-detail',
+              matchId: match.id,
+              teamId: myTeamId,
+              error: err,
+            });
 
             // Se relanza para que el modal NO se cierre y el usuario pueda
             // corregir los datos sin volver a cargarlos desde cero. El mensaje lo
@@ -580,6 +845,13 @@ export default function MatchDetailScreen() {
         isLateWarning={isLateForCancellation()}
         onSubmit={async (data) => {
           await requestCancellation(match.id, myTeamId, data, opponentTeam.id);
+          Logger.info('Solicitud de cancelación enviada', {
+            scope: 'match-detail',
+            matchId: match.id,
+            teamId: myTeamId,
+            reason: data.reason,
+            isLate: isLateForCancellation(),
+          });
           await loadData();
           showAlert(
             'Solicitud enviada',
@@ -593,12 +865,53 @@ export default function MatchDetailScreen() {
         myParticipants={myTeamParticipants}
         onSubmit={async (data) => {
           await claimWo(match.id, myTeamId, data);
+          // El WO deriva en una resolución de admin que puede reescribir el
+          // marcador (D5/D6): conviene tener la traza del lado del cliente.
+          Logger.info('Reclamo de WO enviado', {
+            scope: 'match-detail',
+            matchId: match.id,
+            teamId: myTeamId,
+            reason: data.reason,
+            matchStatus: match.status,
+          });
           await loadData();
           showAlert('Reclamo enviado', 'Tu reclamo WO fue enviado a revisión.');
         }}
       />
 
       {AlertComponent}
+    </View>
+  );
+}
+
+// ─── Reclamo de WO en revisión (D5) ──────────────────────────────────────────
+// El reclamo existía en la base y viajaba en el payload de get_match_detail,
+// pero la pantalla sólo lo pintaba en las ramas WO_A/WO_B — es decir, recién
+// DESPUÉS de que el admin lo aprobara. Mientras estaba en revisión no había
+// ninguna señal: ni para quien reclamó, ni para el equipo señalado.
+
+function WoClaimPendingBanner({
+  match,
+  myTeamId,
+}: {
+  match: MatchDetailViewData;
+  myTeamId: string;
+}) {
+  const isClaimer = match.woClaim?.claimingTeamId === myTeamId;
+
+  return (
+    <View className="mt-4 flex-row items-start gap-3 rounded-2xl border border-warning-tertiary/30 bg-warning-tertiary/10 p-4">
+      <AppIcon family="material-community" name="gavel" size={18} color="#FABD32" />
+      <View className="flex-1">
+        <Text className="font-uiBold text-sm text-warning-tertiary">
+          {isClaimer ? 'Tu reclamo de WO está en revisión' : 'El rival reclamó un WO'}
+        </Text>
+        <Text className="font-ui mt-1 text-xs leading-5 text-neutral-on-surface-variant">
+          {isClaimer
+            ? 'Un administrador va a revisar la evidencia. Te avisamos cuando haya veredicto.'
+            : 'El rival pidió que se le dé el partido por no presentación. Un administrador va a revisar la evidencia y les avisamos el veredicto a los dos equipos.'}
+        </Text>
+      </View>
     </View>
   );
 }
