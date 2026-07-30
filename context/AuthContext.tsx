@@ -46,15 +46,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
+      // `maybeSingle` y no `single`: con `single`, cero filas es un ERROR
+      // (PGRST116). Todo usuario recién registrado pasa por ese estado —
+      // hay sesión pero todavía no hay fila en `profiles`— así que el camino
+      // más normal de la app entraba por la rama de error y ensuciaba la
+      // telemetría con un `Logger.error` por cada alta. Con `maybeSingle`,
+      // "no hay perfil" es `data: null, error: null`, y el error queda
+      // reservado para lo que de verdad falló.
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('auth_user_id', userId)
-        .single();
-
-      if (!error && data) {
-        return data;
-      }
+        .maybeSingle();
 
       // Devolver null acá manda al usuario a /onboarding (ver app/_layout.tsx).
       // Un fallo de red y "este usuario todavía no completó su perfil" producen
@@ -66,9 +69,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           authUserId: userId,
           error,
         });
+        return null;
       }
 
-      return null;
+      if (!data) {
+        // Caso esperado, no un fallo: sesión válida sin fila en `profiles`.
+        // Se loguea en `info` para poder separarlo del error de arriba cuando
+        // alguien reporte "me tira siempre el onboarding".
+        Logger.info('Sesión sin perfil: derivando a onboarding', {
+          scope: 'AuthContext.fetchProfile',
+          authUserId: userId,
+        });
+        return null;
+      }
+
+      return data;
     } catch (e) {
       Logger.error('Excepción cargando el perfil del usuario autenticado', {
         scope: 'AuthContext.fetchProfile',

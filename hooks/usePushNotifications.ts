@@ -61,32 +61,46 @@ export function usePushNotifications(): void {
     let cancelled = false;
 
     void (async () => {
-      // Import dinámico: evita que la carga del módulo explote en Expo Go.
-      const Notifications = await import('expo-notifications');
+      // Todo el bloque va bajo try/catch: sin el entorno nativo de FCM
+      // inicializado, tanto el import dinámico como los métodos nativos de
+      // abajo pueden tirar. Sin capturarlo, la rejection quedaba sin manejar y
+      // `initLogger` (app/_layout.tsx) la reportaba como excepción global —
+      // ruido de `error` en telemetría por una función opcional que falla.
+      try {
+        // Import dinámico: evita que la carga del módulo explote en Expo Go.
+        const Notifications = await import('expo-notifications');
 
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: true,
-          shouldSetBadge: false,
-        }),
-      });
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+          }),
+        });
 
-      // Cold start: la app se abrió tocando una push estando cerrada.
-      const lastResponse = await Notifications.getLastNotificationResponseAsync();
-      if (!cancelled && lastResponse) {
-        const url = extractDeepLinkUrl(lastResponse);
-        if (url) routeIncomingUrl(url);
+        // Cold start: la app se abrió tocando una push estando cerrada.
+        const lastResponse = await Notifications.getLastNotificationResponseAsync();
+        if (!cancelled && lastResponse) {
+          const url = extractDeepLinkUrl(lastResponse);
+          if (url) routeIncomingUrl(url);
+        }
+
+        if (cancelled) return;
+
+        // Warm: taps mientras la app está viva (foreground/background).
+        responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+          const url = extractDeepLinkUrl(response);
+          if (url) routeIncomingUrl(url);
+        });
+      } catch (error) {
+        // Degradación, no falla: la app entera funciona sin esto; lo único que
+        // se pierde es que el tap sobre una push navegue al detalle.
+        Logger.warn('No se pudo montar el listener de push notifications', {
+          scope: 'usePushNotifications.listener',
+          error,
+        });
       }
-
-      if (cancelled) return;
-
-      // Warm: taps mientras la app está viva (foreground/background).
-      responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-        const url = extractDeepLinkUrl(response);
-        if (url) routeIncomingUrl(url);
-      });
     })();
 
     return () => {
