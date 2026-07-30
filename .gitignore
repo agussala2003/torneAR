@@ -42,6 +42,12 @@ yarn-error.*
 .env
 .env*.local
 
+# Firebase / FCM: fuera del repo (es publico). En EAS se inyecta como File
+# secret GOOGLE_SERVICES_JSON; en local tiene que existir este archivo.
+# Ver app.config.js.
+google-services.json
+GoogleService-Info.plist
+
 # typescript
 *.tsbuildinfo
 

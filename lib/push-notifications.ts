@@ -3,6 +3,26 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { Logger } from '@/lib/logger';
 
+/**
+ * Techo duro para el registro del token.
+ *
+ * Sin FCM inicializado en el build (falta `google-services.json` + el plugin
+ * `expo-notifications` en app.json), `getExpoPushTokenAsync` no siempre
+ * rechaza: hay casos donde la promesa se queda colgada para siempre. Como el
+ * llamante la espera con `await`, eso deja el registro pendiente de por vida.
+ * Con el race, el peor caso es "sin token" y no "app esperando".
+ */
+const PUSH_TOKEN_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} superó los ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   // En SDK 53+, expo-notifications crashea si se inicializa dentro de Expo Go en Android.
   // Bypass automático si el usuario está probando en Expo Go:
@@ -46,17 +66,29 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       }
 
       const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-      
-      token = (await Notifications.getExpoPushTokenAsync({
-        projectId: projectId,
-      })).data;
-      
+
+      token = (
+        await withTimeout(
+          Notifications.getExpoPushTokenAsync({ projectId: projectId }),
+          PUSH_TOKEN_TIMEOUT_MS,
+          'getExpoPushTokenAsync',
+        )
+      ).data;
+
       return token;
     } else {
       return null;
     }
   } catch (error) {
-    Logger.error('Error inicializando las notificaciones push', {
+    // `warn`, no `error`: quedarse sin push token degrada una funcionalidad
+    // secundaria, no rompe la app. En el APK de producción esto se dispara
+    // porque el entorno nativo de FCM no está inicializado (ver nota abajo),
+    // y con `error` cada arranque disparaba una alarma por algo conocido.
+    //
+    // ⚠️ Arreglo de fondo pendiente: agregar el plugin `expo-notifications` y
+    // `android.googleServicesFile` (google-services.json) en app.json. Hasta
+    // entonces la app funciona pero NINGÚN dispositivo Android recibe pushes.
+    Logger.warn('No se pudo inicializar el registro de push notifications', {
       scope: 'push-notifications.register',
       platform: Platform.OS,
       isDevice: Device.isDevice,

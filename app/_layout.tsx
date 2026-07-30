@@ -116,7 +116,12 @@ function RootNavigation() {
     // para no redirigir a /login mientras todavía leemos la sesión guardada.
     if (!hydrated || loading || showIntro) return;
 
-    const inAuthGroup = segments[0] === 'login' || segments[0] === 'forgot-password';
+    // `auth` (app/auth/callback.tsx) cuenta como grupo público a propósito: al
+    // volver de Google la sesión tarda unos ms en escribirse, y sin esto el
+    // guard vería `session === null` y patearía a /login en el medio del canje.
+    // La propia pantalla de callback hace el replace cuando ya hay certeza.
+    const inAuthGroup =
+      segments[0] === 'login' || segments[0] === 'forgot-password' || segments[0] === 'auth';
     const inOnboarding = segments[0] === 'onboarding';
 
     if (!session) {
@@ -156,6 +161,7 @@ function RootNavigation() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" />
       <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="auth/callback" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="profile-stats" />
       <Stack.Screen name="team-create" />
