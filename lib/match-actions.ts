@@ -128,6 +128,12 @@ export const PROPOSAL_ERROR_CODES = [
   'PROPOSAL_DATE_IN_PAST',
   'PROPOSAL_DATE_REQUIRED',
   'TEAM_SCHEDULE_CONFLICT',
+  // Lo emite el trigger `trg_matches_ranking_requires_venue` (20260728140000),
+  // no la RPC: salta en el UPDATE a CONFIRMADO y aborta la confirmación entera.
+  // El código ya estaba mapeado en lib/checkin-data.ts, pero ése es el
+  // diccionario del check-in y `handleAcceptProposal` no lo consulta — así que
+  // acá caía igual en el genérico de Supabase.
+  'VENUE_REQUIRED',
 ] as const;
 
 export type ProposalErrorCode = (typeof PROPOSAL_ERROR_CODES)[number];
@@ -147,6 +153,8 @@ const PROPOSAL_ERROR_MESSAGES: Record<ProposalErrorCode, string> = {
   // que en SQUAD_TOO_SMALL, porque saber cuál de los dos es el del conflicto
   // es justo lo que permite resolverlo.
   TEAM_SCHEDULE_CONFLICT: 'Ese horario choca con otro partido confirmado.',
+  VENUE_REQUIRED:
+    'Los partidos de Ranking exigen tener una cancha asignada. Volvé a proponer eligiendo zona y complejo del catálogo.',
 };
 
 /** Mensaje presentable para un error de confirmación de propuesta. */
