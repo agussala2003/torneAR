@@ -8,9 +8,9 @@ type ProfileSocialSectionProps = {
 };
 
 type SocialNetwork = {
-  key: 'instagram' | 'tiktok';
+  key: 'instagram' | 'tiktok' | 'x';
   label: string;
-  /** Ionicons: es la única familia de AppIcon que trae los dos logos. */
+  /** Ionicons: es la única familia de AppIcon que trae los tres logos. */
   icon: string;
   url: string;
 };
@@ -27,13 +27,21 @@ const NETWORKS: SocialNetwork[] = [
     key: 'instagram',
     label: 'Instagram',
     icon: 'logo-instagram',
-    url: 'https://instagram.com/tornear.app',
+    url: 'https://www.instagram.com/tornear.app/',
   },
   {
     key: 'tiktok',
     label: 'TikTok',
     icon: 'logo-tiktok',
     url: 'https://tiktok.com/@tornear.app',
+  },
+  {
+    // `logo-x` y no `logo-twitter`: es la marca vigente y la que acompaña al
+    // dominio x.com del enlace. El pajarito quedaría desalineado con el destino.
+    key: 'x',
+    label: 'X',
+    icon: 'logo-x',
+    url: 'https://x.com/tornear_app',
   },
 ];
 
@@ -74,6 +82,11 @@ export function ProfileSocialSection({ onError }: ProfileSocialSectionProps) {
           Novedades, partidos destacados y todo lo que se viene después de la Beta.
         </Text>
 
+        {/* Ícono arriba y etiqueta abajo. Con dos columnas el ícono entraba en
+            línea con el texto, pero a tres "Instagram" no da en pantallas de
+            360dp y quedaba cortado. En vertical las celdas son idénticas, el
+            ancho del label deja de mandar y entra una cuarta red sin retocar
+            nada. */}
         <View className="mt-3 flex-row gap-2">
           {NETWORKS.map((network) => (
             <TouchableOpacity
@@ -81,14 +94,20 @@ export function ProfileSocialSection({ onError }: ProfileSocialSectionProps) {
               activeOpacity={0.85}
               disabled={opening !== null}
               onPress={() => void handlePress(network)}
-              className="flex-1 flex-row items-center justify-center gap-2 rounded-xl bg-surface-high py-3"
+              className="flex-1 items-center gap-1.5 rounded-xl bg-surface-high px-2 py-3"
             >
-              {opening === network.key ? (
-                <ActivityIndicator size="small" color="#53E076" />
-              ) : (
-                <AppIcon family="ionicons" name={network.icon} size={18} color="#53E076" />
-              )}
-              <Text className="font-uiBold text-sm text-neutral-on-surface">{network.label}</Text>
+              {/* Alto fijo: el spinner no mide igual que el glifo y la fila
+                  entera saltaba un par de píxeles al alternar. */}
+              <View className="h-5 items-center justify-center">
+                {opening === network.key ? (
+                  <ActivityIndicator size="small" color="#53E076" />
+                ) : (
+                  <AppIcon family="ionicons" name={network.icon} size={20} color="#53E076" />
+                )}
+              </View>
+              <Text className="font-uiBold text-xs text-neutral-on-surface" numberOfLines={1}>
+                {network.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
