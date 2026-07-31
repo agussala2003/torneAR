@@ -18,6 +18,7 @@ import { ProfileTeamsSection } from '@/components/profile/ProfileTeamsSection';
 import { CareerTimeline } from '@/components/profile/CareerTimeline';
 import { ProfileSettingsSection } from '@/components/profile/ProfileSettingsSection';
 import { ProfileFeedbackCard } from '@/components/profile/ProfileFeedbackCard';
+import { ProfileSocialSection } from '@/components/profile/ProfileSocialSection';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
@@ -172,6 +173,9 @@ export default function ProfileScreen() {
         <ProfileFeedbackCard
           email={user?.email}
           onError={(message) => showAlert('No pudimos abrir el formulario', message)}
+        />
+        <ProfileSocialSection
+          onError={(message) => showAlert('No pudimos abrir la red', message)}
         />
         <ProfileSettingsSection isSigningOut={isSigningOut} onSignOut={handleSignOut} />
       </ScrollView>
