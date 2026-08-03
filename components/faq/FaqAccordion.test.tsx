@@ -2,56 +2,26 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
+import { FaqAccordion } from './FaqAccordion';
 import type { FaqCategory } from './types';
 
 /**
- * Regresión del bug de la "caja gris vacía".
- *
- * Qué pasaba en producción:
- *   El cuerpo del acordeón se montaba y desmontaba con `entering={FadeIn}` de
- *   reanimated. Al cerrar, el desmontaje de una vista con animación de entrada
- *   en vuelo dejaba al hermano —el encabezado— con la opacidad de la animación
- *   interrumpida. El título y la bajada desaparecían y la tarjeta quedaba como
- *   un rectángulo gris sin nada adentro, imposible de volver a identificar.
- *
- * El arreglo fue sacar al encabezado de toda animación: hoy es un
- * `TouchableOpacity` común que no se desmonta nunca, y `height`/`opacity` se
- * interpolan exclusivamente sobre el contenedor del cuerpo.
+ * Regresión del bug de la "caja gris vacía": al cerrar la sección, la tarjeta
+ * quedaba pintada y el título con la bajada desaparecían.
  *
  * ⚠️ ALCANCE REAL DE ESTOS TESTS — leer antes de confiar en ellos.
- * Acá reanimated está mockeado, así que la animación nativa no corre y el bug
- * original NO se reproduce en este entorno: la implementación vieja también
- * pasaría estos tests. Lo que se fija es el INVARIANTE ESTRUCTURAL que hace
- * imposible el bug —el encabezado se renderiza en los tres momentos del ciclo
- * cerrado → abierto → cerrado, y no depende del montaje del cuerpo—, no el
- * síntoma visual. Si alguien vuelve a meter el título adentro de una vista que
- * se desmonta al cerrar, esto falla; si lo envuelve en un estilo animado que se
- * apaga, no.
+ * El bug se reproducía SÓLO en dispositivo; en web —que es donde corre esta
+ * suite, vía react-native-web— nunca apareció. O sea que **estos tests no lo
+ * detectan** y ninguna versión rota del componente falla acá.
  *
- * Reanimated se mockea acá y no en `vitest.setup.ui.ts` porque es el único
- * componente con tests que lo usa. El mock resuelve los hooks a sus valores
- * finales (sin animación).
+ * Lo que fijan es el invariante estructural que hace imposible la familia
+ * entera de causas: el encabezado se renderiza en los tres momentos del ciclo
+ * cerrado → abierto → cerrado y no depende del montaje del cuerpo. Si alguien
+ * vuelve a meter el título dentro de algo que se desmonta o se anima al cerrar,
+ * esto falla.
+ *
+ * La verificación de que el síntoma desapareció es manual y en celular.
  */
-vi.mock('react-native-reanimated', async () => {
-  const ReactModule = await import('react');
-  const RN = await import('react-native');
-
-  // Sin `forwardRef`: el componente nunca le pasa una ref a `Animated.View`, y
-  // tiparla obligaba a castear.
-  function AnimatedView(props: React.ComponentProps<typeof RN.View>) {
-    return ReactModule.createElement(RN.View, props);
-  }
-
-  return {
-    default: { View: AnimatedView },
-    useSharedValue: <T,>(initial: T) => ({ value: initial }),
-    useDerivedValue: <T,>(fn: () => T) => ({ value: fn() }),
-    useAnimatedStyle: <T,>(fn: () => T) => fn(),
-    withTiming: <T,>(target: T) => target,
-  };
-});
-
-const { FaqAccordion } = await import('./FaqAccordion');
 
 const CATEGORY: FaqCategory = {
   id: 'checkin',
@@ -89,12 +59,28 @@ describe('FaqAccordion', () => {
     expect(screen.getByText(CATEGORY.title)).toBeTruthy();
     expect(screen.getByText(CATEGORY.subtitle)).toBeTruthy();
 
-    // Cerrar: acá es donde el encabezado desaparecía.
+    // Cerrar: acá es donde el encabezado desaparecía en dispositivo.
     rerender(
       <FaqAccordion category={CATEGORY} expanded={false} onToggle={vi.fn()} />,
     );
     expect(screen.getByText(CATEGORY.title)).toBeTruthy();
     expect(screen.getByText(CATEGORY.subtitle)).toBeTruthy();
+  });
+
+  it('monta el cuerpo sólo cuando está expandido', () => {
+    const { rerender } = renderAccordion(false);
+
+    const { question, facts } = CATEGORY.entries[0];
+    expect(screen.queryByText(question)).toBeNull();
+
+    rerender(<FaqAccordion category={CATEGORY} expanded onToggle={vi.fn()} />);
+    expect(screen.getByText(question)).toBeTruthy();
+    expect(screen.getByText(facts![0].value)).toBeTruthy();
+
+    rerender(
+      <FaqAccordion category={CATEGORY} expanded={false} onToggle={vi.fn()} />,
+    );
+    expect(screen.queryByText(question)).toBeNull();
   });
 
   it('avisa al padre cuando se toca el encabezado', () => {
