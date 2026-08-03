@@ -60,6 +60,20 @@ export interface PendingAction {
   matchId?: string | null;
 }
 
+/**
+ * Fila del mini-ranking de la Home: el top 3 del formato que juega el equipo
+ * del usuario. Es un recorte de `RankingTeamEntry` — sólo lo que entra en la
+ * tarjeta, para no arrastrar zona/categoría/fair play que acá no se muestran.
+ */
+export interface MiniRankingEntry {
+  rankPosition: number;
+  teamId: string;
+  teamName: string;
+  shieldUrl: string | null;
+  eloRating: number;
+  isMyTeam: boolean;
+}
+
 export interface HomeViewData {
   myTeams: HomeTeamSnapshot[];
   upcomingMatches: HomeMatchEntry[];
