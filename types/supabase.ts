@@ -2312,7 +2312,6 @@ export type Database = {
         Returns: undefined
       }
       resolve_match: { Args: { p_match_id: string }; Returns: undefined }
-      resolve_match_dispute: { Args: { p_match_id: string }; Returns: Json }
       resolve_wo_claim: {
         Args: { p_admin_notes?: string; p_approve: boolean; p_claim_id: string }
         Returns: undefined

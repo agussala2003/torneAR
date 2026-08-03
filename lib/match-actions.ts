@@ -400,20 +400,14 @@ export async function submitDisputeVote(matchId: string, votedTeamId: string): P
   if (error) throw error;
 }
 
-// type (no interface): habilita el cast directo desde el Json tipado del RPC.
-export type DisputeResolveResult = {
-  winnerTeamId: string;
-  loserTeamId: string;
-  votesA: number;
-  votesB: number;
-  resolutionMethod: 'votes' | 'fair_play_score';
-};
-
-export async function resolveMatchDispute(matchId: string): Promise<DisputeResolveResult> {
-  const { data, error } = await supabase.rpc('resolve_match_dispute', { p_match_id: matchId });
-  if (error) throw error;
-  return data as DisputeResolveResult;
-}
+// `resolveMatchDispute` se eliminó junto con su RPC (migración 20260803150000).
+//
+// El escrutinio corría en el instante en que un capitán apretaba el botón, y
+// como el desempate cae en Fair Play cuando los votos están igualados —y 0 a 0
+// es el estado en que nace toda disputa— el primero en apretar se llevaba el
+// partido. Ahora lo cierra el cron `sweep_disputed_matches` a las 24 h, que no
+// es invocable desde el cliente. La única resolución manual que queda es
+// `admin_resolve_dispute`, admin-gated.
 
 // ─── WO Claim ─────────────────────────────────────────────────────────────────
 // La foto se sube al bucket wo_evidences y luego se llama a la RPC claim_wo

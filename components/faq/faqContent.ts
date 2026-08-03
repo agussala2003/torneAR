@@ -272,7 +272,22 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       {
         question: 'Cargamos resultados distintos. ¿Quién gana?',
         answer:
-          'Si los dos marcadores coinciden, el partido se cierra solo. Si no coinciden, pasa a EN DISPUTA y lo resuelven los votos.\n\nVotan únicamente los jugadores que hicieron check-in, porque estuvieron ahí. Un voto por persona. Gana la versión más votada y el marcador del otro equipo se corrige.\n\nSi hay empate en votos, desempata el Fair Play más alto. Si también empatan en Fair Play, el sistema se niega a decidir y pide revisión de un administrador: prefiere no resolver antes que inventar un ganador.',
+          'Si los dos marcadores coinciden, el partido se cierra solo. Si no coinciden, pasa a EN DISPUTA y lo resuelven los votos.\n\nVotan únicamente los jugadores que hicieron check-in, porque estuvieron ahí. Un voto por persona, y se puede cambiar mientras la votación siga abierta.\n\nA las 24 horas la votación cierra sola y gana la versión más votada; el marcador del otro equipo se corrige. Si hay empate en votos, desempata el Fair Play más alto. Si también empatan en Fair Play, el sistema se niega a decidir y pasa a revisión de un administrador: prefiere no resolver antes que inventar un ganador.',
+        facts: [
+          { label: 'Duración de la votación', value: '24 horas' },
+          { label: 'Quiénes votan', value: 'Los que hicieron check-in' },
+          { label: 'Empate de votos', value: 'Gana el Fair Play más alto' },
+        ],
+      },
+      {
+        question: '¿Puedo cerrar la votación antes si ya ganamos?',
+        answer:
+          'No. Nadie puede: ni vos, ni tu capitán, ni el rival. La votación cierra sola a las 24 horas y no hay forma de adelantarla ni de extenderla.\n\nAntes sí existía un botón de "Resolver Disputa" para los capitanes, y era un problema serio: como el desempate cae en Fair Play cuando los votos están igualados —y cero a cero es el estado en que nace toda disputa— el primero en apretar se llevaba el partido. No era un empate que se rompía por mérito, era una carrera por el botón.\n\nAhora el cierre es un evento de tiempo, así que no hay nada que adelantar.',
+      },
+      {
+        question: '¿Y si nadie vota?',
+        answer:
+          'La votación igual cierra a las 24 horas. Con cero votos de los dos lados, el desempate es por Fair Play y gana el equipo con el puntaje más alto.\n\nSi además el Fair Play está empatado, el partido queda para que lo revise un administrador. Lo mismo pasa si falta el marcador de alguno de los dos equipos: sin un resultado que adoptar, el sistema no inventa uno.\n\nMientras la votación está abierta la app te muestra hacia dónde caería el desempate, así sabés si te conviene juntar votos antes del cierre.',
       },
       {
         question: '¿Un partido puede quedar abierto para siempre?',
@@ -294,6 +309,102 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
         question: '¿Me avisan antes del partido?',
         answer:
           'Sí. Se manda un recordatorio 24 horas antes de cada partido confirmado, exactamente una vez. El sistema lo revisa cada 15 minutos, así que si una corrida falla, la siguiente lo recupera.',
+      },
+    ],
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    id: 'roles',
+    title: 'Roles y Permisos',
+    subtitle: 'Qué puede hacer cada uno dentro del equipo',
+    icon: 'account-key-outline',
+    entries: [
+      {
+        question: '¿Qué roles existen en un equipo?',
+        answer:
+          'Cuatro: Capitán, Subcapitán, Director Técnico y Jugador.\n\nCapitán y subcapitán tienen las mismas atribuciones en casi todo: son la conducción del club. El DT tiene un recorte específico y el jugador tiene lo que le corresponde por estar en la cancha.',
+      },
+      {
+        question: '¿Qué puede hacer el Capitán o el Subcapitán?',
+        answer:
+          'Todo lo que compromete al club:\n\n• Enviar y aceptar desafíos.\n• Proponer, confirmar y cancelar partidos.\n• Presentar la lista de convocados y cargar el resultado.\n• Corregir un resultado que cargó otra persona.\n• Reclamar un walkover (cerrar una disputa no puede nadie: cierra sola).\n• Publicar en el Mercado y aceptar postulantes.\n• Administrar miembros y roles del plantel.\n• Escribir en el chat del partido y en los chats del Mercado.',
+      },
+      {
+        question: '¿Qué puede hacer el Director Técnico?',
+        answer:
+          'Tiene los permisos del día del partido y ninguno de gestión del club.\n\nPUEDE: marcar su llegada, presentar la lista de convocados y cargar el resultado. También votar en una disputa si hizo check-in.\n\nNO PUEDE: proponer, confirmar ni cancelar un partido; responder solicitudes de cancelación; reclamar o resolver un walkover; corregir un resultado que cargó otro; administrar miembros; ni aceptar postulantes del Mercado.\n\nEl corte no es de confianza, es de naturaleza del acto: proponer o confirmar un partido compromete al club frente a otro club —fecha, cancha, seña— y eso es de la conducción. Reclamar o resolver un walkover cierra un resultado.',
+        facts: [
+          { label: 'Presentar la lista', value: 'Sí' },
+          { label: 'Cargar el resultado', value: 'Sí' },
+          { label: 'Confirmar o cancelar partidos', value: 'No' },
+          { label: 'Gestionar el plantel', value: 'No' },
+        ],
+      },
+      {
+        question: '¿Qué puede hacer un Jugador?',
+        answer:
+          'Marcar su propia llegada al partido, votar en una disputa si hizo check-in, y reclamar un walkover si él mismo hizo check-in.\n\nNo puede presentar la lista, cargar el resultado, ni tocar nada de la gestión del club.',
+      },
+      {
+        question: '¿Quién puede votar en una disputa?',
+        answer:
+          'Únicamente los jugadores que hicieron check-in en ese partido, sin importar su rol. Capitán, subcapitán, DT y jugador votan igual: lo que habilita el voto es haber estado ahí, no el cargo.\n\nCerrar la votación, en cambio, no puede nadie: la cierra el sistema a las 24 horas.',
+      },
+      {
+        question: '¿Por qué el DT no puede corregir un resultado que cargó otro?',
+        answer:
+          'Porque ya puede corregir el que cargó él mismo. Pisar el marcador que cargó otra persona —sobre un resultado que ya movió el Elo— es una atribución distinta, y sigue siendo del capitán o subcapitán.',
+      },
+    ],
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    id: 'chats',
+    title: 'Los Chats',
+    subtitle: 'Cuándo se abren y quién los lee',
+    icon: 'chat-outline',
+    entries: [
+      {
+        question: '¿Cuándo se abre el chat de un partido?',
+        answer:
+          'En el momento exacto en que el rival ACEPTA tu desafío. No al enviarlo: mientras el desafío está esperando respuesta no hay ningún canal abierto entre los dos equipos.\n\nEl chat nace junto con el partido, en la misma operación, y hay uno solo por partido.',
+      },
+      {
+        question: '¿Quién lee el chat del partido?',
+        answer:
+          'Todos los miembros de los dos equipos, sin importar el rol. Escribir, en cambio, sólo pueden el capitán y el subcapitán de cada equipo.\n\nOjo con esto: NO es un canal privado de tu equipo. El rival lee absolutamente todo lo que se escribe ahí. Es un canal de coordinación entre clubes, no un vestuario.',
+        facts: [
+          { label: 'Leen', value: 'Ambos planteles completos' },
+          { label: 'Escriben', value: 'Capitán y subcapitán' },
+          { label: 'Invitados', value: 'No tienen acceso' },
+        ],
+      },
+      {
+        question: 'Soy DT, ¿por qué no puedo escribir en el chat del partido?',
+        answer:
+          'Es una inconsistencia conocida, no una decisión. El DT recibió permisos operativos del día del partido —presentar la lista, cargar el resultado— pero las reglas de mensajería quedaron fuera de ese cambio y siguen admitiendo sólo a capitán y subcapitán.\n\nHoy, en el chat, un DT tiene el mismo acceso que un jugador: ve la conversación completa y no puede responder. Está anotado como pendiente.',
+      },
+      {
+        question: '¿Cuándo se abre un chat del Mercado?',
+        answer:
+          'Cuando contactás a un equipo desde una publicación del Mercado. Se abre automáticamente después de registrar tu postulación: primero queda asentada la postulación, después se abre la conversación.\n\nHay un solo chat por cada par jugador–equipo: si te postulás a tres avisos del mismo club, seguís teniendo una sola conversación con él.',
+      },
+      {
+        question: '¿Quién lee lo que le escribo a un club?',
+        answer:
+          'El plantel entero, no sólo quien te responde. Del lado del equipo la lectura está abierta a todos los miembros sin importar el rol; lo que está restringido es la escritura, que queda para capitán y subcapitán.',
+      },
+      {
+        question: 'Me postulé pero el chat no se abrió. ¿Perdí la postulación?',
+        answer:
+          'No. Son dos pasos separados a propósito y el chat es el secundario. Si el chat falla, tu postulación ya quedó registrada y el capitán la recibe igual.\n\nEs deliberado: decirte "no pudimos postularte" cuando sí quedaste postulado es peor que no abrirte el chat.',
+      },
+      {
+        question: '¿Lo que acordamos por chat vale?',
+        answer:
+          'Entre ustedes sí, pero el sistema no lo lee. Nada de lo que se escriba por chat modifica un partido, un resultado o un traspaso: todo eso pasa por su propio circuito con sus propias validaciones. Un "dale, ganamos 3-1" por chat no carga ningún resultado.\n\nTampoco sirve como evidencia automática en un reclamo de walkover: ahí lo que cuenta son los check-in registrados y la foto que se adjunta al reclamo.',
       },
     ],
   },

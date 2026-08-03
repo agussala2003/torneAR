@@ -24,7 +24,6 @@ import {
   respondToCancellationRequest,
   claimWo,
   submitDisputeVote,
-  resolveMatchDispute,
   ResultAlreadySubmittedError,
   getProposalErrorMessage,
 } from '@/lib/match-actions';
@@ -354,40 +353,9 @@ export default function MatchDetailScreen() {
     }
   }
 
-  async function handleDisputeResolve() {
-    if (!match) return;
-    try {
-      const result = await resolveMatchDispute(match.id);
-      // Acción irreversible: adopta el marcador del ganador y dispara el ELO
-      // (ver D1/R7). Queda registrado el método de desempate porque es
-      // exactamente lo que se discute cuando alguien reclama el resultado.
-      Logger.info('Disputa resuelta', {
-        scope: 'match-detail',
-        matchId: match.id,
-        winnerTeamId: result.winnerTeamId,
-        resolutionMethod: result.resolutionMethod,
-        votesA: result.votesA,
-        votesB: result.votesB,
-      });
-      const winnerName =
-        result.winnerTeamId === match.teamA.id ? match.teamA.name : match.teamB.name;
-      const method =
-        result.resolutionMethod === 'votes' ? 'por votación' : 'por Fair Play Score';
-      await loadData();
-      showAlert(
-        '¡Disputa resuelta!',
-        `Ganó ${winnerName} ${method}. El partido pasó a FINALIZADO.`,
-      );
-    } catch (err) {
-      await loadData();
-      Logger.error('Fallo la resolución de la disputa', {
-        scope: 'match-detail',
-        matchId: match.id,
-        error: err,
-      });
-      showAlert('Error', getGenericSupabaseErrorMessage(err));
-    }
-  }
+  // `handleDisputeResolve` vivía acá. La disputa ya no la cierra nadie desde la
+  // app: la resuelve el cron `sweep_disputed_matches` a las 24 h y la RPC
+  // `resolve_match_dispute` fue eliminada (migración 20260803150000).
 
   function isLateForCancellation(): boolean {
     if (!match?.scheduledAt) return false;
@@ -728,7 +696,6 @@ export default function MatchDetailScreen() {
                 profileId={profile.id}
                 disputeState={disputeState}
                 onVote={(teamId) => void handleVoteSubmit(teamId)}
-                onResolve={() => void handleDisputeResolve()}
               />
             ) : null}
             <ActionButtons

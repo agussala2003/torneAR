@@ -29,7 +29,8 @@ Sirve para dos cosas:
 6. [Qué pasa cuando un partido queda colgado](#6-qué-pasa-cuando-un-partido-queda-colgado)
 7. [El Mercado y los perfiles](#7-el-mercado-y-los-perfiles)
 8. [Roles: quién puede hacer qué](#8-roles-quién-puede-hacer-qué)
-9. [Tabla resumen de todos los números](#9-tabla-resumen-de-todos-los-números)
+9. [Los chats: quién habla y quién lee](#9-los-chats-quién-habla-y-quién-lee)
+10. [Tabla resumen de todos los números](#10-tabla-resumen-de-todos-los-números)
 
 ---
 
@@ -439,16 +440,31 @@ Cada equipo carga su versión del marcador. Entonces:
 **Cómo se resuelve una disputa:**
 
 1. **Votan los jugadores que hicieron check-in.** Sólo ellos: estuvieron ahí.
-   Un voto por persona, cambiable hasta que se resuelva.
-2. Gana **la versión más votada**. El marcador del perdedor se corrige para
-   coincidir con el del ganador.
-3. **Si hay empate en votos**, desempata el **Fair Play más alto**.
-4. **Si también empatan en Fair Play**, el sistema **se niega a decidir** y pide
-   revisión de un administrador. Prefiere no resolver antes que inventar un
+   Un voto por persona, cambiable mientras la votación siga abierta.
+2. **La votación cierra sola a las 24 horas** de abierta la disputa. Nadie la
+   puede adelantar ni extender. **Ajustable.**
+3. Al cerrar, gana **la versión más votada**. El marcador del perdedor se
+   corrige para coincidir con el del ganador.
+4. **Si hay empate en votos**, desempata el **Fair Play más alto**.
+5. **Si también empatan en Fair Play**, el sistema **se niega a decidir** y pasa
+   a revisión de un administrador. Prefiere no resolver antes que inventar un
    ganador.
 
-La resolución la solicita el **capitán o subcapitán** de cualquiera de los dos
-equipos.
+**Nadie puede cerrar la votación a mano.** Ni vos, ni tu capitán, ni el rival.
+
+Esto no siempre fue así, y el cambio importa: antes el escrutinio corría en el
+instante en que un capitán apretaba «Resolver Disputa». Como el desempate cae en
+Fair Play cuando los votos están igualados —y cero a cero es el estado en que
+*nace* toda disputa— **el primero en apretar se llevaba el partido**. No era un
+empate que se rompía por mérito: era una carrera por el botón. Convertir el
+cierre en un evento de tiempo elimina la carrera, porque ya no hay nada que
+adelantar.
+
+**El único caso que un administrador resuelve a mano** es cuando el escrutinio
+automático no puede: empate total (punto 5) o falta el marcador de alguno de los
+dos equipos. Eso último pasa cuando la disputa la abrió el sistema y sólo un
+equipo había cargado resultado: no hay marcador que adoptar, y **fabricar uno es
+una decisión administrativa, no automática**.
 
 ### 4.7 Las temporadas
 
@@ -545,10 +561,15 @@ siempre.
 | **Confirmado**, los dos con check-in pero trabado | — | No se toca. Revisión manual. |
 | **En vivo** sin ningún resultado cargado | **24 h** ← ajustable | Se cierra sin computar. No suma ni resta nada. |
 | **En vivo** con un solo resultado cargado | **24 h** | Pasa a **disputa** para que voten los presentes. |
+| **En disputa** | **24 h** ← ajustable | Cierra la votación y **resuelve el partido** (ver 4.6). |
 | **Desafío enviado sin respuesta** | **14 días** ← ajustable | Se rechaza solo. Los dos equipos pueden volver a desafiarse. |
 
 **El barrido nunca pisa un reclamo de walkover que un administrador todavía está
-evaluando.**
+evaluando**, ni una disputa que un administrador ya resolvió.
+
+Las disputas las procesa un barrido **propio y separado**, a los :40 de cada
+hora. Es deliberado: el escrutinio toca Elo, Fair Play y marcadores, y si algo
+sale mal ahí no puede llevarse puesto el cierre de los partidos huérfanos.
 
 **Además, hay dos avisos automáticos:**
 
@@ -656,7 +677,7 @@ abandono o expulsión.
 | Cargar el resultado | ✅ | ✅ | ✅ | ❌ |
 | Corregir un resultado que cargó otro | ✅ | ✅ | ❌ | ❌ |
 | Votar en una disputa | ✅* | ✅* | ✅* | ✅* |
-| Pedir la resolución de una disputa | ✅ | ✅ | ❌ | ❌ |
+| Cerrar la votación de una disputa | ❌ | ❌ | ❌ | ❌ |
 | Enviar o aceptar un desafío | ✅ | ✅ | ❌ | ❌ |
 | Proponer / confirmar / cancelar un partido | ✅ | ✅ | ❌ | ❌ |
 | Reclamar un walkover | ✅ | ✅ | ❌ | ✅** |
@@ -667,6 +688,11 @@ abandono o expulsión.
 \* Sólo quienes hicieron check-in en ese partido.
 \** Un jugador puede reclamar el walkover si él mismo hizo check-in.
 
+**Nadie cierra la votación de una disputa** — ni siquiera un capitán. La cierra
+el sistema a las 24 horas. Es la única fila de esta tabla donde no hay ningún ✅,
+y es a propósito: mientras existió ese permiso, el primero en usarlo se llevaba
+el partido (ver 4.6).
+
 **Por qué el DT tiene ese recorte exacto:** se le dieron los permisos del **día del
 partido** (presentar la lista, cargar el resultado) y **ninguno de gestión del
 club**. El corte no es de confianza, es de naturaleza del acto: proponer o
@@ -675,7 +701,76 @@ eso es de la conducción; reclamar o resolver un walkover cierra un resultado.
 
 ---
 
-## 9. Tabla resumen de todos los números
+## 9. Los chats: quién habla y quién lee
+
+torneAR tiene **dos tipos de chat** y ninguno de los dos se crea a mano: los abre
+el sistema cuando ocurre el hecho que los justifica.
+
+### 9.1 El chat del partido
+
+**Cuándo se crea:** en el momento exacto en que un equipo **acepta** un desafío.
+No al enviarlo. Mientras el desafío está esperando respuesta no hay ningún canal
+abierto entre los dos equipos — el chat nace junto con el partido, en la misma
+operación.
+
+Hay **un solo chat por partido**, garantizado por la base de datos.
+
+| | Quién |
+|---|---|
+| **Puede leer** | Todos los miembros de **los dos equipos**, sin importar el rol |
+| **Puede escribir** | Sólo **capitán y subcapitán**, de cualquiera de los dos equipos |
+
+**Dos consecuencias que conviene tener claras:**
+
+1. **No es un canal privado de tu equipo.** El rival lee absolutamente todo lo
+   que se escribe ahí. Es un canal de coordinación entre clubes, no un vestuario.
+2. **El director técnico y los jugadores leen pero no escriben.** El DT recibió
+   permisos del día del partido (presentar la lista, cargar el resultado), pero
+   las tablas de comunicación quedaron fuera de ese cambio. Hoy, en el chat del
+   partido, un DT tiene el mismo acceso que un jugador: ve la conversación
+   completa y no puede responder.
+
+**Los invitados no entran.** Un jugador que se sumó con el código único del
+partido no es miembro del equipo, así que no ve el chat.
+
+**Si el partido se elimina, el chat se elimina con él.** No queda un historial
+suelto de una conversación sin partido.
+
+### 9.2 El chat del Mercado
+
+**Cuándo se crea:** cuando un jugador contacta a un equipo desde una publicación
+del Mercado. Se abre automáticamente después de registrar la postulación —
+primero queda asentada la postulación, después se abre la conversación.
+
+Hay **un solo chat por cada par jugador–equipo**: si te postulás a tres avisos
+del mismo club, seguís teniendo una sola conversación con él.
+
+| | Quién |
+|---|---|
+| **Puede leer** | El jugador **y cualquier miembro del equipo**, sin importar el rol |
+| **Puede escribir** | El jugador y, del lado del equipo, sólo **capitán y subcapitán** |
+
+**La consecuencia importante:** lo que le escribís a un club **lo lee el plantel
+entero**, no sólo quien te responde. Del lado del equipo la lectura es abierta a
+todos los miembros; lo que está restringido es la escritura.
+
+**Si el chat no se abre, tu postulación igual quedó registrada.** Son dos pasos
+separados a propósito: el chat es secundario, y un fallo suyo no puede hacerte
+creer que no te postulaste.
+
+### 9.3 Qué NO hacen los chats
+
+- **No producen ninguna decisión.** Nada de lo que se acuerde por chat modifica
+  un partido, un resultado o un traspaso: todo eso pasa por su propio circuito
+  con sus propias validaciones. Un «dale, ganamos 3-1» por chat no carga ningún
+  resultado.
+- **No sirven como evidencia automática.** Para un reclamo de walkover lo que
+  cuenta son los check-in registrados y la foto que se adjunta al reclamo, no la
+  conversación.
+
+---
+
+## 10. Tabla resumen de todos los números
 
 | Regla | Valor | ¿Ajustable sin actualizar la app? |
 |---|---|:---:|
@@ -704,11 +799,13 @@ eso es de la conducción; reclamar o resolver un walkover cierra un resultado.
 | Gracia antes del walkover automático | 4 h | ✅ Sí |
 | Cancelación de un pendiente sin coordinar | 14 días | ✅ Sí |
 | Cierre de un partido en vivo sin resultado | 24 h | ✅ Sí |
+| Duración de la votación de una disputa | **24 h** | ✅ Sí |
 | Vencimiento de un desafío sin responder | 14 días | ✅ Sí |
 | Vencimiento del código de invitados | 48 h | ✅ Sí |
 | Vencimiento de avisos «busco equipo» | 14 días | No |
 | Recordatorio antes del partido | 24 h | No |
 | Frecuencia del barrido automático | Cada hora (:20) | No |
+| Frecuencia del escrutinio de disputas | Cada hora (:40) | No |
 
 ---
 
@@ -730,6 +827,11 @@ puntos abiertos conocidos al día de hoy:
    confirmar un Fútbol 11.
 6. **Las zonas sin complejos cargados no permiten partidos de ranking.** Es una
    limitación de cobertura, no de diseño, y se resuelve sumando canchas.
+7. **El director técnico no puede escribir en el chat del partido.** Recibió los
+   permisos operativos del día del partido, pero las políticas de mensajería
+   quedaron fuera de ese cambio y siguen admitiendo sólo a capitán y subcapitán.
+   Es una inconsistencia con el resto de sus atribuciones, no una decisión
+   tomada.
 
 ---
 
