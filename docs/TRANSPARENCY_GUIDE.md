@@ -29,7 +29,8 @@ Sirve para dos cosas:
 6. [Qué pasa cuando un partido queda colgado](#6-qué-pasa-cuando-un-partido-queda-colgado)
 7. [El Mercado y los perfiles](#7-el-mercado-y-los-perfiles)
 8. [Roles: quién puede hacer qué](#8-roles-quién-puede-hacer-qué)
-9. [Tabla resumen de todos los números](#9-tabla-resumen-de-todos-los-números)
+9. [Los chats: quién habla y quién lee](#9-los-chats-quién-habla-y-quién-lee)
+10. [Tabla resumen de todos los números](#10-tabla-resumen-de-todos-los-números)
 
 ---
 
@@ -675,7 +676,76 @@ eso es de la conducción; reclamar o resolver un walkover cierra un resultado.
 
 ---
 
-## 9. Tabla resumen de todos los números
+## 9. Los chats: quién habla y quién lee
+
+torneAR tiene **dos tipos de chat** y ninguno de los dos se crea a mano: los abre
+el sistema cuando ocurre el hecho que los justifica.
+
+### 9.1 El chat del partido
+
+**Cuándo se crea:** en el momento exacto en que un equipo **acepta** un desafío.
+No al enviarlo. Mientras el desafío está esperando respuesta no hay ningún canal
+abierto entre los dos equipos — el chat nace junto con el partido, en la misma
+operación.
+
+Hay **un solo chat por partido**, garantizado por la base de datos.
+
+| | Quién |
+|---|---|
+| **Puede leer** | Todos los miembros de **los dos equipos**, sin importar el rol |
+| **Puede escribir** | Sólo **capitán y subcapitán**, de cualquiera de los dos equipos |
+
+**Dos consecuencias que conviene tener claras:**
+
+1. **No es un canal privado de tu equipo.** El rival lee absolutamente todo lo
+   que se escribe ahí. Es un canal de coordinación entre clubes, no un vestuario.
+2. **El director técnico y los jugadores leen pero no escriben.** El DT recibió
+   permisos del día del partido (presentar la lista, cargar el resultado), pero
+   las tablas de comunicación quedaron fuera de ese cambio. Hoy, en el chat del
+   partido, un DT tiene el mismo acceso que un jugador: ve la conversación
+   completa y no puede responder.
+
+**Los invitados no entran.** Un jugador que se sumó con el código único del
+partido no es miembro del equipo, así que no ve el chat.
+
+**Si el partido se elimina, el chat se elimina con él.** No queda un historial
+suelto de una conversación sin partido.
+
+### 9.2 El chat del Mercado
+
+**Cuándo se crea:** cuando un jugador contacta a un equipo desde una publicación
+del Mercado. Se abre automáticamente después de registrar la postulación —
+primero queda asentada la postulación, después se abre la conversación.
+
+Hay **un solo chat por cada par jugador–equipo**: si te postulás a tres avisos
+del mismo club, seguís teniendo una sola conversación con él.
+
+| | Quién |
+|---|---|
+| **Puede leer** | El jugador **y cualquier miembro del equipo**, sin importar el rol |
+| **Puede escribir** | El jugador y, del lado del equipo, sólo **capitán y subcapitán** |
+
+**La consecuencia importante:** lo que le escribís a un club **lo lee el plantel
+entero**, no sólo quien te responde. Del lado del equipo la lectura es abierta a
+todos los miembros; lo que está restringido es la escritura.
+
+**Si el chat no se abre, tu postulación igual quedó registrada.** Son dos pasos
+separados a propósito: el chat es secundario, y un fallo suyo no puede hacerte
+creer que no te postulaste.
+
+### 9.3 Qué NO hacen los chats
+
+- **No producen ninguna decisión.** Nada de lo que se acuerde por chat modifica
+  un partido, un resultado o un traspaso: todo eso pasa por su propio circuito
+  con sus propias validaciones. Un «dale, ganamos 3-1» por chat no carga ningún
+  resultado.
+- **No sirven como evidencia automática.** Para un reclamo de walkover lo que
+  cuenta son los check-in registrados y la foto que se adjunta al reclamo, no la
+  conversación.
+
+---
+
+## 10. Tabla resumen de todos los números
 
 | Regla | Valor | ¿Ajustable sin actualizar la app? |
 |---|---|:---:|
@@ -730,6 +800,11 @@ puntos abiertos conocidos al día de hoy:
    confirmar un Fútbol 11.
 6. **Las zonas sin complejos cargados no permiten partidos de ranking.** Es una
    limitación de cobertura, no de diseño, y se resuelve sumando canchas.
+7. **El director técnico no puede escribir en el chat del partido.** Recibió los
+   permisos operativos del día del partido, pero las políticas de mensajería
+   quedaron fuera de ese cambio y siguen admitiendo sólo a capitán y subcapitán.
+   Es una inconsistencia con el resto de sus atribuciones, no una decisión
+   tomada.
 
 ---
 

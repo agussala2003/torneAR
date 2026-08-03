@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { useCallback } from 'react';
+import { Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
-  FadeIn,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
@@ -14,6 +14,9 @@ interface Props {
   expanded: boolean;
   onToggle: () => void;
 }
+
+const OPEN_DURATION_MS = 220;
+const CLOSE_DURATION_MS = 170;
 
 /**
  * Un dato duro dentro de una respuesta: etiqueta a la izquierda, valor a la
@@ -54,21 +57,58 @@ function FaqEntryBlock({ entry, isLast }: { entry: FaqEntry; isLast: boolean }) 
 /**
  * Sección desplegable de una categoría de reglas.
  *
- * El cuerpo se monta y desmonta (no se oculta con altura 0): con cinco
- * categorías de ~7 respuestas cada una, mantenerlas todas montadas era pagar el
- * render completo de la pantalla para mostrar un título. La entrada se suaviza
- * con un fade y el chevron gira, que es suficiente para que el despliegue no se
- * sienta un salto.
+ * ── Por qué el encabezado no está animado ───────────────────────────────────
+ * La versión anterior montaba y desmontaba el cuerpo con `entering={FadeIn}`.
+ * Al cerrar, el desmontaje de una vista con animación de entrada en vuelo dejaba
+ * al hermano —el encabezado— con la opacidad de la animación interrumpida: el
+ * título y la bajada desaparecían y la tarjeta quedaba como una caja gris vacía.
+ *
+ * El arreglo no es ajustar la animación de entrada: es que el encabezado **no
+ * participe de ninguna animación**. Hoy es un `TouchableOpacity` común, sin
+ * estilo animado y sin desmontarse nunca. Lo único animado del encabezado es el
+ * chevron, que vive en su propio `Animated.View` aislado y no puede afectar al
+ * texto que tiene al lado.
+ *
+ * ── Cómo se anima el cuerpo ─────────────────────────────────────────────────
+ * `height` y `opacity` se interpolan sobre el contenedor del cuerpo y sólo
+ * sobre él. El contenido va en una vista `absolute` adentro: así no aporta alto
+ * al contenedor (que lo controla la animación) pero `onLayout` igual reporta su
+ * alto natural, que es contra lo que se interpola. Sin esa medición habría que
+ * elegir entre animar a una altura fija inventada o no animar.
+ *
+ * El costo asumido: el contenido de todas las categorías queda montado siempre.
+ * Es contenido estático y sin consultas, así que se paga una vez al abrir la
+ * pantalla; a cambio la animación es correcta desde el primer toque en lugar de
+ * necesitar una apertura previa para conocer la altura.
  */
 export function FaqAccordion({ category, expanded, onToggle }: Props) {
-  const rotation = useSharedValue(expanded ? 1 : 0);
+  /** Alto natural del cuerpo, medido sobre el contenido real. */
+  const bodyHeight = useSharedValue(0);
 
-  useEffect(() => {
-    rotation.value = withTiming(expanded ? 1 : 0, { duration: 180 });
-  }, [expanded, rotation]);
+  /** 0 = cerrado · 1 = abierto. Única fuente de la animación. */
+  const progress = useDerivedValue(() =>
+    withTiming(expanded ? 1 : 0, {
+      duration: expanded ? OPEN_DURATION_MS : CLOSE_DURATION_MS,
+    }),
+  );
+
+  const handleBodyLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const measured = event.nativeEvent.layout.height;
+      // Se reasigna en cada layout (rotación, escala de fuente del sistema): el
+      // alto de destino tiene que seguir al contenido, no quedar fijo al primero.
+      if (measured > 0) bodyHeight.value = measured;
+    },
+    [bodyHeight],
+  );
 
   const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value * 180}deg` }],
+    transform: [{ rotate: `${progress.value * 180}deg` }],
+  }));
+
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: progress.value * bodyHeight.value,
+    opacity: progress.value,
   }));
 
   return (
@@ -77,6 +117,8 @@ export function FaqAccordion({ category, expanded, onToggle }: Props) {
         expanded ? 'border border-brand-primary/25' : ''
       }`}
     >
+      {/* ⚠️ Encabezado sin animación y siempre montado. Cualquier estilo animado
+          acá reintroduce el bug de la caja gris vacía. */}
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={onToggle}
@@ -121,10 +163,20 @@ export function FaqAccordion({ category, expanded, onToggle }: Props) {
         </Animated.View>
       </TouchableOpacity>
 
-      {expanded && (
-        <Animated.View
-          entering={FadeIn.duration(160)}
-          className="border-t border-neutral-outline-variant/30 px-4 pb-4 pt-4"
+      <Animated.View
+        style={bodyStyle}
+        className="overflow-hidden"
+        pointerEvents={expanded ? 'auto' : 'none'}
+      >
+        {/* `absolute` para que el contenido no imponga alto al contenedor: el
+            alto lo manda la animación. `onLayout` sigue midiendo el natural. */}
+        <View
+          onLayout={handleBodyLayout}
+          className="absolute left-0 right-0 top-0 border-t border-neutral-outline-variant/30 px-4 pb-4 pt-4"
+          // Colapsado, el contenido sigue en el árbol: hay que sacarlo del
+          // alcance del lector de pantalla o anuncia texto que no se ve.
+          accessibilityElementsHidden={!expanded}
+          importantForAccessibility={expanded ? 'auto' : 'no-hide-descendants'}
         >
           {category.entries.map((entry, index) => (
             <FaqEntryBlock
@@ -133,8 +185,8 @@ export function FaqAccordion({ category, expanded, onToggle }: Props) {
               isLast={index === category.entries.length - 1}
             />
           ))}
-        </Animated.View>
-      )}
+        </View>
+      </Animated.View>
     </View>
   );
 }
