@@ -12,7 +12,7 @@ import { FAQ_CATEGORIES } from '@/components/faq/faqContent';
  * Contenido estático a propósito: son las reglas del sistema, no datos del
  * usuario. La pantalla abre sin red, sin loader y sin estado de error.
  *
- * Un solo acordeón abierto por vez: con cinco categorías de respuestas largas,
+ * Un solo acordeón abierto por vez: con siete categorías de respuestas largas,
  * permitir varias abiertas convierte la pantalla en un muro de texto donde se
  * pierde la referencia de dónde estás parado.
  */

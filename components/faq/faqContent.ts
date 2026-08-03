@@ -297,4 +297,100 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       },
     ],
   },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    id: 'roles',
+    title: 'Roles y Permisos',
+    subtitle: 'Qué puede hacer cada uno dentro del equipo',
+    icon: 'account-key-outline',
+    entries: [
+      {
+        question: '¿Qué roles existen en un equipo?',
+        answer:
+          'Cuatro: Capitán, Subcapitán, Director Técnico y Jugador.\n\nCapitán y subcapitán tienen las mismas atribuciones en casi todo: son la conducción del club. El DT tiene un recorte específico y el jugador tiene lo que le corresponde por estar en la cancha.',
+      },
+      {
+        question: '¿Qué puede hacer el Capitán o el Subcapitán?',
+        answer:
+          'Todo lo que compromete al club:\n\n• Enviar y aceptar desafíos.\n• Proponer, confirmar y cancelar partidos.\n• Presentar la lista de convocados y cargar el resultado.\n• Corregir un resultado que cargó otra persona.\n• Pedir la resolución de una disputa y reclamar un walkover.\n• Publicar en el Mercado y aceptar postulantes.\n• Administrar miembros y roles del plantel.\n• Escribir en el chat del partido y en los chats del Mercado.',
+      },
+      {
+        question: '¿Qué puede hacer el Director Técnico?',
+        answer:
+          'Tiene los permisos del día del partido y ninguno de gestión del club.\n\nPUEDE: marcar su llegada, presentar la lista de convocados y cargar el resultado. También votar en una disputa si hizo check-in.\n\nNO PUEDE: proponer, confirmar ni cancelar un partido; responder solicitudes de cancelación; reclamar o resolver un walkover; corregir un resultado que cargó otro; administrar miembros; ni aceptar postulantes del Mercado.\n\nEl corte no es de confianza, es de naturaleza del acto: proponer o confirmar un partido compromete al club frente a otro club —fecha, cancha, seña— y eso es de la conducción. Reclamar o resolver un walkover cierra un resultado.',
+        facts: [
+          { label: 'Presentar la lista', value: 'Sí' },
+          { label: 'Cargar el resultado', value: 'Sí' },
+          { label: 'Confirmar o cancelar partidos', value: 'No' },
+          { label: 'Gestionar el plantel', value: 'No' },
+        ],
+      },
+      {
+        question: '¿Qué puede hacer un Jugador?',
+        answer:
+          'Marcar su propia llegada al partido, votar en una disputa si hizo check-in, y reclamar un walkover si él mismo hizo check-in.\n\nNo puede presentar la lista, cargar el resultado, ni tocar nada de la gestión del club.',
+      },
+      {
+        question: '¿Quién puede votar en una disputa?',
+        answer:
+          'Únicamente los jugadores que hicieron check-in en ese partido, sin importar su rol. Capitán, subcapitán, DT y jugador votan igual: lo que habilita el voto es haber estado ahí, no el cargo.\n\nQuien pide que la disputa se resuelva, en cambio, tiene que ser capitán o subcapitán.',
+      },
+      {
+        question: '¿Por qué el DT no puede corregir un resultado que cargó otro?',
+        answer:
+          'Porque ya puede corregir el que cargó él mismo. Pisar el marcador que cargó otra persona —sobre un resultado que ya movió el Elo— es una atribución distinta, y sigue siendo del capitán o subcapitán.',
+      },
+    ],
+  },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  {
+    id: 'chats',
+    title: 'Los Chats',
+    subtitle: 'Cuándo se abren y quién los lee',
+    icon: 'chat-outline',
+    entries: [
+      {
+        question: '¿Cuándo se abre el chat de un partido?',
+        answer:
+          'En el momento exacto en que el rival ACEPTA tu desafío. No al enviarlo: mientras el desafío está esperando respuesta no hay ningún canal abierto entre los dos equipos.\n\nEl chat nace junto con el partido, en la misma operación, y hay uno solo por partido.',
+      },
+      {
+        question: '¿Quién lee el chat del partido?',
+        answer:
+          'Todos los miembros de los dos equipos, sin importar el rol. Escribir, en cambio, sólo pueden el capitán y el subcapitán de cada equipo.\n\nOjo con esto: NO es un canal privado de tu equipo. El rival lee absolutamente todo lo que se escribe ahí. Es un canal de coordinación entre clubes, no un vestuario.',
+        facts: [
+          { label: 'Leen', value: 'Ambos planteles completos' },
+          { label: 'Escriben', value: 'Capitán y subcapitán' },
+          { label: 'Invitados', value: 'No tienen acceso' },
+        ],
+      },
+      {
+        question: 'Soy DT, ¿por qué no puedo escribir en el chat del partido?',
+        answer:
+          'Es una inconsistencia conocida, no una decisión. El DT recibió permisos operativos del día del partido —presentar la lista, cargar el resultado— pero las reglas de mensajería quedaron fuera de ese cambio y siguen admitiendo sólo a capitán y subcapitán.\n\nHoy, en el chat, un DT tiene el mismo acceso que un jugador: ve la conversación completa y no puede responder. Está anotado como pendiente.',
+      },
+      {
+        question: '¿Cuándo se abre un chat del Mercado?',
+        answer:
+          'Cuando contactás a un equipo desde una publicación del Mercado. Se abre automáticamente después de registrar tu postulación: primero queda asentada la postulación, después se abre la conversación.\n\nHay un solo chat por cada par jugador–equipo: si te postulás a tres avisos del mismo club, seguís teniendo una sola conversación con él.',
+      },
+      {
+        question: '¿Quién lee lo que le escribo a un club?',
+        answer:
+          'El plantel entero, no sólo quien te responde. Del lado del equipo la lectura está abierta a todos los miembros sin importar el rol; lo que está restringido es la escritura, que queda para capitán y subcapitán.',
+      },
+      {
+        question: 'Me postulé pero el chat no se abrió. ¿Perdí la postulación?',
+        answer:
+          'No. Son dos pasos separados a propósito y el chat es el secundario. Si el chat falla, tu postulación ya quedó registrada y el capitán la recibe igual.\n\nEs deliberado: decirte "no pudimos postularte" cuando sí quedaste postulado es peor que no abrirte el chat.',
+      },
+      {
+        question: '¿Lo que acordamos por chat vale?',
+        answer:
+          'Entre ustedes sí, pero el sistema no lo lee. Nada de lo que se escriba por chat modifica un partido, un resultado o un traspaso: todo eso pasa por su propio circuito con sus propias validaciones. Un "dale, ganamos 3-1" por chat no carga ningún resultado.\n\nTampoco sirve como evidencia automática en un reclamo de walkover: ahí lo que cuenta son los check-in registrados y la foto que se adjunta al reclamo.',
+      },
+    ],
+  },
 ];

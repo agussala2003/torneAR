@@ -96,13 +96,21 @@ export function ProfileSocialSection({ onError }: ProfileSocialSectionProps) {
               onPress={() => void handlePress(network)}
               className="flex-1 items-center gap-1.5 rounded-xl bg-surface-high px-2 py-3"
             >
-              {/* Alto fijo: el spinner no mide igual que el glifo y la fila
-                  entera saltaba un par de píxeles al alternar. */}
-              <View className="h-5 items-center justify-center">
+              {/* Caja cuadrada y fija (32×32) con el glifo a 18: el spinner no
+                  mide igual que el glifo y la fila entera saltaba un par de
+                  píxeles al alternar.
+
+                  El alto era `h-5` (20px) con el ícono a `size={20}`, es decir
+                  exactamente el mismo número. Un glifo de Ionicons no ocupa
+                  `size` sino el line-height de su fuente, que es mayor, así que
+                  los logos se recortaban arriba y abajo. La caja tiene que ser
+                  más grande que el glifo, no igual: 32 contra 18 deja 7px de
+                  aire por lado. */}
+              <View className="h-8 w-8 items-center justify-center">
                 {opening === network.key ? (
                   <ActivityIndicator size="small" color="#53E076" />
                 ) : (
-                  <AppIcon family="ionicons" name={network.icon} size={20} color="#53E076" />
+                  <AppIcon family="ionicons" name={network.icon} size={18} color="#53E076" />
                 )}
               </View>
               <Text className="font-uiBold text-xs text-neutral-on-surface" numberOfLines={1}>
