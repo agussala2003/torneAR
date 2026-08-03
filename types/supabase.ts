@@ -1560,6 +1560,57 @@ export type Database = {
           },
         ]
       }
+      team_rankings: {
+        Row: {
+          created_at: string
+          draws: number
+          elo_score: number
+          format: Database["public"]["Enums"]["team_format"]
+          losses: number
+          matches_played: number
+          team_id: string
+          updated_at: string
+          wins: number
+        }
+        Insert: {
+          created_at?: string
+          draws?: number
+          elo_score?: number
+          format: Database["public"]["Enums"]["team_format"]
+          losses?: number
+          matches_played?: number
+          team_id: string
+          updated_at?: string
+          wins?: number
+        }
+        Update: {
+          created_at?: string
+          draws?: number
+          elo_score?: number
+          format?: Database["public"]["Enums"]["team_format"]
+          losses?: number
+          matches_played?: number
+          team_id?: string
+          updated_at?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_rankings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_rankings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_ranking"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_stints: {
         Row: {
           created_at: string
@@ -2001,8 +2052,19 @@ export type Database = {
       }
       current_profile_id: { Args: never; Returns: string }
       deactivate_expired_market_posts: { Args: never; Returns: undefined }
+      elo_delta: {
+        Args: { p_elo_rival: number; p_elo_self: number; p_score: number }
+        Returns: number
+      }
       enqueue_match_reminders: { Args: never; Returns: undefined }
       enqueue_season_expiry_reminder: { Args: never; Returns: undefined }
+      ensure_team_ranking_row: {
+        Args: {
+          p_format: Database["public"]["Enums"]["team_format"]
+          p_team_id: string
+        }
+        Returns: undefined
+      }
       fair_play_absence_penalty: { Args: { p_reason: string }; Returns: number }
       get_disputed_matches: {
         Args: never
