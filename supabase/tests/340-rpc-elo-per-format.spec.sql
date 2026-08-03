@@ -29,7 +29,7 @@
 -- ============================================================
 
 begin;
-select plan(11);
+select plan(10);
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- F0 — El alta del equipo siembra la fila de su formato preferido

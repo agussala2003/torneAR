@@ -54,6 +54,10 @@ select set_eq(
       ('match_dispute_votes_voted_team_id_fkey => CASCADE'),
       ('team_join_requests_team_id_fkey => CASCADE'),
       ('team_members_team_id_fkey => CASCADE'),
+      -- El ELO por formato es un dato accesorio del equipo: si el equipo se
+      -- borra, sus filas de ranking no le sirven a nadie (a diferencia de
+      -- matches/match_results, que le pertenecen también al rival).
+      ('team_rankings_team_id_fkey => CASCADE'),
       ('messages_sender_team_id_fkey => SET NULL'),
       ('match_participants_team_id_fkey => NO ACTION'),
       ('match_proposals_from_team_id_fkey => NO ACTION'),
