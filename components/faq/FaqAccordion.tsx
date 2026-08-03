@@ -1,11 +1,4 @@
-import { useCallback } from 'react';
-import { Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useDerivedValue,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import type { FaqCategory, FaqEntry } from './types';
 
@@ -15,8 +8,22 @@ interface Props {
   onToggle: () => void;
 }
 
-const OPEN_DURATION_MS = 220;
-const CLOSE_DURATION_MS = 170;
+/**
+ * Colores dinámicos del encabezado.
+ *
+ * Van por `style` y no por `className` condicional a propósito — ver el bloque
+ * de abajo. Mismo patrón que `MiniRankingCard`, que ya resuelve así los colores
+ * del podio.
+ */
+const COLORS = {
+  accent: '#53E076',
+  accentSoft: 'rgba(83, 224, 118, 0.15)',
+  accentBorder: 'rgba(83, 224, 118, 0.25)',
+  iconIdleBg: '#2A2A2A',
+  title: '#E5E2E1',
+  subtitle: '#869585',
+  iconIdle: '#BCCBB9',
+} as const;
 
 /**
  * Un dato duro dentro de una respuesta: etiqueta a la izquierda, valor a la
@@ -57,68 +64,53 @@ function FaqEntryBlock({ entry, isLast }: { entry: FaqEntry; isLast: boolean }) 
 /**
  * Sección desplegable de una categoría de reglas.
  *
- * ── Por qué el encabezado no está animado ───────────────────────────────────
- * La versión anterior montaba y desmontaba el cuerpo con `entering={FadeIn}`.
- * Al cerrar, el desmontaje de una vista con animación de entrada en vuelo dejaba
- * al hermano —el encabezado— con la opacidad de la animación interrumpida: el
- * título y la bajada desaparecían y la tarjeta quedaba como una caja gris vacía.
+ * ── Por qué este componente no usa Reanimated ni clases condicionales ────────
+ * El bug de "la caja gris vacía" —al cerrar, la tarjeta queda pintada y sin
+ * contenido visible— sobrevivió a dos intentos de arreglo y se reproducía SÓLO
+ * en celular: en web nunca apareció. Ese asimetría es el dato que importa,
+ * porque web y nativo no comparten motor de estilos.
  *
- * El arreglo no es ajustar la animación de entrada: es que el encabezado **no
- * participe de ninguna animación**. Hoy es un `TouchableOpacity` común, sin
- * estilo animado y sin desmontarse nunca. Lo único animado del encabezado es el
- * chevron, que vive en su propio `Animated.View` aislado y no puede afectar al
- * texto que tiene al lado.
+ * Las tres construcciones native-only que tenía esta pantalla, todas eliminadas:
  *
- * ── Cómo se anima el cuerpo ─────────────────────────────────────────────────
- * `height` y `opacity` se interpolan sobre el contenedor del cuerpo y sólo
- * sobre él. El contenido va en una vista `absolute` adentro: así no aporta alto
- * al contenedor (que lo controla la animación) pero `onLayout` igual reporta su
- * alto natural, que es contra lo que se interpola. Sin esa medición habría que
- * elegir entre animar a una altura fija inventada o no animar.
+ *   1. `className` + estilo animado de Reanimated sobre el MISMO nodo
+ *      (`<Animated.View style={bodyStyle} className="overflow-hidden">`). En web
+ *      son dos motores independientes —CSS por un lado, estilos inline por el
+ *      otro— y no se pisan. En nativo NativeWind resuelve el `className` en
+ *      runtime y lo compone con el `style` recibido, así que un `height: 0` /
+ *      `opacity: 0` animado puede terminar aplicado sobre un nodo distinto del
+ *      previsto. Es la explicación que encaja con el síntoma exacto: el fondo de
+ *      la tarjeta se sigue pintando y lo de adentro no se ve.
  *
- * El costo asumido: el contenido de todas las categorías queda montado siempre.
- * Es contenido estático y sin consultas, así que se paga una vez al abrir la
- * pantalla; a cambio la animación es correcta desde el primer toque en lugar de
- * necesitar una apertura previa para conocer la altura.
+ *   2. Cuerpo en `position: absolute` con alto medido por `onLayout`, dentro de
+ *      un contenedor de alto animado y `overflow: hidden`. En Android el
+ *      clipping de hijos absolutos es históricamente poco confiable, y un
+ *      `onLayout` dentro de un padre de alto 0 puede no dispararse nunca.
+ *
+ *   3. Clases condicionales (`expanded ? 'text-brand-primary' : 'text-...'`).
+ *      En web son dos clases CSS y el navegador recalcula; en nativo obligan a
+ *      NativeWind a re-resolver estilos en cada toggle.
+ *
+ * Lo que queda es deliberadamente aburrido: Views comunes, clases estáticas para
+ * layout, colores dinámicos por `style` (el patrón que ya usa `MiniRankingCard`)
+ * y el cuerpo montado o no montado. Sin animación no hay estilo que pueda caer
+ * en el nodo equivocado.
+ *
+ * ⚠️ Antes de volver a agregar una animación acá: verificarla EN DISPOSITIVO,
+ * no en web. Este bug es invisible en el navegador.
  */
 export function FaqAccordion({ category, expanded, onToggle }: Props) {
-  /** Alto natural del cuerpo, medido sobre el contenido real. */
-  const bodyHeight = useSharedValue(0);
-
-  /** 0 = cerrado · 1 = abierto. Única fuente de la animación. */
-  const progress = useDerivedValue(() =>
-    withTiming(expanded ? 1 : 0, {
-      duration: expanded ? OPEN_DURATION_MS : CLOSE_DURATION_MS,
-    }),
-  );
-
-  const handleBodyLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const measured = event.nativeEvent.layout.height;
-      // Se reasigna en cada layout (rotación, escala de fuente del sistema): el
-      // alto de destino tiene que seguir al contenido, no quedar fijo al primero.
-      if (measured > 0) bodyHeight.value = measured;
-    },
-    [bodyHeight],
-  );
-
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${progress.value * 180}deg` }],
-  }));
-
-  const bodyStyle = useAnimatedStyle(() => ({
-    height: progress.value * bodyHeight.value,
-    opacity: progress.value,
-  }));
-
   return (
     <View
-      className={`mb-3 overflow-hidden rounded-2xl bg-surface-container ${
-        expanded ? 'border border-brand-primary/25' : ''
-      }`}
+      className="mb-3 overflow-hidden rounded-2xl bg-surface-container"
+      // Borde siempre presente y sólo cambia de color: alternar `borderWidth`
+      // movería el layout un píxel en cada toggle.
+      style={{
+        borderWidth: 1,
+        borderColor: expanded ? COLORS.accentBorder : 'transparent',
+      }}
     >
-      {/* ⚠️ Encabezado sin animación y siempre montado. Cualquier estilo animado
-          acá reintroduce el bug de la caja gris vacía. */}
+      {/* Encabezado: montado siempre, sin animación y sin clases condicionales.
+          Es el nodo que desaparecía. */}
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={onToggle}
@@ -128,56 +120,45 @@ export function FaqAccordion({ category, expanded, onToggle }: Props) {
         className="flex-row items-center gap-3 px-4 py-4"
       >
         <View
-          className={`h-10 w-10 items-center justify-center rounded-xl ${
-            expanded ? 'bg-brand-primary/15' : 'bg-surface-high'
-          }`}
+          className="h-10 w-10 items-center justify-center rounded-xl"
+          style={{ backgroundColor: expanded ? COLORS.accentSoft : COLORS.iconIdleBg }}
         >
           <AppIcon
             family="material-community"
             name={category.icon}
             size={20}
-            color={expanded ? '#53E076' : '#BCCBB9'}
+            color={expanded ? COLORS.accent : COLORS.iconIdle}
           />
         </View>
 
         <View className="flex-1">
           <Text
-            className={`font-display text-base uppercase tracking-wide ${
-              expanded ? 'text-brand-primary' : 'text-neutral-on-surface'
-            }`}
+            className="font-display text-base uppercase tracking-wide"
+            style={{ color: expanded ? COLORS.accent : COLORS.title }}
           >
             {category.title}
           </Text>
-          <Text className="font-ui mt-0.5 text-[11px] text-neutral-outline" numberOfLines={2}>
+          <Text
+            className="font-ui mt-0.5 text-[11px]"
+            style={{ color: COLORS.subtitle }}
+            numberOfLines={2}
+          >
             {category.subtitle}
           </Text>
         </View>
 
-        <Animated.View style={chevronStyle}>
-          <AppIcon
-            family="material-community"
-            name="chevron-down"
-            size={22}
-            color={expanded ? '#53E076' : '#869585'}
-          />
-        </Animated.View>
+        {/* Se cambia el glifo en vez de rotarlo: una rotación acá exige un nodo
+            animado dentro del encabezado, que es justo lo que se está sacando. */}
+        <AppIcon
+          family="material-community"
+          name={expanded ? 'chevron-up' : 'chevron-down'}
+          size={22}
+          color={expanded ? COLORS.accent : COLORS.subtitle}
+        />
       </TouchableOpacity>
 
-      <Animated.View
-        style={bodyStyle}
-        className="overflow-hidden"
-        pointerEvents={expanded ? 'auto' : 'none'}
-      >
-        {/* `absolute` para que el contenido no imponga alto al contenedor: el
-            alto lo manda la animación. `onLayout` sigue midiendo el natural. */}
-        <View
-          onLayout={handleBodyLayout}
-          className="absolute left-0 right-0 top-0 border-t border-neutral-outline-variant/30 px-4 pb-4 pt-4"
-          // Colapsado, el contenido sigue en el árbol: hay que sacarlo del
-          // alcance del lector de pantalla o anuncia texto que no se ve.
-          accessibilityElementsHidden={!expanded}
-          importantForAccessibility={expanded ? 'auto' : 'no-hide-descendants'}
-        >
+      {expanded && (
+        <View className="border-t border-neutral-outline-variant/30 px-4 pb-4 pt-4">
           {category.entries.map((entry, index) => (
             <FaqEntryBlock
               key={entry.question}
@@ -186,7 +167,7 @@ export function FaqAccordion({ category, expanded, onToggle }: Props) {
             />
           ))}
         </View>
-      </Animated.View>
+      )}
     </View>
   );
 }

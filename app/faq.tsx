@@ -14,7 +14,8 @@ import { FAQ_CATEGORIES } from '@/components/faq/faqContent';
  *
  * Un solo acordeón abierto por vez: con siete categorías de respuestas largas,
  * permitir varias abiertas convierte la pantalla en un muro de texto donde se
- * pierde la referencia de dónde estás parado.
+ * pierde la referencia de dónde estás parado. Como efecto secundario, sólo una
+ * categoría tiene su cuerpo montado a la vez.
  */
 export default function FaqScreen() {
   const router = useRouter();

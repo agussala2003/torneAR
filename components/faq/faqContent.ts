@@ -272,7 +272,22 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       {
         question: 'Cargamos resultados distintos. ¿Quién gana?',
         answer:
-          'Si los dos marcadores coinciden, el partido se cierra solo. Si no coinciden, pasa a EN DISPUTA y lo resuelven los votos.\n\nVotan únicamente los jugadores que hicieron check-in, porque estuvieron ahí. Un voto por persona. Gana la versión más votada y el marcador del otro equipo se corrige.\n\nSi hay empate en votos, desempata el Fair Play más alto. Si también empatan en Fair Play, el sistema se niega a decidir y pide revisión de un administrador: prefiere no resolver antes que inventar un ganador.',
+          'Si los dos marcadores coinciden, el partido se cierra solo. Si no coinciden, pasa a EN DISPUTA y lo resuelven los votos.\n\nVotan únicamente los jugadores que hicieron check-in, porque estuvieron ahí. Un voto por persona, y se puede cambiar mientras la votación siga abierta.\n\nA las 24 horas la votación cierra sola y gana la versión más votada; el marcador del otro equipo se corrige. Si hay empate en votos, desempata el Fair Play más alto. Si también empatan en Fair Play, el sistema se niega a decidir y pasa a revisión de un administrador: prefiere no resolver antes que inventar un ganador.',
+        facts: [
+          { label: 'Duración de la votación', value: '24 horas' },
+          { label: 'Quiénes votan', value: 'Los que hicieron check-in' },
+          { label: 'Empate de votos', value: 'Gana el Fair Play más alto' },
+        ],
+      },
+      {
+        question: '¿Puedo cerrar la votación antes si ya ganamos?',
+        answer:
+          'No. Nadie puede: ni vos, ni tu capitán, ni el rival. La votación cierra sola a las 24 horas y no hay forma de adelantarla ni de extenderla.\n\nAntes sí existía un botón de "Resolver Disputa" para los capitanes, y era un problema serio: como el desempate cae en Fair Play cuando los votos están igualados —y cero a cero es el estado en que nace toda disputa— el primero en apretar se llevaba el partido. No era un empate que se rompía por mérito, era una carrera por el botón.\n\nAhora el cierre es un evento de tiempo, así que no hay nada que adelantar.',
+      },
+      {
+        question: '¿Y si nadie vota?',
+        answer:
+          'La votación igual cierra a las 24 horas. Con cero votos de los dos lados, el desempate es por Fair Play y gana el equipo con el puntaje más alto.\n\nSi además el Fair Play está empatado, el partido queda para que lo revise un administrador. Lo mismo pasa si falta el marcador de alguno de los dos equipos: sin un resultado que adoptar, el sistema no inventa uno.\n\nMientras la votación está abierta la app te muestra hacia dónde caería el desempate, así sabés si te conviene juntar votos antes del cierre.',
       },
       {
         question: '¿Un partido puede quedar abierto para siempre?',
@@ -313,7 +328,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       {
         question: '¿Qué puede hacer el Capitán o el Subcapitán?',
         answer:
-          'Todo lo que compromete al club:\n\n• Enviar y aceptar desafíos.\n• Proponer, confirmar y cancelar partidos.\n• Presentar la lista de convocados y cargar el resultado.\n• Corregir un resultado que cargó otra persona.\n• Pedir la resolución de una disputa y reclamar un walkover.\n• Publicar en el Mercado y aceptar postulantes.\n• Administrar miembros y roles del plantel.\n• Escribir en el chat del partido y en los chats del Mercado.',
+          'Todo lo que compromete al club:\n\n• Enviar y aceptar desafíos.\n• Proponer, confirmar y cancelar partidos.\n• Presentar la lista de convocados y cargar el resultado.\n• Corregir un resultado que cargó otra persona.\n• Reclamar un walkover (cerrar una disputa no puede nadie: cierra sola).\n• Publicar en el Mercado y aceptar postulantes.\n• Administrar miembros y roles del plantel.\n• Escribir en el chat del partido y en los chats del Mercado.',
       },
       {
         question: '¿Qué puede hacer el Director Técnico?',
@@ -334,7 +349,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       {
         question: '¿Quién puede votar en una disputa?',
         answer:
-          'Únicamente los jugadores que hicieron check-in en ese partido, sin importar su rol. Capitán, subcapitán, DT y jugador votan igual: lo que habilita el voto es haber estado ahí, no el cargo.\n\nQuien pide que la disputa se resuelva, en cambio, tiene que ser capitán o subcapitán.',
+          'Únicamente los jugadores que hicieron check-in en ese partido, sin importar su rol. Capitán, subcapitán, DT y jugador votan igual: lo que habilita el voto es haber estado ahí, no el cargo.\n\nCerrar la votación, en cambio, no puede nadie: la cierra el sistema a las 24 horas.',
       },
       {
         question: '¿Por qué el DT no puede corregir un resultado que cargó otro?',

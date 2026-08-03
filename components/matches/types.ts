@@ -258,10 +258,10 @@ export interface DisputeState {
   /**
    * Fair Play de cada equipo al momento de mirar la disputa.
    *
-   * No es decorativo: `resolve_match_dispute` desempata por Fair Play cuando
-   * los votos están igualados —y 0 a 0 es el estado en que nace toda disputa—,
-   * así que sin este dato la UI no puede anticipar el resultado de tocar
-   * "Resolver Disputa". Ver DisputeSection.
+   * No es decorativo: el escrutinio automático (`sweep_disputed_matches`, a las
+   * 24 h) desempata por Fair Play cuando los votos quedan igualados, así que
+   * este dato es lo que le permite a la UI decirle al equipo hacia dónde caería
+   * el cierre si no junta votos. Ver DisputeSection.
    */
   fairPlayTeamA: number;
   fairPlayTeamB: number;
