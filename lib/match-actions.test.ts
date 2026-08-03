@@ -12,7 +12,6 @@ import {
   respondToCancellationRequest,
   joinMatchAsGuest,
   submitDisputeVote,
-  resolveMatchDispute,
   claimWo,
   ResultAlreadySubmittedError,
 } from './match-actions';
@@ -258,7 +257,7 @@ describe('submitMatchResult', () => {
   });
 });
 
-describe('requestCancellation / joinMatchAsGuest / submitDisputeVote / resolveMatchDispute', () => {
+describe('requestCancellation / joinMatchAsGuest / submitDisputeVote', () => {
   it('requestCancellation llama a request_match_cancellation con reason/notes (el partido no se cancela acá)', async () => {
     supabaseRpcMock.mockResolvedValueOnce({ data: null, error: null });
     await requestCancellation('m1', 'teamA', { reason: 'MUTUO_ACUERDO', notes: 'ok' }, 'teamB');
@@ -322,21 +321,9 @@ describe('requestCancellation / joinMatchAsGuest / submitDisputeVote / resolveMa
     });
   });
 
-  it('resolveMatchDispute llama a resolve_match_dispute y devuelve el resultado', async () => {
-    supabaseRpcMock.mockResolvedValueOnce({
-      data: {
-        winnerTeamId: 'teamA',
-        loserTeamId: 'teamB',
-        votesA: 5,
-        votesB: 2,
-        resolutionMethod: 'votes',
-      },
-      error: null,
-    });
-    const result = await resolveMatchDispute('m1');
-    expect(supabaseRpcMock).toHaveBeenCalledWith('resolve_match_dispute', { p_match_id: 'm1' });
-    expect(result.winnerTeamId).toBe('teamA');
-  });
+  // El test de `resolveMatchDispute` se eliminó con la función: la disputa la
+  // cierra el cron `sweep_disputed_matches` a las 24 h y ya no hay ninguna
+  // resolución disparable desde el cliente (migración 20260803150000).
 });
 
 describe('claimWo', () => {

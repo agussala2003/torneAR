@@ -440,16 +440,31 @@ Cada equipo carga su versión del marcador. Entonces:
 **Cómo se resuelve una disputa:**
 
 1. **Votan los jugadores que hicieron check-in.** Sólo ellos: estuvieron ahí.
-   Un voto por persona, cambiable hasta que se resuelva.
-2. Gana **la versión más votada**. El marcador del perdedor se corrige para
-   coincidir con el del ganador.
-3. **Si hay empate en votos**, desempata el **Fair Play más alto**.
-4. **Si también empatan en Fair Play**, el sistema **se niega a decidir** y pide
-   revisión de un administrador. Prefiere no resolver antes que inventar un
+   Un voto por persona, cambiable mientras la votación siga abierta.
+2. **La votación cierra sola a las 24 horas** de abierta la disputa. Nadie la
+   puede adelantar ni extender. **Ajustable.**
+3. Al cerrar, gana **la versión más votada**. El marcador del perdedor se
+   corrige para coincidir con el del ganador.
+4. **Si hay empate en votos**, desempata el **Fair Play más alto**.
+5. **Si también empatan en Fair Play**, el sistema **se niega a decidir** y pasa
+   a revisión de un administrador. Prefiere no resolver antes que inventar un
    ganador.
 
-La resolución la solicita el **capitán o subcapitán** de cualquiera de los dos
-equipos.
+**Nadie puede cerrar la votación a mano.** Ni vos, ni tu capitán, ni el rival.
+
+Esto no siempre fue así, y el cambio importa: antes el escrutinio corría en el
+instante en que un capitán apretaba «Resolver Disputa». Como el desempate cae en
+Fair Play cuando los votos están igualados —y cero a cero es el estado en que
+*nace* toda disputa— **el primero en apretar se llevaba el partido**. No era un
+empate que se rompía por mérito: era una carrera por el botón. Convertir el
+cierre en un evento de tiempo elimina la carrera, porque ya no hay nada que
+adelantar.
+
+**El único caso que un administrador resuelve a mano** es cuando el escrutinio
+automático no puede: empate total (punto 5) o falta el marcador de alguno de los
+dos equipos. Eso último pasa cuando la disputa la abrió el sistema y sólo un
+equipo había cargado resultado: no hay marcador que adoptar, y **fabricar uno es
+una decisión administrativa, no automática**.
 
 ### 4.7 Las temporadas
 
@@ -546,10 +561,15 @@ siempre.
 | **Confirmado**, los dos con check-in pero trabado | — | No se toca. Revisión manual. |
 | **En vivo** sin ningún resultado cargado | **24 h** ← ajustable | Se cierra sin computar. No suma ni resta nada. |
 | **En vivo** con un solo resultado cargado | **24 h** | Pasa a **disputa** para que voten los presentes. |
+| **En disputa** | **24 h** ← ajustable | Cierra la votación y **resuelve el partido** (ver 4.6). |
 | **Desafío enviado sin respuesta** | **14 días** ← ajustable | Se rechaza solo. Los dos equipos pueden volver a desafiarse. |
 
 **El barrido nunca pisa un reclamo de walkover que un administrador todavía está
-evaluando.**
+evaluando**, ni una disputa que un administrador ya resolvió.
+
+Las disputas las procesa un barrido **propio y separado**, a los :40 de cada
+hora. Es deliberado: el escrutinio toca Elo, Fair Play y marcadores, y si algo
+sale mal ahí no puede llevarse puesto el cierre de los partidos huérfanos.
 
 **Además, hay dos avisos automáticos:**
 
@@ -657,7 +677,7 @@ abandono o expulsión.
 | Cargar el resultado | ✅ | ✅ | ✅ | ❌ |
 | Corregir un resultado que cargó otro | ✅ | ✅ | ❌ | ❌ |
 | Votar en una disputa | ✅* | ✅* | ✅* | ✅* |
-| Pedir la resolución de una disputa | ✅ | ✅ | ❌ | ❌ |
+| Cerrar la votación de una disputa | ❌ | ❌ | ❌ | ❌ |
 | Enviar o aceptar un desafío | ✅ | ✅ | ❌ | ❌ |
 | Proponer / confirmar / cancelar un partido | ✅ | ✅ | ❌ | ❌ |
 | Reclamar un walkover | ✅ | ✅ | ❌ | ✅** |
@@ -667,6 +687,11 @@ abandono o expulsión.
 
 \* Sólo quienes hicieron check-in en ese partido.
 \** Un jugador puede reclamar el walkover si él mismo hizo check-in.
+
+**Nadie cierra la votación de una disputa** — ni siquiera un capitán. La cierra
+el sistema a las 24 horas. Es la única fila de esta tabla donde no hay ningún ✅,
+y es a propósito: mientras existió ese permiso, el primero en usarlo se llevaba
+el partido (ver 4.6).
 
 **Por qué el DT tiene ese recorte exacto:** se le dieron los permisos del **día del
 partido** (presentar la lista, cargar el resultado) y **ninguno de gestión del
@@ -774,11 +799,13 @@ creer que no te postulaste.
 | Gracia antes del walkover automático | 4 h | ✅ Sí |
 | Cancelación de un pendiente sin coordinar | 14 días | ✅ Sí |
 | Cierre de un partido en vivo sin resultado | 24 h | ✅ Sí |
+| Duración de la votación de una disputa | **24 h** | ✅ Sí |
 | Vencimiento de un desafío sin responder | 14 días | ✅ Sí |
 | Vencimiento del código de invitados | 48 h | ✅ Sí |
 | Vencimiento de avisos «busco equipo» | 14 días | No |
 | Recordatorio antes del partido | 24 h | No |
 | Frecuencia del barrido automático | Cada hora (:20) | No |
+| Frecuencia del escrutinio de disputas | Cada hora (:40) | No |
 
 ---
 
