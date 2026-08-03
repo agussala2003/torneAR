@@ -56,6 +56,13 @@ export function ProfileSettingsSection({ isSigningOut, onSignOut }: ProfileSetti
           className="border-b border-neutral-outline-variant/35"
           onPress={() => router.push('/profile/settings' as any)}
         />
+        <Row
+          family="material-community"
+          icon="book-open-variant"
+          title="Reglas del Juego"
+          className="border-b border-neutral-outline-variant/35"
+          onPress={() => router.push('/faq')}
+        />
 
         <TouchableOpacity
           disabled={isSigningOut}

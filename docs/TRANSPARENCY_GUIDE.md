@@ -458,14 +458,15 @@ equipos.
   entre temporadas.
 - Los partidos todavía abiertos se traspasan a la temporada nueva.
 
-> **Inconsistencia detectada y declarada:** existe además una tarea automática
-> heredada (`season_reset_elo`, programada al 1 de enero y 1 de julio a las 03:00)
-> que **sí achica el Elo**, acercándolo a 1000 a la mitad de la distancia
-> (`1000 + (Elo − 1000) × 0.5`). Esa tarea contradice la regla de «Elo continuo»
-> del cambio de temporada administrado, y además **sólo toca el Elo global, no el
-> Elo por formato**. Está señalada acá porque afecta directamente lo que el
-> usuario ve, y debería resolverse a favor de una sola regla antes de la próxima
-> fecha de corte.
+> **Sobre la vieja reducción semestral de Elo:** durante un tiempo existió una
+> tarea automática (`season_reset_elo`, al 1 de enero y 1 de julio) que achicaba
+> el Elo acercándolo a 1000 a la mitad de la distancia. **Fue dada de baja el
+> 14 de julio de 2026** junto con la función que la ejecutaba, precisamente
+> porque mutaba el estado competitivo en silencio sin cerrar ni crear
+> temporadas. Desde entonces **la transición de temporada es manual, la ejecuta
+> un administrador y el Elo nunca se achica**. El único proceso automático que
+> queda alrededor de las temporadas sólo **avisa** a los administradores cuando
+> la temporada activa venció; nunca modifica nada.
 
 ### 4.8 Nadie está «en calibración»
 
@@ -722,14 +723,12 @@ puntos abiertos conocidos al día de hoy:
    global**, no el del formato. Puede haber diferencias con la tabla de ranking
    hasta que se complete la migración.
 3. **El historial de evolución del Elo no distingue formatos** todavía.
-4. **La tarea automática de reducción de Elo semestral contradice la regla de
-   «Elo continuo»** del cambio de temporada administrado (ver 4.7).
-5. **La ventana horaria del check-in la aplica la app, no el servidor.** El
+4. **La ventana horaria del check-in la aplica la app, no el servidor.** El
    servidor valida pertenencia, estado, quórum y ubicación, pero no la ventana.
-6. **Los invitados no cuentan para confirmar un partido**, aunque sí cuentan para
+5. **Los invitados no cuentan para confirmar un partido**, aunque sí cuentan para
    el check-in. Un equipo de 6 que habitualmente completa con invitados no puede
    confirmar un Fútbol 11.
-7. **Las zonas sin complejos cargados no permiten partidos de ranking.** Es una
+6. **Las zonas sin complejos cargados no permiten partidos de ranking.** Es una
    limitación de cobertura, no de diseño, y se resuelve sumando canchas.
 
 ---
