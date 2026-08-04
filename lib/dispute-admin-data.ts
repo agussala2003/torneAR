@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import { buildDisputeScoreboard } from '@/lib/dispute-scores';
+import type { CanonicalScoreline } from '@/lib/dispute-scores';
 
 /**
  * Herramienta administrativa para disputas (D2).
@@ -19,11 +21,13 @@ interface RawDisputedMatch {
   team_a_id: string;
   team_a_name: string;
   team_a_goals: number | null;
+  team_a_goals_against: number | null;
   team_a_fps: number;
   team_a_votes: number;
   team_b_id: string;
   team_b_name: string;
   team_b_goals: number | null;
+  team_b_goals_against: number | null;
   team_b_fps: number;
   team_b_votes: number;
 }
@@ -33,6 +37,16 @@ export interface DisputedMatchSide {
   teamName: string;
   /** null = ese equipo nunca cargó su resultado. */
   goals: number | null;
+  /**
+   * El marcador COMPLETO que propuso este equipo, reescrito siempre como
+   * "equipo A – equipo B" (ver lib/dispute-scores).
+   *
+   * `goals` solo no alcanza para decidir: son los goles que cada equipo se
+   * adjudica, de dos planillas distintas. Puestos uno al lado del otro parecen
+   * un marcador y no lo son. Con esto el admin ve qué dijo cada uno del partido
+   * entero. `null` = ese equipo nunca cargó.
+   */
+  scoreline: CanonicalScoreline | null;
   fairPlayScore: number;
   votes: number;
 }
@@ -65,6 +79,23 @@ export async function fetchDisputedMatches(): Promise<DisputedMatch[]> {
     const fpsA = Number(r.team_a_fps);
     const fpsB = Number(r.team_b_fps);
 
+    // Misma normalización que usa la pantalla del jugador: el admin y el equipo
+    // tienen que estar mirando exactamente el mismo par de marcadores.
+    const board = buildDisputeScoreboard({
+      teamAId: r.team_a_id,
+      teamAName: r.team_a_name,
+      teamBId: r.team_b_id,
+      teamBName: r.team_b_name,
+      scoreByTeamA:
+        r.team_a_goals === null || r.team_a_goals_against === null
+          ? null
+          : { goalsScored: r.team_a_goals, goalsAgainst: r.team_a_goals_against },
+      scoreByTeamB:
+        r.team_b_goals === null || r.team_b_goals_against === null
+          ? null
+          : { goalsScored: r.team_b_goals, goalsAgainst: r.team_b_goals_against },
+    });
+
     return {
       matchId: r.match_id,
       scheduledAt: r.scheduled_at,
@@ -74,6 +105,7 @@ export async function fetchDisputedMatches(): Promise<DisputedMatch[]> {
         teamId: r.team_a_id,
         teamName: r.team_a_name,
         goals: r.team_a_goals,
+        scoreline: board.teamA.scoreline,
         fairPlayScore: fpsA,
         votes: votesA,
       },
@@ -81,6 +113,7 @@ export async function fetchDisputedMatches(): Promise<DisputedMatch[]> {
         teamId: r.team_b_id,
         teamName: r.team_b_name,
         goals: r.team_b_goals,
+        scoreline: board.teamB.scoreline,
         fairPlayScore: fpsB,
         votes: votesB,
       },

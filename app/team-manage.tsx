@@ -674,6 +674,7 @@ export default function TeamManageScreen() {
           myRole={myRole}
           canEditTeam={canEditTeam}
           uploadingShield={uploadingShield}
+          members={members}
           onEditTeam={openEditTeamModal}
           onPickShield={handlePickShield}
           onCopyInviteCode={handleCopyInviteCode}

@@ -29,6 +29,7 @@ import {
   MarketConversation,
 } from '@/lib/chat-api';
 import { fetchTeamInviteCode } from '@/lib/market-api';
+import { useKeyboardAwareBottomInset } from '@/hooks/useKeyboardAwareBottomInset';
 
 function formatRole(role: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | null): string {
   if (!role) return '';
@@ -53,6 +54,7 @@ export default function MarketChatScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
+  const inputBottomInset = useKeyboardAwareBottomInset();
 
   const [messages, setMessages] = useState<MarketMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -412,6 +414,9 @@ export default function MarketChatScreen() {
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
+          /* `padding` también en Android: con edge-to-edge activo (app.json)
+             la ventana ya no se redimensiona sola con el teclado aunque el
+             manifest declare `adjustResize`. */
           behavior="padding"
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
@@ -432,8 +437,13 @@ export default function MarketChatScreen() {
             }
           />
 
-          {/* Barra de acciones + input */}
-          <View className="p-4 bg-surface-low border-t border-surface-high">
+          {/* Barra de acciones + input. Mismo fix que el chat de partido: el
+              `p-4` fijo dejaba el input pegado al borde en los teléfonos con
+              gesture bar, y el inset se replega cuando sube el teclado. */}
+          <View
+            className="px-4 pt-4 bg-surface-low border-t border-surface-high"
+            style={{ paddingBottom: inputBottomInset }}
+          >
             {isCaptainMode && (
               <View className="flex-row gap-2 mb-3">
                 {isLoadingCodes ? (

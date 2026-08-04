@@ -82,6 +82,30 @@ export type Database = {
         }
         Relationships: []
       }
+      app_versions: {
+        Row: {
+          latest_version: string
+          min_required_version: string
+          platform: string
+          update_url: string
+          updated_at: string
+        }
+        Insert: {
+          latest_version: string
+          min_required_version: string
+          platform: string
+          update_url: string
+          updated_at?: string
+        }
+        Update: {
+          latest_version?: string
+          min_required_version?: string
+          platform?: string
+          update_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       badges: {
         Row: {
           criteria_description: string | null
@@ -1012,6 +1036,7 @@ export type Database = {
           checkin_team_a_at: string | null
           checkin_team_b_at: string | null
           created_at: string
+          disputed_at: string | null
           duration_minutes: number | null
           finished_at: string | null
           format: Database["public"]["Enums"]["team_format"] | null
@@ -1038,6 +1063,7 @@ export type Database = {
           checkin_team_a_at?: string | null
           checkin_team_b_at?: string | null
           created_at?: string
+          disputed_at?: string | null
           duration_minutes?: number | null
           finished_at?: string | null
           format?: Database["public"]["Enums"]["team_format"] | null
@@ -1064,6 +1090,7 @@ export type Database = {
           checkin_team_a_at?: string | null
           checkin_team_b_at?: string | null
           created_at?: string
+          disputed_at?: string | null
           duration_minutes?: number | null
           finished_at?: string | null
           format?: Database["public"]["Enums"]["team_format"] | null
@@ -2075,11 +2102,13 @@ export type Database = {
           scheduled_at: string
           team_a_fps: number
           team_a_goals: number
+          team_a_goals_against: number
           team_a_id: string
           team_a_name: string
           team_a_votes: number
           team_b_fps: number
           team_b_goals: number
+          team_b_goals_against: number
           team_b_id: string
           team_b_name: string
           team_b_votes: number
@@ -2367,6 +2396,7 @@ export type Database = {
         }
         Returns: Json
       }
+      sweep_disputed_matches: { Args: never; Returns: Json }
       sweep_stale_matches: { Args: never; Returns: Json }
       transfer_captaincy_and_leave: {
         Args: { p_team_id: string; p_to_profile_id: string }
