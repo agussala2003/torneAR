@@ -4,6 +4,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { getTeamRoleLabel, TeamRole } from '@/lib/team-options';
 import { roleAppearance, firstLetterUpper, positionLabel, canManageMember } from '@/lib/team-helpers';
+import { calculateAge, formatAge } from '@/lib/age';
 
 interface TeamMemberRow {
   profile_id: string;
@@ -15,6 +16,7 @@ interface TeamMemberRow {
     username: string | null;
     avatar_url: string | null;
     preferred_position: string | null;
+    date_of_birth: string | null;
   } | null;
 }
 
@@ -44,6 +46,8 @@ export function TeamMembersList({
             : getSupabaseStorageUrl('avatars', member.profiles.avatar_url)
           : '';
         const roleVisual = roleAppearance(member.role);
+
+        const memberAge = formatAge(calculateAge(member.profiles?.date_of_birth));
 
         const isSelf = profileId === member.profile_id;
         const canManageThisMember = canManageMember(myRole, member.role, isSelf);
@@ -81,11 +85,16 @@ export function TeamMembersList({
                   >
                     @{member.profiles?.username ?? 'sin_usuario'}{isSelf ? ' (vos)' : ''}
                   </Text>
+                  {/* La edad se cuelga de la línea de la posición en vez de
+                      ocupar una propia: la card ya tiene tres renglones y el
+                      dato es del mismo orden (ficha del jugador). Se omite el
+                      separador entero cuando no hay fecha cargada. */}
                   <Text
                     className="font-ui mt-1 text-[11px] tracking-wide text-neutral-on-surface-variant"
                     numberOfLines={1}
                   >
                     {firstLetterUpper(positionLabel(member.profiles?.preferred_position ?? 'CUALQUIERA'))}
+                    {memberAge ? ` · ${memberAge}` : ''}
                   </Text>
                 </View>
               </View>

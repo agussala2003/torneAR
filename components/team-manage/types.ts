@@ -25,6 +25,8 @@ export type TeamMemberRow = {
     username: string | null;
     avatar_url: string | null;
     preferred_position: string | null;
+    /** 'YYYY-MM-DD'. Alimenta el promedio de edad del plantel (lib/age.ts). */
+    date_of_birth: string | null;
     expo_push_token?: string | null;
   } | null;
 };
@@ -40,6 +42,7 @@ export type TeamJoinRequestRow = {
     username: string | null;
     avatar_url: string | null;
     preferred_position: string;
+    date_of_birth: string | null;
     expo_push_token?: string | null;
   } | null;
 };

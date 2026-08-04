@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
+import { useKeyboardAwareBottomInset } from '@/hooks/useKeyboardAwareBottomInset';
 import { fetchMessages, sendMessage, markConversationAsRead } from '@/lib/chat-api';
 import type { MarketMessage } from '@/lib/chat-api';
 
@@ -42,6 +43,7 @@ export default function MatchChatScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
+  const inputBottomInset = useKeyboardAwareBottomInset();
 
   const [header, setHeader] = useState<MatchChatHeader | null>(null);
   const [messages, setMessages] = useState<MarketMessage[]>([]);
@@ -297,7 +299,14 @@ export default function MatchChatScreen() {
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
+          /* `padding` también en Android: la app corre edge-to-edge (app.json →
+             android.edgeToEdgeEnabled) y en ese modo la ventana ya no se
+             redimensiona sola con el teclado, aunque el manifest declare
+             `adjustResize`. Sin el KAV empujando, el input queda tapado. */
           behavior="padding"
+          /* 0 en Android: el header es una View de esta misma pantalla y el KAV
+             arranca por debajo, así que mide su propia posición y no necesita
+             compensación extra. */
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
           <FlatList
@@ -318,8 +327,13 @@ export default function MatchChatScreen() {
             }
           />
 
-          {/* Input bar */}
-          <View className="flex-row items-center gap-2 border-t border-surface-high bg-surface-low p-4">
+          {/* Input bar. El padding inferior sale del hook y no de una constante:
+              con `p-4` la barra quedaba pegada al borde en los teléfonos con
+              gesture bar. */}
+          <View
+            className="flex-row items-center gap-2 border-t border-surface-high bg-surface-low px-4 pt-4"
+            style={{ paddingBottom: inputBottomInset }}
+          >
             <TextInput
               className="flex-1 rounded-full bg-surface-high px-4 py-3 font-ui text-sm text-neutral-on-surface"
               placeholder="Escribí un mensaje..."

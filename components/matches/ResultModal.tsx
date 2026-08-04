@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -69,6 +70,13 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
   const [mvpId, setMvpId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { showAlert, AlertComponent } = useCustomAlert();
+  const insets = useSafeAreaInsets();
+
+  // El `pb-10` fijo que había acá no era safe area: en un teléfono con gesture
+  // bar se quedaba corto y el botón de confirmar caía debajo de la barra; en
+  // uno sin ella sobraba. El mínimo de 16 mantiene el aire del diseño en los
+  // dispositivos que reportan inset 0.
+  const bottomInset = Math.max(insets.bottom, 16);
 
   // Guard SÍNCRONO contra el doble tap. `disabled={loading}` no alcanza: entre
   // el tap y el re-render que aplica setLoading(true) hay una ventana en la que
@@ -146,8 +154,16 @@ export function ResultModal({ visible, onClose, onSubmit, myParticipants }: Prop
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      {/* El sheet crecía sin tope: con un plantel de 11 el contenido tapaba la
+          pantalla entera y el ScrollView, al no tener altura acotada por la que
+          desbordar, nunca llegaba a scrollear. `maxHeight` lo deja como sheet
+          (se ve el fondo arriba, y ese fondo es el gesto de cierre) y recién
+          ahí el scroll interno tiene sentido. */}
       <View className="flex-1 justify-end bg-black/60">
-        <View className="rounded-t-3xl bg-surface-container pb-10">
+        <View
+          className="overflow-hidden rounded-t-3xl bg-surface-container"
+          style={{ maxHeight: '88%', paddingBottom: bottomInset }}
+        >
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 py-4">
             <Text className="font-uiBold text-lg text-neutral-on-surface">Cargar resultado</Text>

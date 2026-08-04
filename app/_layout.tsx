@@ -12,7 +12,9 @@ import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { AppIntroSplash } from '@/components/AppIntroSplash';
+import { AppUpdateModal } from '@/components/AppUpdateModal';
 import { Colors } from '@/constants/theme';
+import { useForceUpdate } from '@/hooks/useForceUpdate';
 import { isProfileComplete } from '@/lib/auth-utils';
 import { deepLinkToHref, resolveDeepLink } from '@/lib/deep-linking';
 import { initLogger } from '@/lib/logger';
@@ -198,6 +200,16 @@ export default function RootLayout() {
   // que ocurren mientras la app todavía no pintó nada.
   useEffect(() => initLogger(), []);
 
+  // Force update. Va acá y no dentro de RootNavigation por dos motivos:
+  //   · Se evalúa sin sesión. Un build bloqueado tiene que frenarse también en
+  //     el login: si sólo cubriera las pantallas autenticadas, alguien con la
+  //     sesión vencida entraría, no podría actualizar y quedaría en un limbo.
+  //   · El modal queda como hermano de <RootNavigation />, o sea por encima de
+  //     cualquier ruta, incluido el splash de intro.
+  // El hook nunca suspende el render: si la consulta falla o no hay red,
+  // devuelve `required: false` y la app abre normal.
+  const forceUpdate = useForceUpdate();
+
   if (!fontsLoaded) {
     return null;
   }
@@ -207,6 +219,12 @@ export default function RootLayout() {
       <AuthProvider>
         <UIProvider>
           <RootNavigation />
+          <AppUpdateModal
+            visible={forceUpdate.required}
+            currentVersion={forceUpdate.currentVersion}
+            latestVersion={forceUpdate.latestVersion}
+            updateUrl={forceUpdate.updateUrl}
+          />
           <StatusBar style="light" />
         </UIProvider>
       </AuthProvider>

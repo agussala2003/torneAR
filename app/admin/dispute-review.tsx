@@ -14,6 +14,7 @@ import {
   type DisputedMatchSide,
   type DisputeResolution,
 } from '@/lib/dispute-admin-data';
+import { formatScoreline } from '@/lib/dispute-scores';
 import { Logger } from '@/lib/logger';
 
 const FORMAT_SHORT: Record<string, string> = {
@@ -30,7 +31,16 @@ function formatFps(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-/** Columna de un equipo: marcador cargado, votos y Fair Play. */
+/**
+ * Columna de un equipo: el marcador COMPLETO que propuso, votos y Fair Play.
+ *
+ * Antes acá se pintaba `side.goals` solo — los goles que ese equipo se
+ * adjudica. Dos de esas cifras, una al lado de la otra, se leen como un
+ * marcador y no lo son: salen de dos planillas distintas. "A: 2  B: 3" no dice
+ * si el desacuerdo es de un gol o de cinco. Ahora cada columna muestra el
+ * marcador entero tal como lo cargó su equipo, siempre en orden A–B, que es
+ * exactamente lo que ve el jugador en DisputeSection.
+ */
 function TeamColumn({ side, align }: { side: DisputedMatchSide; align: 'left' | 'right' }) {
   const items = align === 'right' ? 'items-end' : 'items-start';
   return (
@@ -42,11 +52,11 @@ function TeamColumn({ side, align }: { side: DisputedMatchSide; align: 'left' | 
       >
         {side.teamName}
       </Text>
-      <Text className="font-displayBlack mt-1 text-3xl leading-none text-neutral-on-surface">
-        {side.goals ?? '—'}
+      <Text className="font-displayBlack mt-1 text-2xl leading-none text-neutral-on-surface">
+        {formatScoreline(side.scoreline)}
       </Text>
       <Text className="font-ui mt-1 text-[10px] text-neutral-outline">
-        {side.goals === null ? 'no cargó' : 'cargado'}
+        {side.scoreline === null ? 'no cargó' : 'cargó'}
       </Text>
       <Text className="font-ui mt-1 text-[11px] text-neutral-on-surface-variant">
         {side.votes} voto{side.votes === 1 ? '' : 's'} · FP {formatFps(side.fairPlayScore)}
@@ -202,7 +212,11 @@ export default function DisputeReviewScreen() {
                 </Text>
               </View>
 
-              {/* Marcadores enfrentados */}
+              {/* Marcadores enfrentados. La leyenda fija el eje: las dos cifras
+                  de cada columna son "local – visitante", no "míos – suyos". */}
+              <Text className="font-ui mb-2 text-[10px] uppercase tracking-widest text-neutral-outline">
+                Marcadores cargados ({m.teamA.teamName} – {m.teamB.teamName})
+              </Text>
               <View className="flex-row items-start gap-3">
                 <TeamColumn side={m.teamA} align="left" />
                 <Text className="font-ui mt-6 text-xs text-neutral-outline">vs</Text>

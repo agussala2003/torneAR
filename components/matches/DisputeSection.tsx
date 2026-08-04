@@ -1,5 +1,7 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { buildDisputeScoreboard, formatScoreline } from '@/lib/dispute-scores';
+import type { DisputeClaim } from '@/lib/dispute-scores';
 import type { MatchDetailViewData, DisputeState } from '@/components/matches/types';
 
 interface Props {
@@ -11,6 +13,35 @@ interface Props {
 
 function formatFairPlay(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/** Una de las dos planillas enfrentadas, ya en orden canónico A–B. */
+function ClaimRow({ claim, highlight }: { claim: DisputeClaim; highlight: boolean }) {
+  return (
+    <View
+      className={`flex-row items-center justify-between rounded-xl px-3 py-2.5 ${
+        highlight ? 'bg-brand-primary/10' : 'bg-surface-high/60'
+      }`}
+    >
+      <Text
+        className="font-uiBold flex-1 text-sm text-neutral-on-surface"
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {claim.teamName}
+        {highlight && (
+          <Text className="font-ui text-xs text-neutral-on-surface-variant"> (tu equipo)</Text>
+        )}
+      </Text>
+      <Text
+        className={`font-displayBlack ml-3 text-xl leading-none ${
+          claim.scoreline ? 'text-neutral-on-surface' : 'text-neutral-outline'
+        }`}
+      >
+        {formatScoreline(claim.scoreline)}
+      </Text>
+    </View>
+  );
 }
 
 /**
@@ -51,6 +82,27 @@ export function DisputeSection({ match, profileId, disputeState, onVote }: Props
   const votesTied =
     disputeState !== null && disputeState.votesForTeamA === disputeState.votesForTeamB;
 
+  // Las dos planillas enfrentadas. `myResult`/`opponentResult` vienen en primera
+  // persona ("mis goles" / "los del rival") y desde la perspectiva de MI equipo,
+  // así que primero hay que devolverle cada planilla a su dueño y recién después
+  // pasarlas al eje A–B. Sin este paso, votar era elegir un nombre de equipo sin
+  // saber qué marcador se estaba votando.
+  const resultOfTeamA = isMyTeamA ? match.myResult : match.opponentResult;
+  const resultOfTeamB = isMyTeamA ? match.opponentResult : match.myResult;
+
+  const scoreboard = buildDisputeScoreboard({
+    teamAId: match.teamA.id,
+    teamAName: match.teamA.name,
+    teamBId: match.teamB.id,
+    teamBName: match.teamB.name,
+    scoreByTeamA: resultOfTeamA
+      ? { goalsScored: resultOfTeamA.goalsScored, goalsAgainst: resultOfTeamA.goalsAgainst }
+      : null,
+    scoreByTeamB: resultOfTeamB
+      ? { goalsScored: resultOfTeamB.goalsScored, goalsAgainst: resultOfTeamB.goalsAgainst }
+      : null,
+  });
+
   return (
     <View className="mt-4 gap-3">
       {/* ── Estado de la disputa + conteo en vivo ─────────────────────────── */}
@@ -63,6 +115,25 @@ export function DisputeSection({ match, profileId, disputeState, onVote }: Props
           Los resultados cargados no coinciden. Los jugadores que hicieron check-in pueden votar
           por la versión correcta.
         </Text>
+
+        {/* ── Los dos marcadores propuestos, en el mismo eje ───────────────── */}
+        {/* Antes acá sólo estaban los nombres de los equipos: se votaba sin ver
+            qué resultado propuso cada uno. Ahora las dos planillas se leen
+            enfrentadas y siempre como "equipo A – equipo B", así la
+            discrepancia se ve sin hacer la cuenta mental. */}
+        <View className="mt-3 gap-2">
+          <Text className="font-ui text-[10px] uppercase tracking-widest text-neutral-outline">
+            Marcadores cargados ({match.teamA.name} – {match.teamB.name})
+          </Text>
+          <ClaimRow claim={scoreboard.teamA} highlight={isMyTeamA} />
+          <ClaimRow claim={scoreboard.teamB} highlight={!isMyTeamA} />
+          {scoreboard.hasMissingClaim && (
+            <Text className="font-ui text-[11px] leading-4 text-neutral-on-surface-variant">
+              El equipo marcado con “—” nunca cargó su planilla.
+            </Text>
+          )}
+        </View>
+
         {disputeState && (
           <View className="mt-3 flex-row gap-6">
             <Text className="font-uiBold text-xs text-neutral-on-surface-variant">
@@ -107,8 +178,8 @@ export function DisputeSection({ match, profileId, disputeState, onVote }: Props
               <Text className="font-ui mt-1 text-xs text-neutral-on-surface-variant">
                 Votaste por el resultado de{' '}
                 {disputeState.votedForTeamId === match.teamA.id
-                  ? match.teamA.name
-                  : match.teamB.name}
+                  ? `${scoreboard.teamA.teamName} (${formatScoreline(scoreboard.teamA.scoreline)})`
+                  : `${scoreboard.teamB.teamName} (${formatScoreline(scoreboard.teamB.scoreline)})`}
                 . Esperando el cierre de la votación.
               </Text>
             </View>
@@ -117,16 +188,30 @@ export function DisputeSection({ match, profileId, disputeState, onVote }: Props
               <Text className="font-uiBold text-xs uppercase tracking-widest text-neutral-on-surface-variant">
                 Votá por el resultado correcto
               </Text>
-              {([match.teamA, match.teamB] as const).map((team) => (
+              {/* El botón lleva el marcador que se está votando: el voto define
+                  un RESULTADO, no un equipo, y con el nombre solo el jugador
+                  tenía que recordar cuál era cuál de la tarjeta de arriba. */}
+              {([scoreboard.teamA, scoreboard.teamB] as const).map((claim) => (
                 <TouchableOpacity
-                  key={team.id}
+                  key={claim.teamId}
                   activeOpacity={0.8}
-                  onPress={() => onVote(team.id)}
+                  onPress={() => onVote(claim.teamId)}
                   className="flex-row items-center justify-between rounded-xl border border-warning-tertiary/30 bg-warning-tertiary/10 px-4 py-3"
                 >
-                  <Text className="font-uiBold text-sm text-warning-tertiary">
-                    Votar por {team.name}
-                  </Text>
+                  <View className="flex-1">
+                    <Text
+                      className="font-uiBold text-sm text-warning-tertiary"
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      Votar por {claim.teamName}
+                    </Text>
+                    <Text className="font-ui mt-0.5 text-xs text-neutral-on-surface-variant">
+                      {claim.scoreline
+                        ? `Su marcador: ${formatScoreline(claim.scoreline)}`
+                        : 'No cargó marcador'}
+                    </Text>
+                  </View>
                   <AppIcon family="material-community" name="chevron-right" size={18} color="#FABD32" />
                 </TouchableOpacity>
               ))}

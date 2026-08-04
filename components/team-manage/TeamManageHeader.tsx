@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { TeamDetailRow } from './types';
+import { TeamDetailRow, TeamMemberRow } from './types';
 import { getTeamCategoryLabel, getTeamFormatLabel, getTeamRoleLabel, TeamRole } from '@/lib/team-options';
+import { averageAge } from '@/lib/age';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
 interface TeamManageHeaderProps {
@@ -11,6 +12,8 @@ interface TeamManageHeaderProps {
   myRole: TeamRole | null;
   canEditTeam: boolean;
   uploadingShield: boolean;
+  /** Plantel completo, para el promedio de edad. */
+  members: TeamMemberRow[];
   onEditTeam: () => void;
   onPickShield: () => void;
   onCopyInviteCode: () => void;
@@ -22,6 +25,7 @@ export function TeamManageHeader({
   myRole,
   canEditTeam,
   uploadingShield,
+  members,
   onEditTeam,
   onPickShield,
   onCopyInviteCode,
@@ -29,6 +33,14 @@ export function TeamManageHeader({
 }: TeamManageHeaderProps) {
   const router = useRouter();
   const shieldUrl = team.shield_url ? getSupabaseStorageUrl('shields', team.shield_url) : '';
+
+  // Se calcula sobre quienes cargaron su fecha; `counted` permite aclarar la
+  // muestra cuando no es todo el plantel, en vez de dar un promedio que parece
+  // del equipo entero y no lo es.
+  const squadAge = useMemo(
+    () => averageAge(members.map((member) => member.profiles?.date_of_birth)),
+    [members],
+  );
 
   return (
     <View className="relative mt-6 rounded-xl border border-neutral-outline-variant/35 bg-surface-low p-4">
@@ -131,6 +143,28 @@ export function TeamManageHeader({
               {Number(team.fair_play_score).toFixed(1)}
             </Text>
           </View>
+        </View>
+
+        {/* Promedio de edad del plantel. Fila propia y no una cuarta baldosa:
+            con 4 en la misma fila el número queda con menos ancho que sus
+            dígitos y el label se corta. */}
+        <View className="mt-3 flex-row items-center justify-between rounded-lg bg-surface-high px-3 py-3">
+          <View className="flex-1 pr-3">
+            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">
+              Promedio de edad
+            </Text>
+            {squadAge && squadAge.counted < members.length && (
+              <Text className="font-ui mt-0.5 text-[10px] text-neutral-outline">
+                sobre {squadAge.counted} de {members.length} jugadores con fecha cargada
+              </Text>
+            )}
+          </View>
+          <Text
+            className="font-display text-xl text-neutral-on-surface"
+            style={{ fontVariant: ['tabular-nums'] }}
+          >
+            {squadAge ? `${squadAge.average} años` : '—'}
+          </Text>
         </View>
 
         <TouchableOpacity

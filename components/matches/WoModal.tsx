@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -62,6 +63,12 @@ export function WoModal({ visible, onClose, onSubmit, myParticipants }: Props) {
   const [mvpId, setMvpId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { showAlert, AlertComponent } = useCustomAlert();
+  const insets = useSafeAreaInsets();
+
+  // Mismo criterio que ResultModal: el `pb-10` fijo no contemplaba la gesture
+  // bar. Este sheet es el más largo de los dos (banner + escala de Fair Play +
+  // 4 motivos + evidencia fotográfica), así que era el que peor se veía.
+  const bottomInset = Math.max(insets.bottom, 16);
 
   function close() {
     setStep(1);
@@ -167,8 +174,14 @@ export function WoModal({ visible, onClose, onSubmit, myParticipants }: Props) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
+      {/* maxHeight: sin tope el sheet ocupaba toda la pantalla y el ScrollView
+          interno no tenía por dónde desbordar, así que el contenido del paso 1
+          quedaba cortado sin poder scrollear hasta el botón. */}
       <View className="flex-1 justify-end bg-black/60">
-        <View className="rounded-t-3xl bg-surface-container pb-10">
+        <View
+          className="overflow-hidden rounded-t-3xl bg-surface-container"
+          style={{ maxHeight: '88%', paddingBottom: bottomInset }}
+        >
           {/* Header */}
           <View className="flex-row items-center justify-between px-5 py-4">
             <View className="flex-row items-center gap-2">

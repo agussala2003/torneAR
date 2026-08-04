@@ -92,18 +92,18 @@ export async function fetchTeamManageViewData(teamId: string, profileId: string 
       .maybeSingle(),
     supabase
       .from('team_members')
-      .select('profile_id, role, joined_at, profiles(id, full_name, username, avatar_url, preferred_position, expo_push_token)')
+      .select('profile_id, role, joined_at, profiles(id, full_name, username, avatar_url, preferred_position, date_of_birth, expo_push_token)')
       .eq('team_id', teamId)
       .order('joined_at', { ascending: true }),
     supabase
       .from('team_join_requests')
-      .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position, expo_push_token)')
+      .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position, date_of_birth, expo_push_token)')
       .eq('team_id', teamId)
       .eq('status', 'PENDIENTE')
       .order('created_at', { ascending: true }),
     supabase
       .from('team_join_requests')
-      .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position, expo_push_token)')
+      .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position, date_of_birth, expo_push_token)')
       .eq('team_id', teamId)
       .in('status', ['ACEPTADA', 'RECHAZADA'])
       .order('created_at', { ascending: false })

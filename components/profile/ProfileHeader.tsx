@@ -4,6 +4,7 @@ import { Image, Text, View, TouchableOpacity, ActivityIndicator } from 'react-na
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/context/AuthContext';
 import { ProfileRow } from './types';
+import { calculateAge, formatAge } from '@/lib/age';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { uploadProfileAvatar } from '@/lib/profile-edit-data';
 import CustomAlert from '@/components/ui/CustomAlert';
@@ -37,6 +38,8 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
   const avatarUrl = avatarPath
     ? getSupabaseStorageUrl('avatars', avatarPath)
     : null;
+
+  const ageLabel = formatAge(calculateAge(profile.date_of_birth));
 
   const pickAndUploadImage = async () => {
     try {
@@ -189,6 +192,22 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
             {positionLabel(profile.preferred_position)}
           </Text>
         </View>
+
+        {/* El chip se omite entero si no hay fecha cargada: un "— años" al lado
+            de la zona y la posición se lee como un dato roto, no como uno que
+            falta. `date_of_birth` es obligatoria en el onboarding
+            (isProfileComplete), así que el caso es el de los perfiles viejos. */}
+        {ageLabel && (
+          <View className="max-w-full flex-row items-center gap-1 rounded-full bg-surface-high px-3 py-1">
+            <AppIcon family="material-community" name="cake-variant-outline" size={12} color="#FABD32" />
+            <Text
+              className="font-uiBold shrink text-xs text-neutral-on-surface"
+              numberOfLines={1}
+            >
+              {ageLabel}
+            </Text>
+          </View>
+        )}
       </View>
 
       <CustomAlert
