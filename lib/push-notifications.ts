@@ -81,13 +81,14 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     }
   } catch (error) {
     // `warn`, no `error`: quedarse sin push token degrada una funcionalidad
-    // secundaria, no rompe la app. En el APK de producción esto se dispara
-    // porque el entorno nativo de FCM no está inicializado (ver nota abajo),
-    // y con `error` cada arranque disparaba una alarma por algo conocido.
+    // secundaria, no rompe la app.
     //
-    // ⚠️ Arreglo de fondo pendiente: agregar el plugin `expo-notifications` y
-    // `android.googleServicesFile` (google-services.json) en app.json. Hasta
-    // entonces la app funciona pero NINGÚN dispositivo Android recibe pushes.
+    // Con FCM ya configurado (plugin `expo-notifications` + `googleServicesFile`,
+    // este último resuelto en app.config.js), llegar acá dejó de ser el caso
+    // normal y pasó a ser puntual: emulador sin Google Play Services, build sin
+    // el google-services.json materializado, o un fallo de red contra el
+    // servicio de tokens de Expo. Si se repite en dispositivos reales de
+    // producción, ahí sí hay algo que investigar.
     Logger.warn('No se pudo inicializar el registro de push notifications', {
       scope: 'push-notifications.register',
       platform: Platform.OS,

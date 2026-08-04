@@ -12,30 +12,39 @@
 
 ## 0. Antes de empezar
 
-### 0.1 Leé esto primero: un bloqueante conocido
+### 0.1 Leé esto primero: las push necesitan un build nuevo
 
-> [!WARNING]
-> **Las push notifications NO llegan en Android.** No es un bug a descubrir en
-> esta sesión: es una configuración faltante ya identificada en el código
-> ([`lib/push-notifications.ts`](lib/push-notifications.ts#L88)).
+> [!IMPORTANT]
+> **FCM ya está configurado** (plugin `expo-notifications` en `app.json` +
+> `googleServicesFile` resuelto en `app.config.js`), así que los pasos marcados
+> 🔔 **PUSH** **deben pasar**. Si fallan, es un hallazgo real — reportalo.
 >
-> `app.json` no declara el plugin `expo-notifications` ni
-> `android.googleServicesFile`, así que FCM nunca se inicializa y
-> `getExpoPushTokenAsync` falla — el registro del token queda en `null` y
-> **ningún dispositivo Android recibe pushes**.
+> **Pero sólo funcionan en un build nativo posterior a esa configuración.** Un
+> APK viejo no tiene FCM adentro por más que la config esté en el repo: agregar
+> un plugin cambia el proyecto nativo y exige recompilar.
 >
-> **Impacto en este playbook:** los pasos marcados 🚫 **PUSH** están escritos
-> pero se dan por fallados de antemano. No los reportes como hallazgos nuevos.
-> Verificá en su lugar la **notificación in-app** (campanita → `/notifications`),
-> que sí funciona porque se lee de la tabla `notifications`.
+> **Antes de la sesión, verificá que el build que vas a instalar es nuevo:**
+> ```bash
+> eas build --profile development --platform android
+> ```
+> Instalá ese build en **ambos** celulares. Si reutilizás un APK anterior al
+> 2026-08-04, las push no van a llegar y **no es un bug**.
 >
-> **Para habilitarlos** antes de la sesión (requiere rebuild nativo):
-> 1. Agregar `"expo-notifications"` a `plugins` en `app.json`.
-> 2. Agregar `"googleServicesFile": "./google-services.json"` dentro de `android`.
->    El archivo ya está en el repo.
-> 3. `eas build --profile development --platform android` y reinstalar en ambos.
+> **Chequeo rápido en el celular** (60 segundos, hacelo antes de arrancar):
+> entrá con cualquier cuenta y corré en el SQL Editor
+> ```sql
+> select username, expo_push_token from public.profiles where username = '<usuario>';
+> ```
+> - `expo_push_token` con un valor `ExponentPushToken[…]` → el build está bien,
+>   seguí con el playbook.
+> - `expo_push_token` en `NULL` → el build **no** tiene FCM, o el usuario denegó
+>   el permiso de notificaciones. Revisá ambos antes de seguir; si no, todos los
+>   pasos 🔔 van a fallar por la misma causa y perdés la sesión.
 >
-> Si hacés esto, desmarcá los 🚫 y ejecutalos como pruebas normales.
+> **Además:** en Android 13+ el permiso de notificaciones es explícito. La app
+> lo pide en el primer arranque — **aceptalo en los dos celulares**. Si lo
+> denegaste, hay que habilitarlo a mano en Ajustes → Apps → TorneAR →
+> Notificaciones.
 
 ### 0.2 Requisitos de build
 
@@ -87,7 +96,7 @@ código, forzar un cooldown). Tené abierto el **SQL Editor de Supabase**.
 | 🗄️ **SQL** | Paso que se ejecuta en el SQL Editor, no en la app |
 | ⏱️ | Verificación de tiempo real: mirar el **otro** celular sin tocarlo |
 | 🎯 | Prueba crítica del módulo — si falla, frená y reportá |
-| 🚫 **PUSH** | Bloqueado por 0.1. Se espera que falle |
+| 🔔 **PUSH** | Requiere el build nuevo de 0.1. **Debe pasar** |
 | ↩️ | Acción de limpieza / reversión obligatoria |
 
 ### 0.6 Registro de la corrida
@@ -287,10 +296,15 @@ y el traspaso de un jugador.
 - [ ] 📱**A** — Tocar la notificación.
       **Esperado:** navega al detalle correspondiente y el badge de no leídos
       baja.
-- [ ] 🚫 **PUSH** 📱**A** — Con la app en segundo plano, repetir 3.1 desde B.
-      **Esperado (bloqueado por 0.1):** debería llegar una push al system tray.
-      **Real hoy:** no llega. Confirmá que **la in-app sí se generó** al volver
-      a abrir la app.
+- [ ] 🔔 **PUSH** 🎯 📱**A** — Con la app en **segundo plano**, repetir 3.1
+      desde B.
+      **Esperado:** llega una **push notification** al system tray.
+      Verificá el **ícono pequeño** en la barra de estado: debe verse la
+      **silueta de la pelota con la flecha**, no un cuadrado blanco.
+      **Fallo a reportar:** cuadrado/círculo blanco sólido → el
+      `notification-icon.png` no tiene el alfa correcto.
+- [ ] 🔔 **PUSH** 📱**A** — Desplegar la notificación.
+      **Esperado:** el acento de color es el verde de marca (`#53E076`).
 
 ### 3.3 🎯 Stress test visual del chat
 
@@ -401,21 +415,30 @@ el cooldown de 30 días.
 
 ### 4.2 🎯 Recepción en segundo plano (Celu B)
 
-- [ ] 🚫 **PUSH** 🎯 📱**B** — Poner la app **en segundo plano** (botón home, no
+- [ ] 🔔 **PUSH** 🎯 📱**B** — Poner la app **en segundo plano** (botón home, no
       matarla). Que A envíe el desafío.
       **Esperado:** llega una **push notification** al system tray con el título
       del desafío. Al tocarla, la app abre directo en `/challenge-inbox`.
-      **Real hoy:** no llega (ver 0.1).
-- [ ] 🚫 **PUSH** 📱**B** — Repetir con la app **completamente cerrada**
-      (cold start).
-      **Esperado:** push + deep link consumido tras la hidratación de la sesión
-      (`useDeepLinkStore`).
-- [ ] ✅ **Sustituto verificable hoy** — 📱**B**: abrir la app y mirar la
-      campanita.
-      **Esperado:** notificación in-app del desafío recibido.
-- [ ] 🗄️ **SQL** — Confirmar el estado real del token:
+- [ ] 🔔 **PUSH** 🎯 📱**B** — Repetir con la app **completamente cerrada**
+      (cold start: deslizar de recientes).
+      **Esperado:** llega la push. Al tocarla, la app arranca de cero y —una vez
+      hidratada la sesión— navega al desafío. El deep link queda **pendiente**
+      hasta que hay sesión y se consume una sola vez (`useDeepLinkStore`).
+      **Fallo a reportar:** que abra en Home y se pierda el destino, o que
+      navegue dos veces.
+- [ ] 🎯 📱**B** — Verificar el **canal de notificación**: Ajustes → Apps →
+      TorneAR → Notificaciones.
+      **Esperado:** existe el canal **`default`** (lo declara el plugin y lo crea
+      el código con importancia máxima). **Fallo a reportar:** que las
+      notificaciones caigan en un canal «Miscellaneous».
+- [ ] 📱**B** — Abrir la app y mirar la campanita.
+      **Esperado:** también hay notificación **in-app** del desafío. Push e
+      in-app son dos canales distintos; ambos deben existir.
+- [ ] 🗄️ **SQL** — Confirmar que el token quedó registrado:
       `select expo_push_token from profiles where username = '<usuario-B>';`
-      **Esperado hoy:** `NULL`. Eso confirma 0.1 y descarta un bug distinto.
+      **Esperado:** un valor `ExponentPushToken[…]`.
+      **Si está `NULL`** el build no tiene FCM o falta el permiso — volvé a 0.1
+      antes de reportar nada como bug de producto.
 
 ### 4.3 Aceptación del desafío
 
