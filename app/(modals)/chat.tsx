@@ -299,11 +299,12 @@ export default function MatchChatScreen() {
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          /* `padding` también en Android: la app corre edge-to-edge (app.json →
-             android.edgeToEdgeEnabled) y en ese modo la ventana ya no se
-             redimensiona sola con el teclado, aunque el manifest declare
-             `adjustResize`. Sin el KAV empujando, el input queda tapado. */
-          behavior="padding"
+          /* Sólo iOS. En Android el empuje lo hace el padding de la barra
+             (`useKeyboardAwareBottomInset`): con edge-to-edge el KAV mide su
+             frame por debajo de la barra de navegación y al replegarse el
+             teclado deja un residuo que nunca vuelve a cero. Con los dos
+             mecanismos activos ese residuo se sumaba al inset de reposo. */
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           /* 0 en Android: el header es una View de esta misma pantalla y el KAV
              arranca por debajo, así que mide su propia posición y no necesita
              compensación extra. */
@@ -327,9 +328,9 @@ export default function MatchChatScreen() {
             }
           />
 
-          {/* Input bar. El padding inferior sale del hook y no de una constante:
-              con `p-4` la barra quedaba pegada al borde en los teléfonos con
-              gesture bar. */}
+          {/* Input bar. El padding inferior sale del hook, que es el único dueño
+              de ese espacio: aire sobre la gesture bar en reposo, y el alto del
+              teclado cuando está abierto. */}
           <View
             className="flex-row items-center gap-2 border-t border-surface-high bg-surface-low px-4 pt-4"
             style={{ paddingBottom: inputBottomInset }}

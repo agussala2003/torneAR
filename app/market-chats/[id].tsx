@@ -414,10 +414,12 @@ export default function MarketChatScreen() {
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          /* `padding` también en Android: con edge-to-edge activo (app.json)
-             la ventana ya no se redimensiona sola con el teclado aunque el
-             manifest declare `adjustResize`. */
-          behavior="padding"
+          /* Sólo iOS. En Android el empuje lo hace el padding de la barra
+             (`useKeyboardAwareBottomInset`): con edge-to-edge el KAV mide su
+             frame por debajo de la barra de navegación y al replegarse el
+             teclado deja un residuo que nunca vuelve a cero. Con los dos
+             mecanismos activos ese residuo se sumaba al inset de reposo. */
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
           <FlatList
@@ -437,9 +439,9 @@ export default function MarketChatScreen() {
             }
           />
 
-          {/* Barra de acciones + input. Mismo fix que el chat de partido: el
-              `p-4` fijo dejaba el input pegado al borde en los teléfonos con
-              gesture bar, y el inset se replega cuando sube el teclado. */}
+          {/* Barra de acciones + input. Mismo patrón que el chat de partido: el
+              hook es el único dueño del espacio inferior — aire sobre la gesture
+              bar en reposo, y el alto del teclado cuando está abierto. */}
           <View
             className="px-4 pt-4 bg-surface-low border-t border-surface-high"
             style={{ paddingBottom: inputBottomInset }}

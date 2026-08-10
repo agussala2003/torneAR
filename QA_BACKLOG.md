@@ -126,7 +126,7 @@ backend —que corre contra la **base de producción compartida** (`develop` y
 > Bajo riesgo: no toca lógica de dominio ni base de datos.
 
 - [ ] **A7** — Definir el patrón único de safe area para sheets/modales, tomando como referencia los que ya están correctos (modal de resultado 7.1 y modal de WO 8.1).
-- [ ] **A1 + A2** — Fix del `KeyboardAvoidingView` + insets del chat, replicado en `app/market-chats/[id].tsx` y `app/(modals)/chat.tsx`.
+- [x] **A1 + A2** — Fix del `KeyboardAvoidingView` + insets del chat, replicado en `app/market-chats/[id].tsx` y `app/(modals)/chat.tsx`. *(Causa raíz: dos mecanismos empujando el mismo espacio en Android edge-to-edge. `hooks/useKeyboardAwareBottomInset.ts` pasa a ser el único dueño del espacio inferior y el KAV queda sólo para iOS. Pendiente de verificar en los dos celulares físicos.)*
 - [ ] **A5a** — Padding inferior del modal selector de equipos.
 - [ ] **A4** — Padding inferior del modal de convocatoria («Confirmar lista» tapado).
 - [ ] **A6** — Padding inferior del modal de invitación a partido.
