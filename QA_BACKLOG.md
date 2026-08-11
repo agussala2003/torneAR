@@ -135,9 +135,12 @@ backend —que corre contra la **base de producción compartida** (`develop` y
 - [x] **A5b** — Escudos de equipo en el selector, con fallback a iniciales. *(Requirió traer `shield_url` al `teamStore`; `TeamShield` se movió a `components/ui/` por ser compartido entre `matches`, `home` y `ui`.)*
 - [x] **A10** — Copy del modal «cuenta creada» + que la navegación al onboarding espere al Aceptar. *(La retención del guard vive en `stores/signupGateStore.ts`.)*
 - [x] **A12** — Término unificado: **«Rating»**. Barrido hecho en perfil, mercado, gestión de equipo, ranking, disputas, admin, modales de partido y política de privacidad. Los identificadores internos (`elo_rating`, `prRating`, `eloHistory`) quedan como están a propósito: son el contrato con la base.
-- [ ] **A9** — Duración mínima visible de los loaders de login/registro.
-- [ ] **A11** — Cerrar el modal de propuesta al confirmar el envío.
-- [ ] **A8** — Splash inconsistente con sesión iniciada (el más sutil de reproducir; va al final de la fase).
+- [x] **A9** — Duración mínima visible de los loaders de login/registro. *(→ `hooks/useMinimumVisible.ts`, aplicado también en recuperar contraseña.)*
+- [x] **A11** — Cerrar el modal de propuesta al confirmar el envío. *(Causa raíz: el efecto de auto-apertura por parámetro de ruta no era de una sola vez y reabría el sheet en cada refresco.)*
+- [x] **A8** — Splash inconsistente con sesión iniciada. *(El intro se contaba desde el montaje, corriendo por debajo del splash nativo; ahora arranca cuando ese splash se va.)*
+
+**✅ Fase 1 completa** — 14/14 tareas. Todo pendiente de validación en los dos
+celulares físicos: son fallas visuales y de timing que no cubre ningún test.
 
 ### 🟢 Fase 2 — Formularios y Validaciones (Zod + React Hook Form)
 

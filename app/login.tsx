@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
 import { useSignupGateStore } from '@/stores/signupGateStore';
+import { useMinimumVisible } from '@/hooks/useMinimumVisible';
 import {
   signInSchema,
   signUpSchema,
@@ -25,6 +26,12 @@ export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
 
   const { showAlert, AlertComponent } = useCustomAlert();
+
+  // Flags de PRESENTACIÓN. Los guards de reentrada de abajo siguen mirando
+  // `loading` / `googleLoading` reales: si usaran estos, el formulario quedaría
+  // bloqueado más tiempo del que dura la operación.
+  const showAuthLoader = useMinimumVisible(loading);
+  const showGoogleLoader = useMinimumVisible(googleLoading);
 
   // El schema depende del modo: login no revalida el largo (cuentas viejas con
   // 6 caracteres deben poder entrar), registro exige PASSWORD_MIN_LENGTH.
@@ -245,8 +252,8 @@ export default function LoginScreen() {
 
         <HeroButton
           onPress={handleSubmit(onSubmit)}
-          isLoading={loading}
-          disabled={googleLoading}
+          isLoading={showAuthLoader}
+          disabled={showGoogleLoader}
           label={isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           style={{ marginBottom: 24, width: '100%', shadowColor: '#53E076', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
         />
@@ -259,8 +266,8 @@ export default function LoginScreen() {
 
         <GoogleAuthButton
           onPress={onGooglePress}
-          isLoading={googleLoading}
-          disabled={loading}
+          isLoading={showGoogleLoader}
+          disabled={showAuthLoader}
           label={isLogin ? 'Continuar con Google' : 'Registrarme con Google'}
         />
 
@@ -274,7 +281,7 @@ export default function LoginScreen() {
 
       {AlertComponent}
 
-      {loading && <GlobalLoader label={isLogin ? 'Iniciando sesion' : 'Creando cuenta'} />}
+      {showAuthLoader && <GlobalLoader label={isLogin ? 'Iniciando sesión' : 'Creando cuenta'} />}
     </KeyboardAvoidingView>
   );
 }

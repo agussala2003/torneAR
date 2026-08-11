@@ -36,6 +36,9 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+/** Cuánto se ve el intro animado, ya con el splash nativo fuera de pantalla. */
+const INTRO_DURATION_MS = 2300;
+
 /**
  * torneAR es dark-only.
  *
@@ -70,10 +73,20 @@ function RootNavigation() {
   // Gating) y refresca el expo_push_token del perfil. Se auto-gatea por sesión.
   usePushNotifications();
 
+  // El intro se cuenta desde que el splash NATIVO se fue, no desde el montaje.
+  //
+  // Antes arrancaba al montar, pero hasta `hydrated` la pantalla la seguía
+  // ocupando el splash nativo: los 2,3 s corrían por debajo, invisibles. Sin
+  // sesión eso no se notaba (hidratar es inmediato), pero con sesión guardada
+  // hay que leer AsyncStorage y traer el perfil, así que la hidratación se comía
+  // el intro — o entero, si tardaba más que la cuenta. De ahí el «a veces no
+  // aparece, sobre todo con la sesión iniciada» del módulo 1.1.
   useEffect(() => {
-    const timer = setTimeout(() => setShowIntro(false), 2300);
+    if (!hydrated) return;
+
+    const timer = setTimeout(() => setShowIntro(false), INTRO_DURATION_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [hydrated]);
 
   // Soltamos el splash nativo recién cuando leímos la sesión inicial. Para ese
   // momento este componente ya está montado renderizando <AppIntroSplash />,

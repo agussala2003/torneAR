@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useTeamStore } from '@/stores/teamStore';
@@ -172,12 +172,21 @@ export default function MatchDetailScreen() {
   // o EN_DISPUTA y esta pantalla se entera sin salir y volver a entrar.
   useMatchRealtime(matchId, useCallback(() => { void loadData(); }, [loadData]));
 
-  // Auto-open modal from navigation params once data loads
+  // Auto-open modal from navigation params once data loads.
+  //
+  // Se consume UNA sola vez. El parámetro sobrevive en la ruta, y `loading` y
+  // `match` cambian en cada `loadData()`, así que sin este guard el efecto
+  // volvía a correr al refrescar después de enviar: el sheet se cerraba y se
+  // reabría solo, tapando el alert de «Propuesta enviada» —que vive en esta
+  // pantalla y queda DETRÁS del <Modal> nativo—, y había que cerrarlo a mano
+  // para verlo (auditoría E2E, módulo 5).
+  const autoOpenConsumedRef = useRef(false);
   useEffect(() => {
-    if (!loading && match) {
-      if (openProposalModal === 'true') setShowProposalModal(true);
-      if (openResultModal === 'true') setShowResultModal(true);
-    }
+    if (loading || !match || autoOpenConsumedRef.current) return;
+
+    autoOpenConsumedRef.current = true;
+    if (openProposalModal === 'true') setShowProposalModal(true);
+    if (openResultModal === 'true') setShowResultModal(true);
   }, [loading, match, openProposalModal, openResultModal]);
 
   // ─── Patrón de resincronización ────────────────────────────────────────────
@@ -265,6 +274,12 @@ export default function MatchDetailScreen() {
     // abierto. Atraparlo aca mostraba el mensaje en el alert de esta pantalla,
     // que queda DETRAS del <Modal> nativo y por lo tanto no se ve.
     await submitProposal(match.id, myTeamId, data);
+
+    // Cierre explícito y sólo tras el éxito: si `submitProposal` lanza, nunca se
+    // llega acá y el sheet queda abierto con el formulario cargado. El
+    // `await loadData()` que sigue le da al <Modal> nativo tiempo de sobra para
+    // desmontarse antes de que el alert monte el suyo.
+    setShowProposalModal(false);
     await loadData();
     showAlert('Propuesta enviada', 'El rival recibirá tu propuesta.');
   }
