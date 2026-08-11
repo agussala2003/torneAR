@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { Colors } from '@/constants/theme';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { BlurView } from 'expo-blur';
-import { StyleSheet } from 'react-native';
+import { AppState, StyleSheet } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
 
@@ -19,6 +19,28 @@ export default function TabLayout() {
     if (profile?.id) {
       void fetchMyTeams(profile.id);
     }
+  }, [profile?.id, fetchMyTeams]);
+
+  /*
+   * Revalidacion al volver del segundo plano.
+   *
+   * Justamente porque este layout monta una sola vez, una expulsion ocurrida
+   * mientras la app estaba abierta no llegaba nunca: el equipo seguia en el
+   * selector hasta matar la app y reabrirla (auditoria E2E, modulo 4.3).
+   *
+   * Revalidar seguido es barato POR DISENO: `fetchMyTeams` compara el resultado
+   * campo a campo y, si nada cambio, conserva el array anterior y no publica
+   * estado nuevo. Sin esa comparacion esto dispararia recargas en cascada en
+   * todo consumidor que tenga `myTeams` en sus dependencias.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && profile?.id) {
+        void fetchMyTeams(profile.id);
+      }
+    });
+
+    return () => subscription.remove();
   }, [profile?.id, fetchMyTeams]);
 
   return (

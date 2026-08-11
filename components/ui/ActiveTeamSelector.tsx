@@ -1,17 +1,34 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList } from 'react-native';
 import { useTeamStore } from '@/stores/teamStore';
+import { useAuth } from '@/context/AuthContext';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SafeAreaBottomSheet } from '@/components/ui/SafeAreaBottomSheet';
 import { TeamShield } from '@/components/ui/TeamShield';
 
 export function ActiveTeamSelector() {
-  const { activeTeamId, activeTeamName, myTeams, setActiveTeam } = useTeamStore();
+  const { activeTeamId, activeTeamName, myTeams, setActiveTeam, fetchMyTeams } = useTeamStore();
+  const { profile } = useAuth();
   const [modalVisible, setModalVisible] = useState(false);
 
   if (myTeams.length < 2) {
     return null; // Ocultar si tiene 0 o 1 solo equipo
   }
+
+  /*
+   * Revalidar al ABRIR es lo que cierra el caso exacto del reporte: al usuario
+   * lo echaron de un equipo y el selector se lo seguía ofreciendo una y otra vez
+   * (auditoría E2E, módulo 4.3). Acá el gesto del usuario es la señal.
+   *
+   * Es barato: `fetchMyTeams` conserva el array anterior si nada cambió, así que
+   * abrir el selector cien veces no publica un solo estado nuevo. Y si el equipo
+   * expulsado era el activo, el propio store pivotea al primero disponible —o a
+   * vacío si se quedó sin club— antes de que la lista se pinte.
+   */
+  const handleOpen = () => {
+    setModalVisible(true);
+    if (profile?.id) void fetchMyTeams(profile.id);
+  };
 
   const handleSelect = (id: string, name: string) => {
     setActiveTeam(id, name);
@@ -22,7 +39,7 @@ export function ActiveTeamSelector() {
     <>
       <TouchableOpacity
         activeOpacity={0.8}
-        onPress={() => setModalVisible(true)}
+        onPress={handleOpen}
         className="flex-row items-center justify-center px-3 py-1.5 rounded-full bg-surface-high border border-neutral-outline-variant/15 gap-1.5"
       >
         <AppIcon family="material-community" name="shield-half-full" size={14} color="#BCCBB9" />

@@ -54,6 +54,9 @@ export default function MatchChatScreen() {
   // mensajes: indistinguible de un chat legitimamente vacio. Ahora el fallo es
   // explicito y reintentable.
   const [loadError, setLoadError] = useState(false);
+  // A13: mensajes optimistas que no se pudieron entregar. Estado efímero y local
+  // a la pantalla a propósito — no es dominio y no sobrevive a salir del chat.
+  const [failedMessageIds, setFailedMessageIds] = useState<string[]>([]);
   const [retryToken, setRetryToken] = useState(0);
 
   // Derive effective myTeamId (from param or from match membership)
@@ -170,7 +173,45 @@ export default function MatchChatScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [conversationId, profile, paramTeamId, retryToken]);
 
-  const handleSend = async () => {
+  /**
+   * Entrega (o reintenta) un mensaje ya pintado de forma optimista.
+   *
+   * Antes, al fallar, la burbuja se borraba de la lista: lo que el usuario había
+   * escrito simplemente se esfumaba, sin aviso ni forma de recuperarlo
+   * (auditoría E2E, módulo 3.3). Ahora queda visible y marcada, y el tap la
+   * reintenta con el mismo contenido.
+   */
+  const deliverMessage = useCallback(
+    async (message: MarketMessage) => {
+      if (!conversationId) return;
+
+      setFailedMessageIds((prev) => prev.filter((id) => id !== message.id));
+      setIsSending(true);
+      try {
+        const realMsg = await sendMessage(conversationId, message.content, myTeamId || undefined);
+        Logger.info('Mensaje enviado en el chat del partido', {
+          scope: 'chat.deliverMessage',
+          conversationId,
+          messageId: realMsg.id,
+          senderTeamId: myTeamId || null,
+        });
+        setMessages((prev) => prev.map((m) => (m.id === message.id ? realMsg : m)));
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      } catch (err) {
+        Logger.error('No se pudo enviar el mensaje del chat de partido', {
+          scope: 'chat.deliverMessage',
+          conversationId,
+          error: err,
+        });
+        setFailedMessageIds((prev) => [...prev, message.id]);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [conversationId, myTeamId],
+  );
+
+  const handleSend = () => {
     const text = inputText.trim();
     if (!text || !profile || !conversationId) return;
 
@@ -188,35 +229,15 @@ export default function MatchChatScreen() {
 
     setMessages((prev) => [...prev, tempMsg]);
     setInputText('');
-    setIsSending(true);
-
-    try {
-      const realMsg = await sendMessage(conversationId, text, myTeamId || undefined);
-      Logger.info('Mensaje enviado en el chat del partido', {
-        scope: 'chat.handleSend',
-        conversationId,
-        messageId: realMsg.id,
-        senderTeamId: myTeamId || null,
-      });
-      setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? realMsg : m)));
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch (err) {
-      // El mensaje optimista desaparece de la lista sin ningún aviso: desde el
-      // lado del usuario, lo que escribió simplemente se esfumó.
-      Logger.error('No se pudo enviar el mensaje del chat de partido', {
-        scope: 'chat.handleSend',
-        conversationId,
-        error: err,
-      });
-      setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
-    } finally {
-      setIsSending(false);
-    }
+    void deliverMessage(tempMsg);
   };
 
   const renderMessage = useCallback(({ item }: { item: MarketMessage }) => {
     const isMine = item.sender_profile_id === profile?.id;
-    const isTemp = item.id.startsWith('temp-');
+    const hasFailed = failedMessageIds.includes(item.id);
+    // Atenuado sólo mientras viaja: si ya falló, la burbuja vuelve a opacidad
+    // plena y lo que comunica el estado es el aviso de abajo.
+    const isInFlight = item.id.startsWith('temp-') && !hasFailed;
 
     // Show which team sent the message
     const senderLabel = isMine
@@ -238,7 +259,9 @@ export default function MatchChatScreen() {
               isMine
                 ? 'bg-brand-primary rounded-tr-sm'
                 : 'bg-surface-high rounded-tl-sm'
-            } ${isTemp ? 'opacity-60' : ''}`}
+            } ${isInFlight ? 'opacity-60' : ''} ${
+              hasFailed ? 'border border-danger-error/60' : ''
+            }`}
           >
             <Text
               className={`font-ui text-sm ${isMine ? 'text-[#003914]' : 'text-neutral-on-surface'}`}
@@ -253,10 +276,25 @@ export default function MatchChatScreen() {
               {formatTime(item.created_at)}
             </Text>
           </View>
+
+          {hasFailed && (
+            <TouchableOpacity
+              onPress={() => void deliverMessage(item)}
+              disabled={isSending}
+              activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              className="mt-1 flex-row items-center justify-end gap-1"
+            >
+              <AppIcon family="material-community" name="alert-circle-outline" size={12} color="#FFB4AB" />
+              <Text className="font-ui text-[10px] text-danger-error">
+                No enviado · Tocá para reintentar
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
-  }, [profile]);
+  }, [profile, failedMessageIds, isSending, deliverMessage]);
 
   const headerTitle = header
     ? `${header.teamAName} vs ${header.teamBName}`

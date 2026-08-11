@@ -155,9 +155,16 @@ celulares físicos: son fallas visuales y de timing que no cubre ningún test.
 
 > Acá empieza el riesgo de regresión: va después de tener la UI estable.
 
-- [ ] **C1** — Invalidación del `teamStore` ante cambios de membresía + manejo del caso «el equipo activo ya no existe».
-- [ ] **C2** — Incluir `match_participants` (con `is_guest`) en las queries de Partidos e Inicio, respetando la distinción unirse (`CONFIRMADO`) vs. visualizar (todos los estados posteriores).
-- [ ] **A13** — Feedback del mensaje fallido en el chat offline (reintentar / marcar como no enviado).
+- [x] **C1** — Revalidación del `teamStore` al abrir el selector y al volver del segundo plano. El pivoteo del equipo activo ya existía en el store; lo que faltaba era invalidar. *Sin realtime: `team_members` no está en la publicación `supabase_realtime` y agregarla es una migración — ver «Pendiente» abajo.*
+- [x] **C2** — Partidos e Inicio incluyen los partidos canjeados como invitado (`match_participants.is_guest`), sin migración: las tablas son de lectura pública bajo RLS. Unirse sigue restringido a `CONFIRMADO`; visualizar persiste en todos los estados posteriores.
+- [x] **A13** — El mensaje que falla queda visible, marcado «No enviado» y se reintenta con un toque. En los dos chats.
+
+**✅ Fase 3 completa** — 3/3 tareas.
+
+**Pendiente para Fase 4 (derivado de C1):** publicar `team_members` en
+`supabase_realtime` con `REPLICA IDENTITY FULL` (el filtro por `profile_id` en
+un DELETE necesita que la fila vieja viaje completa). Con eso la expulsión se
+vería en el acto y no en la próxima apertura del selector.
 
 ### 🟠 Fase 4 — Backend Supabase
 
