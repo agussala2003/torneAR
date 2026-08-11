@@ -1,6 +1,7 @@
 import { Image, Text, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { calculateAge, formatAge } from '@/lib/age';
 import type { ProfileRow } from './types';
 
 function positionLabel(pos: string): string {
@@ -15,6 +16,10 @@ export function StatsHeader({ profile }: StatsHeaderProps) {
   const avatarUrl = profile.avatar_url
     ? getSupabaseStorageUrl('avatars', profile.avatar_url)
     : null;
+
+  // `null` cuando el jugador no cargo su fecha de nacimiento: en ese caso no se
+  // renderiza el badge en vez de mostrar un "0 años" que parece un dato real.
+  const age = formatAge(calculateAge(profile.date_of_birth));
 
   return (
     <View className="items-center pb-2 pt-4">
@@ -42,7 +47,13 @@ export function StatsHeader({ profile }: StatsHeaderProps) {
         @{profile.username}
       </Text>
 
-      <View className="mt-3 flex-row items-center gap-3">
+      <View className="mt-3 flex-row flex-wrap items-center justify-center gap-3">
+        {age && (
+          <View className="flex-row items-center gap-1 rounded-full bg-surface-high px-3 py-1">
+            <AppIcon family="material-community" name="cake-variant-outline" size={12} color="#FABD32" />
+            <Text className="font-uiBold text-xs text-neutral-on-surface">{age}</Text>
+          </View>
+        )}
         <View className="flex-row items-center gap-1 rounded-full bg-surface-high px-3 py-1">
           <AppIcon family="material-community" name="map-marker-outline" size={12} color="#8CCDFF" />
           <Text className="font-uiBold text-xs text-neutral-on-surface">

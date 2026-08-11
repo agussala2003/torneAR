@@ -95,7 +95,7 @@ function MiniRankingRow({ entry, isLast }: RowProps) {
             {entry.eloRating}
           </Text>
           <Text className="font-ui text-[9px] uppercase tracking-wider text-neutral-outline">
-            Elo
+            Ranking
           </Text>
         </View>
       </View>

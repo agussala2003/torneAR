@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { RankingTeamRow } from './RankingTeamRow';
+import { RANKING_COL, RANKING_ROW_PX } from './rankingGrid';
 import type { RankingTeamEntry } from './types';
 
 interface Props {
@@ -48,13 +49,38 @@ export function RankingTable({ entries, onTeamPress, topLimit = 5, onClearFilter
             <Text className="mb-2.5 font-displayBlack text-base uppercase tracking-widest text-neutral-on-surface">
                 🏆 Mejores equipos
             </Text>
-            <View className="mb-2 flex-row items-center px-3">
-                <Text className="w-7 font-uiBold text-xs uppercase text-neutral-on-surface-variant">#</Text>
-                <View className="w-10" />
-                <Text className="flex-1 font-uiBold text-xs uppercase text-neutral-on-surface-variant">Equipo</Text>
-                <Text className="mr-4 font-uiBold text-xs uppercase text-neutral-on-surface-variant">EF%</Text>
-                <Text className="font-uiBold text-xs uppercase text-neutral-on-surface-variant">Rating</Text>
-                <View className="w-5" />
+            {/* Cada columna lee su ancho de RANKING_COL, igual que RankingTeamRow:
+                es lo que garantiza que los titulos caigan sobre sus valores. */}
+            <View
+                className="mb-2 flex-row items-center"
+                style={{ paddingHorizontal: RANKING_ROW_PX }}
+            >
+                <Text
+                    style={{ width: RANKING_COL.position }}
+                    className="font-uiBold text-xs uppercase text-neutral-on-surface-variant"
+                >
+                    #
+                </Text>
+                <View style={{ width: RANKING_COL.shield }} />
+                <Text
+                    style={{ minWidth: 0 }}
+                    className="flex-1 font-uiBold text-xs uppercase text-neutral-on-surface-variant"
+                >
+                    Equipo
+                </Text>
+                <Text
+                    style={{ width: RANKING_COL.efficiency }}
+                    className="font-uiBold text-right text-xs uppercase text-neutral-on-surface-variant"
+                >
+                    EF%
+                </Text>
+                <Text
+                    style={{ width: RANKING_COL.rating }}
+                    className="font-uiBold text-right text-xs uppercase text-neutral-on-surface-variant"
+                >
+                    Rating
+                </Text>
+                <View style={{ width: RANKING_COL.chevron }} />
             </View>
 
             {topTeams.map((entry, index) => (

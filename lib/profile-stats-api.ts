@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
+import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { Database } from '@/types/supabase';
 import type {
   ProfileStatsViewData,
@@ -10,6 +12,8 @@ import type {
 
 type TeamRole = Database['public']['Enums']['team_role'];
 
+type RawScorer = { profile_id: string; goals: number };
+
 type ParticipantRaw = {
   team_id: string;
   matches: {
@@ -19,11 +23,19 @@ type ParticipantRaw = {
     match_type: string;
     team_a_id: string;
     team_b_id: string;
-    team_a: { name: string } | null;
-    team_b: { name: string } | null;
-    match_results: { team_id: string; goals_scored: number; goals_against: number }[];
+    team_a: { name: string; shield_url: string | null } | null;
+    team_b: { name: string; shield_url: string | null } | null;
+    match_results: {
+      team_id: string;
+      goals_scored: number;
+      goals_against: number;
+      mvp_id: string | null;
+      scorers: RawScorer[] | null;
+    }[];
   } | null;
 };
+
+type EloHistoryRaw = { match_id: string; team_id: string; delta: number };
 
 type BadgeRpcRow = {
   id: string; slug: string; name: string;
@@ -35,6 +47,16 @@ type TeamRaw = {
   role: TeamRole;
   teams: { id: string; name: string; elo_rating: number; shield_url: string | null } | null;
 };
+
+/**
+ * Los escudos se guardan como path del bucket, salvo los que ya vinieron como
+ * URL absoluta de una migracion vieja. Resolverlo en el DAL y no en la pantalla
+ * evita repetir el mismo ternario en cada componente que pinta un escudo.
+ */
+function resolveShieldUrl(shieldUrl: string | null): string | null {
+  if (!shieldUrl) return null;
+  return shieldUrl.startsWith('http') ? shieldUrl : getSupabaseStorageUrl('shields', shieldUrl);
+}
 
 function percent(n: number, d: number): string {
   if (d <= 0) return '0%';
@@ -61,9 +83,9 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
         matches(
           id, scheduled_at, status, match_type,
           team_a_id, team_b_id,
-          team_a:teams!team_a_id(name),
-          team_b:teams!team_b_id(name),
-          match_results(team_id, goals_scored, goals_against)
+          team_a:teams!team_a_id(name, shield_url),
+          team_b:teams!team_b_id(name, shield_url),
+          match_results(team_id, goals_scored, goals_against, mvp_id, scorers)
         )
       `)
       .eq('profile_id', profileId)
@@ -96,29 +118,67 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
     (row) => !!row.matches,
   );
 
+  // Movimiento de Ranking por partido. Va en una consulta aparte porque
+  // `elo_history` no cuelga de `match_participants` y los ids no se conocen
+  // hasta que vuelve la consulta de arriba.
+  //
+  // La clave es match_id + team_id: la tabla guarda una fila por equipo y por
+  // partido, asi que filtrar solo por match_id traeria tambien el delta del
+  // rival — que es justo el numero opuesto al que hay que mostrar.
+  const rankDeltaByMatch = new Map<string, number>();
+  const matchIds = participantRows.map((row) => row.matches!.id);
+
+  if (matchIds.length > 0) {
+    const eloRes = await supabase
+      .from('elo_history')
+      .select('match_id, team_id, delta')
+      .in('match_id', matchIds);
+
+    if (eloRes.error) {
+      // Accesorio: sin esto el historial se muestra igual, solo que sin el
+      // badge de Ranking. Queda registrado para no confundir "no se pudo leer"
+      // con "este partido no movio el Ranking".
+      Logger.warn('No se pudo leer el movimiento de Ranking del historial', {
+        scope: 'profileStats.fetchProfileStatsViewData',
+        profileId,
+        error: eloRes.error,
+      });
+    }
+
+    for (const row of (eloRes.data as EloHistoryRaw[]) ?? []) {
+      rankDeltaByMatch.set(`${row.match_id}:${row.team_id}`, row.delta);
+    }
+  }
+
   const recentMatches: RecentMatchResult[] = participantRows
     .map((row) => {
       const match = row.matches!;
-      const rivalName =
-        match.team_a_id === row.team_id
-          ? (match.team_b?.name ?? 'Rival')
-          : (match.team_a?.name ?? 'Rival');
+      const isTeamA = match.team_a_id === row.team_id;
+      const rival = isTeamA ? match.team_b : match.team_a;
+      const rivalName = rival?.name ?? 'Rival';
 
       let result: 'V' | 'E' | 'D' | null = null;
       let goalsFor: number | null = null;
       let goalsAgainst: number | null = null;
 
+      // El resultado del equipo propio es tambien el que trae al MVP y a los
+      // goleadores: `match_results` tiene una fila por equipo y cada capitan
+      // carga la suya.
+      const own = match.match_results.find((r) => r.team_id === row.team_id);
+
       if (match.status === 'FINALIZADO') {
-        const own = match.match_results.find((r) => r.team_id === row.team_id);
         if (own) {
           goalsFor = own.goals_scored;
           goalsAgainst = own.goals_against;
           result = goalsFor > goalsAgainst ? 'V' : goalsFor < goalsAgainst ? 'D' : 'E';
         }
       } else if (match.status === 'WO_A' || match.status === 'WO_B') {
-        const isTeamA = match.team_a_id === row.team_id;
         result = (match.status === 'WO_A') === isTeamA ? 'V' : 'D';
       }
+
+      const playerGoals = (own?.scorers ?? [])
+        .filter((scorer) => scorer.profile_id === profileId)
+        .reduce((total, scorer) => total + Number(scorer.goals ?? 0), 0);
 
       return {
         id: match.id,
@@ -126,9 +186,13 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
         status: match.status,
         matchType: match.match_type,
         rivalName,
+        rivalShieldUrl: resolveShieldUrl(rival?.shield_url ?? null),
         goalsFor,
         goalsAgainst,
         result,
+        playerGoals,
+        isMvp: own?.mvp_id === profileId,
+        rankDelta: rankDeltaByMatch.get(`${match.id}:${row.team_id}`) ?? null,
       };
     })
     .sort((a, b) => {

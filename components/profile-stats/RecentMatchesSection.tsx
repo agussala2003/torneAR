@@ -1,5 +1,7 @@
 import { Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { getInitials } from '@/lib/market-utils';
 import type { RecentMatchResult } from './types';
 
 function formatDate(dateIso: string | null): string {
@@ -49,6 +51,56 @@ function ResultBadge({ result }: { result: 'V' | 'E' | 'D' | null }) {
   );
 }
 
+/**
+ * Escudo del rival. `expo-image` y no el `Image` de RN: cachea en disco, y esta
+ * lista repite los mismos escudos entre partidos.
+ */
+function RivalShield({ shieldUrl, rivalName }: { shieldUrl: string | null; rivalName: string }) {
+  if (shieldUrl) {
+    return (
+      <Image
+        source={{ uri: shieldUrl }}
+        style={{ width: 28, height: 28, borderRadius: 14 }}
+        contentFit="cover"
+      />
+    );
+  }
+
+  // Iniciales antes que un escudo generico: en una lista de partidos el icono
+  // repetido no distingue a un rival de otro.
+  return (
+    <View className="h-7 w-7 items-center justify-center rounded-full bg-surface-high">
+      <Text className="font-uiBold text-[10px] text-neutral-on-surface-variant">
+        {getInitials(rivalName)}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Badge del movimiento de Ranking.
+ *
+ * El 0 se muestra en gris y sin signo: "no se movio" es informacion, y pintarlo
+ * de verde o rojo sugeriria un cambio que no hubo.
+ */
+function RankDeltaBadge({ delta }: { delta: number }) {
+  const tone =
+    delta > 0
+      ? 'bg-brand-primary/15 text-brand-primary'
+      : delta < 0
+        ? 'bg-danger-error/15 text-danger-error'
+        : 'bg-surface-high text-neutral-on-surface-variant';
+
+  return (
+    <Text
+      className={`font-uiBold rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${tone}`}
+      style={{ fontVariant: ['tabular-nums'] }}
+    >
+      {delta > 0 ? `+${delta}` : delta} Rank
+    </Text>
+  );
+}
+
 type RecentMatchesSectionProps = {
   matches: RecentMatchResult[];
 };
@@ -75,19 +127,44 @@ export function RecentMatchesSection({ matches }: RecentMatchesSectionProps) {
               <ResultBadge result={match.result} />
 
               <View className="flex-1">
-                <Text className="font-uiBold text-sm text-neutral-on-surface" numberOfLines={1}>
-                  vs {match.rivalName}
-                </Text>
-                <View className="mt-0.5 flex-row items-center gap-2">
+                <View className="flex-row items-center gap-2">
+                  <RivalShield shieldUrl={match.rivalShieldUrl} rivalName={match.rivalName} />
+                  <Text
+                    className="font-uiBold flex-1 text-sm text-neutral-on-surface"
+                    numberOfLines={1}
+                  >
+                    vs {match.rivalName}
+                  </Text>
+                </View>
+
+                <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
                   <Text className="font-uiBold rounded bg-surface-high px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-neutral-on-surface-variant">
                     {match.matchType === 'RANKING' ? 'Ranking' : 'Amistoso'}
                   </Text>
+                  {match.rankDelta !== null && <RankDeltaBadge delta={match.rankDelta} />}
                   {!!match.scheduledAt && (
                     <Text className="font-ui text-[11px] text-neutral-on-surface-variant">
                       {formatDate(match.scheduledAt)}
                     </Text>
                   )}
                 </View>
+
+                {/* Hitos personales: solo aparecen cuando ocurrieron. Una fila
+                    de "0 goles / no fuiste MVP" en cada partido seria ruido. */}
+                {(match.playerGoals > 0 || match.isMvp) && (
+                  <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
+                    {match.playerGoals > 0 && (
+                      <Text className="font-uiBold rounded bg-brand-primary/15 px-1.5 py-0.5 text-[9px] text-brand-primary">
+                        ⚽ Anotaste {match.playerGoals}
+                      </Text>
+                    )}
+                    {match.isMvp && (
+                      <Text className="font-uiBold rounded bg-warning-tertiary/15 px-1.5 py-0.5 text-[9px] text-warning-tertiary">
+                        ⭐ MVP
+                      </Text>
+                    )}
+                  </View>
+                )}
               </View>
 
               {match.goalsFor !== null && match.goalsAgainst !== null ? (
