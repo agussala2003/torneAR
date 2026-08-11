@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, Platform } from 'react-native';
-import type { KeyboardEvent } from 'react-native';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 
 /**
  * Padding inferior de una barra fija anclada al fondo (el input de los chats).
@@ -39,7 +39,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  */
 export function useKeyboardAwareBottomInset(gap = 8): number {
   const insets = useSafeAreaInsets();
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const keyboardHeight = useKeyboardHeight();
   const [restingInset, setRestingInset] = useState(insets.bottom);
 
   // Sólo se actualiza con el teclado cerrado (ver "el inset de reposo se congela").
@@ -48,24 +48,6 @@ export function useKeyboardAwareBottomInset(gap = 8): number {
       setRestingInset(insets.bottom);
     }
   }, [insets.bottom, keyboardHeight, restingInset]);
-
-  useEffect(() => {
-    // `will` en iOS: llega antes de la animación, así que el cambio va en el
-    // mismo frame. En Android `keyboardDidShow`/`DidHide` son los únicos que
-    // disparan.
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, (event: KeyboardEvent) => {
-      setKeyboardHeight(event.endCoordinates?.height ?? 0);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   // Reposo: la altura real de la gesture bar (o de los botones) más el aire.
   if (keyboardHeight === 0) {

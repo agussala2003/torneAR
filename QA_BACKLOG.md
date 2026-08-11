@@ -125,12 +125,12 @@ backend —que corre contra la **base de producción compartida** (`develop` y
 
 > Bajo riesgo: no toca lógica de dominio ni base de datos.
 
-- [ ] **A7** — Definir el patrón único de safe area para sheets/modales, tomando como referencia los que ya están correctos (modal de resultado 7.1 y modal de WO 8.1).
+- [x] **A7** — Definir el patrón único de safe area para sheets/modales, tomando como referencia los que ya están correctos (modal de resultado 7.1 y modal de WO 8.1). *(→ `components/ui/SafeAreaBottomSheet.tsx` + `hooks/useBottomInset.ts` + `hooks/useKeyboardHeight.ts`.)*
 - [x] **A1 + A2** — Fix del `KeyboardAvoidingView` + insets del chat, replicado en `app/market-chats/[id].tsx` y `app/(modals)/chat.tsx`. *(Causa raíz: dos mecanismos empujando el mismo espacio en Android edge-to-edge. `hooks/useKeyboardAwareBottomInset.ts` pasa a ser el único dueño del espacio inferior y el KAV queda sólo para iOS. Pendiente de verificar en los dos celulares físicos.)*
-- [ ] **A5a** — Padding inferior del modal selector de equipos.
-- [ ] **A4** — Padding inferior del modal de convocatoria («Confirmar lista» tapado).
-- [ ] **A6** — Padding inferior del modal de invitación a partido.
-- [ ] **A7** — Barrido del resto de modales aplicando el patrón definido.
+- [x] **A5a** — Padding inferior del modal selector de equipos. *(Además: tope de alto, para que la lista scrollee en vez de cortarse.)*
+- [x] **A4** — Padding inferior de la barra «Confirmar lista» de la convocatoria. *(No era un modal sino una barra absoluta en `app/match-checkin.tsx` con `pb-8` fijo.)*
+- [x] **A6** — Padding inferior del modal de invitación a partido (`GuestJoinModal`).
+- [x] **A7** — Barrido del resto de sheets aplicando el patrón: `ResultModal`, `WoModal`, `ProposalModal`, `CancellationModal`, `FilterModal` (mercado) y `RankingFilterModal`.
 - [ ] **A3** — Teclado tapando la Descripción en el modal de crear publicación del Mercado.
 - [ ] **A5b** — Escudos de equipo en el selector, con placeholder por defecto.
 - [ ] **A10** — Copy del modal «cuenta creada» + que la navegación al onboarding espere al Aceptar.
