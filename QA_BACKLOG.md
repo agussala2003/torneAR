@@ -183,7 +183,8 @@ vería en el acto y no en la próxima apertura del selector.
 - [x] **E1** — `[functions.push-dispatch] verify_jwt = false` en `supabase/config.toml`. Probado en local: sin header `Authorization` la petición **llega a la función**, que ahora es quien decide (401 con secreto incorrecto, 200 con el correcto). El trigger no necesita cambios. **Requiere redesplegar la función** para que aplique en producción.
 - [ ] **E2** — Revalidar el deep link de la push en cold start (paso 4.2). Bloqueado hasta que E1 esté desplegado.
 - [x] **D3** — `UPDATE` sin `WHERE` acotado en `transition_season` (migración `20260811121000`). Probado end-to-end en local: 22 equipos con contadores sucios → 0, temporada rotada, `rollback`.
-- [ ] **D4** — Re-verificar la evolución de Rating con una temporada ya iniciada. Desbloqueado por D3, pendiente de validación en dispositivo.
+- [x] **D4** — **Causa raíz encontrada, y no era la temporada.** `seasons` y `elo_history` tenían RLS activo y **cero policies** (deny-all silencioso): el cliente leía 0 filas sin error. Corregido con `*_select_all` en la migración `20260811140000`. Ver **D6** abajo. Falta la revalidación visual en dispositivo, ya desbloqueada.
+- [x] **D6** — **RLS sin policies en `seasons` y `elo_history`** (migración `20260811140000`). Heredado de `20240101000001_prod_parity_gap`, que replicó el `ENABLE ROW LEVEL SECURITY` que producción había puesto a mano sobre 5 tablas; 3 recibieron policies después, estas 2 nunca. Sólo `SELECT` con `using (true)`: son catálogo competitivo público y las escrituras siguen cerradas (las hacen RPCs `SECURITY DEFINER`). Verificado en local: `authenticated` pasa de 0 a 1 temporada y de 0 a 32 filas de historial; el `INSERT` del cliente sigue rebotando y el `UPDATE` afecta 0 filas.
 - [x] **D1** — Visibilidad del `unique_code` restringida a `CONFIRMADO` en `app/match-detail.tsx`.
 - [x] **D2** — `checkin_geofence_radius_m` a 500 m (migración `20260810120000`, validada en local). *El logging de la distancia real queda pendiente: es cambio de RPC, no de configuración.*
 - [x] **D5** — Auditado y **documentado como bloqueante**: no hay App ID real hasta que exista la ficha en App Store Connect, así que no hay valor correcto que cargar. La migración deja el `UPDATE` listo y la guarda operativa escrita (no subir la mínima de iOS).
@@ -208,6 +209,7 @@ Tres migraciones esperan autorización explícita para el `db push` (`develop` y
 | `20260811121000_fix_transition_season_where` | Acota el `UPDATE` de `transition_season` | ✅ probado end-to-end con rollback |
 | `20260811130000_checkin_distance_telemetry` | Registra la distancia real del check-in en `app_logs` | ✅ check-in real a 120 m registrado |
 | `20260811131000_transition_season_reset_team_rankings` | Resetea también los contadores por formato | ✅ Rating y partidos jugados intactos |
+| `20260811140000_seasons_elo_history_select_policies` | Policies de `SELECT` en `seasons` y `elo_history` (D6) | ✅ lectura restituida, escritura sigue cerrada |
 
 > Las dos últimas reescriben RPCs con `CREATE OR REPLACE`. Sus cuerpos se
 > tomaron de `pg_get_functiondef` sobre la base viva, **no** de los archivos de
@@ -225,7 +227,7 @@ push-dispatch`): `verify_jwt` se aplica al desplegar, así que el cambio de
 | ID | Qué falta | Estado |
 |---|---|---|
 | **E2** | Deep link de la push en cold start | Bloqueado hasta desplegar E1 |
-| **D4** | Evolución de Rating con temporada iniciada | Desbloqueado por D3; a validar en dispositivo |
+| **D4** | Evolución de Rating y panel de Temporadas | Arreglado (D6); a revalidar en dispositivo tras el `db push` |
 | **Validación física** | Los 25 hallazgos, en los dos celulares | Ningún test cubre insets, timings ni push reales |
 
 ### Cerrado en esta última pasada
