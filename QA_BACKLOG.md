@@ -180,35 +180,46 @@ vería en el acto y no en la próxima apertura del selector.
   `[functions.push-dispatch]` en `supabase/config.toml`) y el trigger sólo manda
   `x-push-secret`, sin `Authorization`. El secreto del vault y `pg_net` quedan
   descartados: la petición sale y llega, la rebota el gateway.
-- [ ] **E1** — Aplicar la corrección (desactivar `verify_jwt` para `push-dispatch` o mandar el header de servicio desde el trigger) y redesplegar.
-- [ ] **E2** — Revalidar el deep link de la push en cold start (paso 4.2, quedó sin testear por E1).
-- [ ] ⏸️ **D3** — Localizar y acotar el `UPDATE` sin `WHERE` en la RPC de transición de temporada. *Pausado para la próxima sesión.*
-- [ ] ⏸️ **D4** — Re-verificar la evolución de Rating con una temporada ya iniciada (bloqueado por D3). *Pausado.*
+- [x] **E1** — `[functions.push-dispatch] verify_jwt = false` en `supabase/config.toml`. Probado en local: sin header `Authorization` la petición **llega a la función**, que ahora es quien decide (401 con secreto incorrecto, 200 con el correcto). El trigger no necesita cambios. **Requiere redesplegar la función** para que aplique en producción.
+- [ ] **E2** — Revalidar el deep link de la push en cold start (paso 4.2). Bloqueado hasta que E1 esté desplegado.
+- [x] **D3** — `UPDATE` sin `WHERE` acotado en `transition_season` (migración `20260811121000`). Probado end-to-end en local: 22 equipos con contadores sucios → 0, temporada rotada, `rollback`.
+- [ ] **D4** — Re-verificar la evolución de Rating con una temporada ya iniciada. Desbloqueado por D3, pendiente de validación en dispositivo.
 - [x] **D1** — Visibilidad del `unique_code` restringida a `CONFIRMADO` en `app/match-detail.tsx`.
 - [x] **D2** — `checkin_geofence_radius_m` a 500 m (migración `20260810120000`, validada en local). *El logging de la distancia real queda pendiente: es cambio de RPC, no de configuración.*
 - [x] **D5** — Auditado y **documentado como bloqueante**: no hay App ID real hasta que exista la ficha en App Store Connect, así que no hay valor correcto que cargar. La migración deja el `UPDATE` listo y la guarda operativa escrita (no subir la mínima de iOS).
-- [ ] ⏸️ **A14** — Mostrar la distancia a cada complejo al elegir sede (cálculo sobre coordenadas ya presentes en `venues`). *Pausado para la próxima sesión.*
+- [x] **A14** — Distancia a cada complejo al elegir sede (`lib/geo.ts`, Haversine en el cliente). Sin RPC: `venues.lat/lng` ya viajaba en la consulta. Sólo se muestra si el permiso de ubicación ya estaba concedido.
 
 ---
 
-## Estado al cierre de la sesión del 2026-08-10
+## Estado al cierre de la sesión del 2026-08-11
 
-**Cerrado:** Fases 1, 2 y 3 completas (21 hallazgos) + D1, D2 y D5.
+**Las 4 fases están cerradas en código.** Los 25 hallazgos de la auditoría
+tienen corrección, salvo los que quedan explícitamente abiertos abajo.
 
-**En pausa para la próxima sesión:**
+### ⚠️ Nada fue desplegado a producción
 
-| ID | Qué falta | Por qué está pausado |
+Tres migraciones esperan autorización explícita para el `db push` (`develop` y
+`main` comparten la base de producción):
+
+| Migración | Qué hace | Validada en local |
 |---|---|---|
-| **E1** | Aplicar la corrección de `verify_jwt` y redesplegar `push-dispatch` | Causa raíz ya confirmada; la corrección toca el despliegue de la edge function |
-| **E2** | Revalidar el deep link en cold start | Bloqueado por E1 |
-| **D3 / D4** | `UPDATE` sin `WHERE` en la transición de temporada | Requiere leer y corregir la RPC completa |
-| **A14** | Distancia a cada complejo | Cálculo geoespacial + cambio de UI en `ProposalModal` |
-| **C1 (realtime)** | Publicar `team_members` en `supabase_realtime` con `REPLICA IDENTITY FULL` | Migración a producción; la revalidación al abrir el selector ya cubre el caso reportado |
-| **D2 (logging)** | Registrar la distancia real medida en cada check-in | Cambio de RPC, no de configuración |
+| `20260810120000_quick_wins_settings` | Geofence 150 → 500 m | ✅ verificado |
+| `20260811120000_realtime_team_members` | Publica `team_members` + `REPLICA IDENTITY FULL` | ✅ verificado (`relreplident = 'f'`) |
+| `20260811121000_fix_transition_season_where` | Acota el `UPDATE` de `transition_season` | ✅ probado end-to-end con rollback |
 
-> ⚠️ **Ninguna migración fue empujada a producción.** `20260810120000` está
-> validada contra el stack local y espera autorización explícita para el
-> `db push`: `develop` y `main` comparten la base de producción.
+Además, **`push-dispatch` necesita redespliegue** (`supabase functions deploy
+push-dispatch`): `verify_jwt` se aplica al desplegar, así que el cambio de
+`config.toml` no surte efecto en producción hasta entonces.
+
+### Abierto
+
+| ID | Qué falta | Estado |
+|---|---|---|
+| **E2** | Deep link de la push en cold start | Bloqueado hasta desplegar E1 |
+| **D4** | Evolución de Rating con temporada iniciada | Desbloqueado por D3; a validar en dispositivo |
+| **D2 (logging)** | Registrar la distancia real de cada check-in | Cambio de RPC; permitiría bajar el radio con datos |
+| `team_rankings` | Sus contadores de temporada **nunca se resetean** en `transition_season` | Deuda detectada al arreglar D3; ver el comentario de la migración `20260811121000`. Corregirlo mueve números ya visibles en el ranking — decisión de dominio |
+| **Validación física** | Los 25 hallazgos, en los dos celulares | Ningún test cubre insets, timings ni push reales |
 
 ---
 
