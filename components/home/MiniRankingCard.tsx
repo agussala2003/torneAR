@@ -1,10 +1,11 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { TeamShield } from '@/components/matches/TeamShield';
-import type { MiniRankingEntry } from './types';
+import { TeamShield } from '@/components/ui/TeamShield';
+import type { MiniRankingContext, MiniRankingEntry } from './types';
 import type { Database } from '@/types/supabase';
 
 type TeamFormat = Database['public']['Enums']['team_format'];
+type TeamCategory = Database['public']['Enums']['team_category'];
 
 const FORMAT_LABEL: Record<TeamFormat, string> = {
   FUTBOL_5: 'Fútbol 5',
@@ -14,6 +15,22 @@ const FORMAT_LABEL: Record<TeamFormat, string> = {
   FUTBOL_9: 'Fútbol 9',
   FUTBOL_11: 'Fútbol 11',
 };
+
+const CATEGORY_LABEL: Record<TeamCategory, string> = {
+  HOMBRES: 'Hombres',
+  MUJERES: 'Mujeres',
+  MIXTO: 'Mixto',
+};
+
+/** Chip de contexto de la cabecera (formato, categoría, zona). */
+function ContextChip({ label, icon }: { label: string; icon: string }) {
+  return (
+    <View className="flex-row items-center gap-1 rounded-full border border-brand-primary/25 bg-brand-primary/10 px-2 py-0.5">
+      <AppIcon family="material-community" name={icon} size={11} color="#53E076" />
+      <Text className="font-uiBold text-[10px] text-brand-primary">{label}</Text>
+    </View>
+  );
+}
 
 /** Oro / plata / bronce. El resto (no debería haber) cae en el gris de siempre. */
 const PODIUM_STYLE: Record<number, { bg: string; text: string; border: string }> = {
@@ -36,7 +53,15 @@ function MiniRankingRow({ entry, isLast }: RowProps) {
 
   return (
     <View>
-      <View className="flex-row items-center gap-3 px-4 py-3">
+      {/* La fila propia se despega del resto con fondo + borde izquierdo verde:
+          el nombre en verde solo se perdía cuando el equipo caía 2º o 3º. */}
+      <View
+        className={`flex-row items-center gap-3 py-3 pr-4 ${
+          entry.isMyTeam
+            ? 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[14px]'
+            : 'pl-4'
+        }`}
+      >
         {/* Posición */}
         <View
           className="h-7 w-7 items-center justify-center rounded-full border"
@@ -82,8 +107,12 @@ function MiniRankingRow({ entry, isLast }: RowProps) {
 
 interface Props {
   entries: MiniRankingEntry[];
-  /** Formato con el que se consultó el top 3. `null` mientras no se conoce. */
-  format: TeamFormat | null;
+  /**
+   * Zona + categoría + formato con los que se consultó el top 3. `null` mientras
+   * no se conoce. Es el mismo contexto que se manda por params a la tab Ranking:
+   * lo que se lee en los chips es exactamente lo que se va a ver al entrar.
+   */
+  context: MiniRankingContext | null;
   loading: boolean;
   onPress: () => void;
 }
@@ -92,14 +121,15 @@ interface Props {
  * Tarjeta de sólo presentación: la consulta a Supabase vive en la pantalla Home.
  * Acá no hay más lógica que elegir entre esqueleto, vacío y las tres filas.
  */
-export function MiniRankingCard({ entries, format, loading, onPress }: Props) {
-  const formatLabel = format ? FORMAT_LABEL[format] : null;
+export function MiniRankingCard({ entries, context, loading, onPress }: Props) {
+  const formatLabel = context?.format ? FORMAT_LABEL[context.format] : null;
+  const categoryLabel = context?.category ? CATEGORY_LABEL[context.category] : null;
 
   return (
     <View className="mb-5">
       <View className="mb-3 flex-row items-center justify-between">
         <Text className="font-displayBlack text-xs uppercase tracking-widest text-neutral-on-surface-variant">
-          Top 3 {formatLabel ?? 'del ranking'}
+          Ranking
         </Text>
         <TouchableOpacity activeOpacity={0.7} onPress={onPress}>
           <Text className="font-uiBold text-xs text-info-secondary">Ver ranking</Text>
@@ -111,6 +141,34 @@ export function MiniRankingCard({ entries, format, loading, onPress }: Props) {
         onPress={onPress}
         className="overflow-hidden rounded-2xl bg-surface-container"
       >
+        {/* ── Cabecera con contexto ──────────────────────────────────────────
+            Una franja propia, más clara que el cuerpo y con el trofeo en verde:
+            el widget arrancaba directo en la fila 1 y no decía de qué torneo
+            era la tabla. */}
+        <View className="flex-row items-center gap-2.5 border-b border-neutral-outline/20 bg-surface-high/50 px-4 py-3">
+          <View className="h-8 w-8 items-center justify-center rounded-full bg-brand-primary/15">
+            <AppIcon family="material-community" name="trophy" size={17} color="#53E076" />
+          </View>
+
+          <View className="flex-1">
+            <Text className="font-displayBlack text-[15px] text-neutral-on-surface" numberOfLines={1}>
+              Top 3 {formatLabel ?? 'del ranking'}
+            </Text>
+
+            {/* `flex-wrap`: con zonas de nombre largo ("Zona Oeste GBA") los tres
+                chips no entran en una línea y se recortarían. */}
+            <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
+              {categoryLabel && <ContextChip label={categoryLabel} icon="account-group" />}
+              {context?.zone && <ContextChip label={context.zone} icon="map-marker" />}
+              {!categoryLabel && !context?.zone && (
+                <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-outline">
+                  Todas las zonas y categorías
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+
         {loading ? (
           // Tres filas fantasma con la misma altura que las reales: sin salto de
           // layout cuando llega la respuesta.

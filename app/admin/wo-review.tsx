@@ -223,7 +223,7 @@ export default function WoReviewScreen() {
         title={dialog?.approve ? 'Aprobar WO' : 'Rechazar WO'}
         message={
           dialog?.approve
-            ? 'Se asignará el 3-0, se aplicarán las estadísticas (ELO, temporada, Fair Play) y se acreditarán los goleadores/MVP. Esta acción no se puede deshacer.'
+            ? 'Se asignará el 3-0, se aplicarán las estadísticas (Rating, temporada, Fair Play) y se acreditarán los goleadores/MVP. Esta acción no se puede deshacer.'
             : 'El reclamo será rechazado. Podés dejar una nota con el motivo.'
         }
         confirmLabel={dialog?.approve ? 'Aprobar' : 'Rechazar'}

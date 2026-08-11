@@ -35,6 +35,30 @@ function parseBirthDate(dateOfBirth: string): { year: number; month: number; day
   return { year, month, day };
 }
 
+/** Edad mínima para registrarse en la app. */
+export const MINIMUM_SIGNUP_AGE = 18;
+
+/**
+ * Años cumplidos a partir de un `Date` ya parseado.
+ *
+ * Existe como función aparte porque hay dos formatos de entrada en la app: la
+ * columna `date_of_birth` ('YYYY-MM-DD') que consume `calculateAge`, y el
+ * `DD/MM/YYYY` del formulario, que el schema de Zod ya convirtió a `Date` para
+ * validar el calendario. Sin este punto de entrada, el schema tendría que
+ * re-serializar la fecha a string sólo para volver a parsearla acá.
+ */
+export function calculateAgeFromDate(birthDate: Date, now: Date = new Date()): number | null {
+  let age = now.getFullYear() - birthDate.getFullYear();
+
+  // Todavía no cumplió este año: se descuenta uno.
+  const monthDiff = now.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+
+  return age < 0 ? null : age;
+}
+
 /**
  * Años cumplidos.
  *
@@ -51,15 +75,7 @@ export function calculateAge(
   const birth = parseBirthDate(dateOfBirth);
   if (!birth) return null;
 
-  let age = now.getFullYear() - birth.year;
-
-  // Todavía no cumplió este año: se descuenta uno.
-  const monthDiff = now.getMonth() + 1 - birth.month;
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.day)) {
-    age -= 1;
-  }
-
-  return age < 0 ? null : age;
+  return calculateAgeFromDate(new Date(birth.year, birth.month - 1, birth.day), now);
 }
 
 /** "27 años" / "1 año", o `null` si no hay edad que mostrar. */

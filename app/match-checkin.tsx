@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { useBottomInset } from '@/hooks/useBottomInset';
 import { fetchCheckinViewData, submitTeamCheckin, getCheckinErrorMessage } from '@/lib/checkin-data';
 import { getCheckinLocation } from '@/lib/checkin-location';
 import { GlobalLoader } from '@/components/GlobalLoader';
@@ -29,6 +30,8 @@ const NEXT_STATE: Record<CheckinLineupState, CheckinLineupState> = {
 export default function MatchCheckinScreen() {
   const { matchId, myTeamId } = useLocalSearchParams<{ matchId: string; myTeamId: string }>();
   const { showAlert, AlertComponent } = useCustomAlert();
+  // Barra de acción anclada al fondo: mismo criterio que los bottom sheets.
+  const bottomInset = useBottomInset({ gap: 12, minimum: 24 });
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -236,8 +239,15 @@ export default function MatchCheckinScreen() {
         )}
       </ScrollView>
 
-      {/* Confirmación fija abajo con motivo inline si los cupos no dan */}
-      <View className="absolute inset-x-0 bottom-0 bg-surface-base px-4 pb-8 pt-3 shadow-ambient-lg">
+      {/* Confirmación fija abajo con motivo inline si los cupos no dan.
+          El `pb-8` fijo que había acá no contemplaba la gesture bar: en
+          edge-to-edge la barra se dibuja encima y el botón «Confirmar lista»
+          quedaba parcialmente pisado. El `gap` suma aire por sobre el inset
+          para que el botón no comparta franja con el gesto de "volver". */}
+      <View
+        className="absolute inset-x-0 bottom-0 bg-surface-base px-4 pt-3 shadow-ambient-lg"
+        style={{ paddingBottom: bottomInset }}
+      >
         {blockReason && (
           <View className="mb-2 flex-row items-center gap-2 rounded-xl bg-warning-tertiary/10 px-3 py-2">
             <AppIcon family="material-community" name="alert-circle-outline" size={14} color="#FABD32" />

@@ -124,83 +124,105 @@ persista los datos que después alimentan la edad y el promedio del plantel.
 
 ### 1.1 Registro con email (Celu A)
 
-- [ ] 📱**A** — Abrir la app recién instalada.
+- [✅] 📱**A** — Abrir la app recién instalada.
       **Esperado:** splash de intro (~2,3 s) y luego `/login`. Sin flash blanco
       entre el splash nativo y el de la app.
-- [ ] 📱**A** — Tocar el enlace para cambiar a modo registro. Ingresar email y
+      **Resultado:**: El splash suele aparecer diria un 90% de las veces, mas cuando lo abro por primera vez o sin tener sesion iniciada. Cuando tengo sesion iniciada ahi si que a veces no aparece.
+- [✅] 📱**A** — Tocar el enlace para cambiar a modo registro. Ingresar email y
       contraseña válidos. Enviar.
       **Esperado:** la cuenta se crea y arranca el flujo de confirmación por
       email si está activado en el proyecto.
-- [ ] 📱**A** — Probar el camino infeliz: registrarse con un email ya usado.
+      **Resultado:**: Salta un modal de cuenta creada, y revisa tu mail para confirmarlo y verificarlo pero antes de que pueda darle a aceptar ya pasa a la pestaña del onboarding, esto pasa porque en realidad no tengo activada la confirmacion del email en supbase. Entonces deberiamos informarle, tu cuenta fue creada correctamente y que si redirija al onboarding, osea entiendo que solo seria cambiar el mensaje
+- [✅] 📱**A** — Probar el camino infeliz: registrarse con un email ya usado.
       **Esperado:** mensaje de error legible en español, **no** el texto crudo
       de Supabase (`User already registered`).
-- [ ] 📱**A** — Probar contraseña corta (< mínimo del schema Zod).
+      **Resultado:**: Correcto, informa "El correo electrónico ya está registrado, proba iniciando sesión.".
+- [✅] 📱**A** — Probar contraseña corta (< mínimo del schema Zod).
       **Esperado:** error de validación inline, sin llamada a la red.
-- [ ] 📱**A** — Confirmar el email si corresponde y entrar.
+      **Resultado:**: Correcto, informa "La contraseña debe tener al menos 8 caracteres.". Aunque el boton de crear cuenta sigue habilitado para presionar y puedo presionarlo infinitamente mientras mi contraseña no cumpla los requisitos y no informa nada, creo que seria bueno deshabilitar el boton con diseño hasta que cumpla todos los requesitos de validacion
+- [✅] 📱**A** — Confirmar el email si corresponde y entrar.
       **Esperado:** al tener sesión pero perfil incompleto, el guard de
       [`app/_layout.tsx`](app/_layout.tsx#L131) redirige a `/onboarding`.
       **No** debe poder llegar a `/(tabs)`.
+      **Resultado:**: Correcto, salta el onboarding automaticamente. Lo que si en general de este modulo de registro y login los loaders funcionan raro, a veces se muestran muy poco y desaparecen y es como que no le hacen entender al usuario que esta cargando, hay que revisar los loaders en este aspecto y como funcionan
 
 ### 1.2 Onboarding de 3 pasos (Celu A)
 
 El formulario valida por paso; el botón de avanzar dispara `trigger()` sobre
 los campos de ese paso.
 
-- [ ] 📱**A** — **Paso 1 «Datos Base»**: dejar el nombre vacío e intentar avanzar.
+- [✅] 📱**A** — **Paso 1 «Datos Base»**: dejar el nombre vacío e intentar avanzar.
       **Esperado:** no avanza, error inline en el campo.
-- [ ] 📱**A** — Completar `Nombre completo`, `Usuario` y `Zona` (selector modal).
+      **Resultado**: Correcto, salta un mensaje de error inline debajo del campo.
+- [✅] 📱**A** — Completar `Nombre completo`, `Usuario` y `Zona` (selector modal).
       **Esperado:** la barra de progreso pasa a 2/3.
-- [ ] 📱**A** — Probar un `Usuario` ya existente.
+      **Resultado**: Correcto, la barra de progreso pasa a 2/3.
+- [✅] 📱**A** — Probar un `Usuario` ya existente.
       **Esperado:** error claro de unicidad, no un 409 crudo.
-- [ ] 🎯 📱**A** — **Paso 2 «Datos Personales»**: ingresar la **fecha de
+      **Resultado**: Correcto, informa "Este usuario ya existe, proba otro." Pero en lo informa una vez completo los 3 pasos y procesa, quiero aclarar eso nada mas.
+- [✅] 🎯 📱**A** — **Paso 2 «Datos Personales»**: ingresar la **fecha de
       nacimiento** con una fecha conocida (anotala, se usa en 1.4). Completar
       género, pie hábil y equipo favorito.
       **Esperado:** la máscara de fecha (`lib/date-mask.ts`) formatea mientras
       se escribe. Una fecha imposible (`31/02/1995`) debe ser rechazada.
-- [ ] 📱**A** — Probar una fecha **futura**.
+      **Resultado:**: Correcto, la máscara de fecha formatea mientras se escribe. Una fecha imposible (`31/02/1995`) debe ser rechazada. Informa el error inline. Aun asi cuando vuelvo a escribir una fecha valida (18/12/1997) me sigue diciendo que la fecha es invalida, osea no desaparece el error inline, aunque puedo darle a siguiente y me lleva a la siguiente pestaña, yo ajustria que los erorers inline desaparezcan cuando se corrige el error y el boton de siguiente se habilite solo cuando todos los campos del paso actual son validos, exactamente, que manejemos los botones con habilitacion y deshabiliacion segun si los campos son validos o no
+- [✅] 📱**A** — Probar una fecha **futura**.
       **Esperado:** rechazada por validación.
-- [ ] 📱**A** — **Paso 3 «Tu Cancha»**: elegir posición preferida. Finalizar.
+      **Resultado**: Incorrecto, puse 28/02/2027 y me acepto la fecha, deberia rechazarla porque es futura.
+- [✅] 📱**A** — **Paso 3 «Tu Cancha»**: elegir posición preferida. Finalizar.
       **Esperado:** navega a `/(tabs)` (Home). Ya no se puede volver a
       `/onboarding` con el botón atrás.
-- [ ] 📱**A** — Matar la app por completo y reabrir.
+      **Resultado**: Correcto, me lleva a la pestaña de home.
+- [✅] 📱**A** — Matar la app por completo y reabrir.
       **Esperado:** entra directo a `/(tabs)` sin repetir el onboarding — la
       sesión se hidrata desde AsyncStorage.
+      **Resultado**: Correcto, entra directo a `/(tabs)` sin repetir el onboarding — la sesión se hidrata desde AsyncStorage.
 
 ### 1.3 Registro con Google (Celu B)
 
-- [ ] 📱**B** — En `/login`, tocar el botón de Google.
+- [✅] 📱**B** — En `/login`, tocar el botón de Google.
       **Esperado:** abre el navegador/custom tab con el consentimiento.
-- [ ] 🎯 📱**B** — **Cancelar** el consentimiento cerrando la ventana.
+      **Resultado**: Correcto, me redirige a la pagina de iniciar sesion de google.
+- [✅] 🎯 📱**B** — **Cancelar** el consentimiento cerrando la ventana.
       **Esperado:** la app vuelve al login **sin** mostrar un error rojo —
       cancelar es una decisión del usuario, no un fallo. Se debe poder
       reintentar inmediatamente.
-- [ ] 📱**B** — Completar el login con Google.
+      **Resultado**: Correcto, cuando vuelvo a la app vuelve al login sin ningun error.
+- [✅] 📱**B** — Completar el login con Google.
       **Esperado:** vuelve a la app y, como Google no aporta zona/posición/pie
       hábil/nacimiento, cae en `/onboarding`.
-- [ ] 📱**B** — Completar los 3 pasos con una **fecha de nacimiento distinta**
+      **Resultado**: Correcto, me vuelve a la app y como no me aporto ningun dato me redirige al onboarding.
+- [✅] 📱**B** — Completar los 3 pasos con una **fecha de nacimiento distinta**
       a la de A (anotala).
       **Esperado:** llega a `/(tabs)`.
+      **Resultado**: Correcto, llega a la pestaña de home.
 
 ### 1.4 🎯 Verificación del cálculo de edad
 
-- [ ] 📱**A** — Ir a la pestaña **Perfil**.
+- [✅] 📱**A** — Ir a la pestaña **Perfil**.
       **Esperado:** junto a los chips de zona y posición aparece un chip con
       ícono de torta y el texto **`N años`**, coherente con la fecha de 1.2.
-- [ ] 📱**B** — Ídem con su propia fecha.
+      **Resultado**: Correcto, aparece el chip con el icono de torta y la edad.
+- [✅] 📱**B** — Ídem con su propia fecha.
       **Esperado:** la edad corresponde a **años cumplidos**.
-- [ ] 🎯 🗄️ **SQL** — Caso borde del cumpleaños. Poner la fecha de nacimiento de
+- [✅] 🎯 🗄️ **SQL** — Caso borde del cumpleaños. Poner la fecha de nacimiento de
       A **exactamente en la fecha de hoy** de hace 30 años
       ([Anexo A.1](#a1--forzar-una-fecha-de-nacimiento)).
       Recargar el perfil en 📱**A**.
       **Esperado:** muestra **30 años**, no 29. La edad se cuenta el mismo día
       del cumpleaños.
-- [ ] 🗄️ **SQL** — Ahora poner la fecha **un día después** (cumple mañana).
+      **Resultado**: Correcto, muestra 30 años.
+- [✅] 🗄️ **SQL** — Ahora poner la fecha **un día después** (cumple mañana).
       **Esperado:** muestra **29 años**.
-- [ ] ↩️ 🗄️ **SQL** — Restaurar la fecha original de A.
-- [ ] 🗄️ **SQL** — Poner `date_of_birth = NULL` en A y recargar.
+      **Resultado**: Correcto, muestra 29 años.
+- [✅] ↩️ 🗄️ **SQL** — Restaurar la fecha original de A.
+      **Resultado**: Correcto, muestra la edad original.
+- [✅] 🗄️ **SQL** — Poner `date_of_birth = NULL` en A y recargar.
       **Esperado:** el chip de edad **desaparece por completo**. No debe verse
       `— años` ni `null años` ni `0 años`.
-- [ ] ↩️ 🗄️ **SQL** — Restaurar la fecha de A.
+      **Resultado**: Correcto, te redirige al onboarding, ya que se requiere si o si la fecha de nacimiento.
+- [✅] ↩️ 🗄️ **SQL** — Restaurar la fecha de A.
+      **Resultado**: Correcto, muestra la edad original.
 
 ---
 
@@ -211,36 +233,46 @@ edad del plantel.
 
 ### 2.1 Edición de perfil
 
-- [ ] 📱**A** — Perfil → editar. Cambiar nombre y posición. Guardar.
+- [✅] 📱**A** — Perfil → editar. Cambiar nombre y posición. Guardar.
       **Esperado:** vuelve a la pantalla de perfil con los datos nuevos ya
       pintados, sin necesidad de recargar.
-- [ ] 📱**A** — Editar la fecha de nacimiento y guardar.
+      **Resultado**: Correcto, vuelve a la pantalla de perfil con los datos nuevos ya pintados, sin necesidad de recargar.
+- [✅] 📱**A** — Editar la fecha de nacimiento y guardar.
       **Esperado:** el chip de edad se recalcula.
-- [ ] 🎯 📱**A** — Subir un **avatar** desde la galería, con recorte cuadrado.
+      **Resultado**: Correcto, el chip de edad se recalcula.
+- [✅] 🎯 📱**A** — Subir un **avatar** desde la galería, con recorte cuadrado.
       **Esperado:** spinner durante la subida; al terminar se ve la foto y el
       badge de la esquina pasa de `+` a `✓` (verificado).
-- [ ] 📱**A** — Verificar en **Supabase → Storage → `avatars`** que el archivo
+      **Resultado**: Correcto, spinner durante la subida; al terminar se ve la foto y el badge de la esquina pasa de + a ✓ (verificado).
+- [✅] 📱**A** — Verificar en **Supabase → Storage → `avatars`** que el archivo
       existe.
       **Esperado:** un objeto nuevo bajo la ruta del perfil.
-- [ ] 📱**A** — Probar el camino infeliz: **denegar** el permiso de galería.
+      **Resultado**: Correcto, se ve un objeto nuevo bajo la ruta del perfil.
+- [✅] 📱**A** — Probar el camino infeliz: **denegar** el permiso de galería.
       **Esperado:** alert explicando que se necesita el permiso. La app no
       crashea ni queda con el spinner colgado.
+      **Resultado**: Correcto, alert explicando que se necesita el permiso. La app no crashea ni queda con el spinner colgado.
 
 ### 2.2 Creación de los dos equipos
 
-- [ ] 📱**A** — Crear **Equipo A**: nombre, zona, categoría, formato preferido
+- [✅] 📱**A** — Crear **Equipo A**: nombre, zona, categoría, formato preferido
       (usar **FUTBOL_5** para que el quórum de check-in sea bajo).
       **Esperado:** se crea y A queda como `CAPITAN`.
-- [ ] 📱**B** — Crear **Equipo B** con los mismos criterios.
+      **Resultado**: Correcto, se crea y A queda como CAPITAN.
+- [✅] 📱**B** — Crear **Equipo B** con los mismos criterios.
       **Esperado:** ídem para B.
-- [ ] 🎯 📱**A** — En gestión de equipo, subir el **escudo** (recorte incluido).
+      **Resultado**: Correcto, ídem para B.
+- [✅] 🎯 📱**A** — En gestión de equipo, subir el **escudo** (recorte incluido).
       **Esperado:** spinner; luego el escudo se ve en el header. Verificar el
       objeto en **Storage → `shields`**.
-- [ ] 📱**A** — Copiar el **código de invitación** del equipo con el botón de
+      **Resultado**: Correcto, spinner; luego el escudo se ve en el header. Verificar el objeto en Storage → `shields`.
+- [✅] 📱**A** — Copiar el **código de invitación** del equipo con el botón de
       copiar.
       **Esperado:** feedback de copiado y el código en el portapapeles.
-- [ ] 📱**A** — Probar el botón de **compartir** invitación.
+      **Resultado**: Correcto, feedback de copiado y el código en el portapapeles.
+- [✅] 📱**A** — Probar el botón de **compartir** invitación.
       **Esperado:** abre el share sheet nativo de Android.
+      **Resultado**: Correcto, abre el share sheet nativo de Android.
 
 ### 2.3 🎯 Promedio de edad del plantel
 
@@ -248,23 +280,32 @@ Con un solo miembro por equipo el promedio es trivialmente igual a su edad. Para
 probarlo de verdad hay que sumar jugadores — se hace en el módulo 3 vía mercado,
 así que **este bloque se completa recién después del 3.5**.
 
-- [ ] 📱**A** — Gestión de equipo → bloque **«Resumen»**.
+- [✅] 📱**A** — Gestión de equipo → bloque **«Resumen»**.
       **Esperado:** debajo de las baldosas de PR / Partidos / Fair Play hay una
       fila **«Promedio de edad»** con el valor en años.
-- [ ] 📱**A** — Contrastar contra la lista de jugadores de más abajo: cada
+      **Resultado**: Correcto, debajo de las baldosas de PR / Partidos / Fair Play hay una
+      fila **«Promedio de edad»** con el valor en años.
+- [✅] 📱**A** — Contrastar contra la lista de jugadores de más abajo: cada
       jugador muestra su posición y su edad separadas por `·`.
       **Esperado:** el promedio coincide con el cálculo manual, redondeado a
       **un decimal**.
-- [ ] 🎯 🗄️ **SQL** — Poner `date_of_birth = NULL` a **uno** de los miembros
+      **Resultado**: Correcto, el promedio coincide con el cálculo manual, redondeado a
+      un decimal.
+- [✅] 🎯 🗄️ **SQL** — Poner `date_of_birth = NULL` a **uno** de los miembros
       del equipo A ([Anexo A.1](#a1--forzar-una-fecha-de-nacimiento)) y recargar.
       **Esperado (lo importante):** el promedio **NO** se desploma. Ese jugador
       queda excluido del cálculo y aparece la aclaración
       **«sobre N de M jugadores con fecha cargada»**.
       **Fallo a reportar:** si el promedio cae a la mitad, se está contando el
       `NULL` como 0.
-- [ ] 🗄️ **SQL** — Poner `date_of_birth = NULL` a **todos** los miembros.
+      **Resultado**: Correcto, el promedio no se desploma. Ese jugador
+      queda excluido del cálculo y aparece la aclaración
+      **«sobre N de M jugadores con fecha cargada»**.
+- [✅] 🗄️ **SQL** — Poner `date_of_birth = NULL` a **todos** los miembros.
       **Esperado:** la fila muestra `—`, sin romper la pantalla.
-- [ ] ↩️ 🗄️ **SQL** — Restaurar todas las fechas.
+      **Resultado**: Correcto, la fila muestra `—`, sin romper la pantalla.
+- [✅] ↩️ 🗄️ **SQL** — Restaurar todas las fechas.
+      **Resultado**: Correcto, se restauran todas las fechas.
 
 ---
 
@@ -275,36 +316,48 @@ y el traspaso de un jugador.
 
 ### 3.1 Publicación y postulación
 
-- [ ] 📱**A** — Mercado → crear publicación de tipo **`BUSCA_EQUIPO`** o
+- [✅] 📱**A** — Mercado → crear publicación de tipo **`BUSCA_EQUIPO`** o
       **`BUSCA_PARTIDO`** según el caso a probar. Completar y publicar.
       **Esperado:** aparece en el listado del mercado.
-- [ ] ⏱️ 📱**B** — **Sin tocar nada**, entrar a la pestaña Mercado.
+      **Resultado**: Correcto, aparece en el listado del mercado. Lo que si hay que tener en cuenta es que al momento de crear la publicacion con el modal, al querer escribir la descripcion se tapa por el teclado y no puedo ver a medida que escribo, deberiamos poner la descripcion antes del teclado para que se pueda ver. O en todo caso poner la descripcion arriba del teclado o hacer que se pueda scrollear el modal.
+- [✅] ⏱️ 📱**B** — **Sin tocar nada**, entrar a la pestaña Mercado.
       **Esperado:** la publicación de A aparece (el listado recarga con
       `useFocusEffect`).
-- [ ] 📱**B** — Postularse a la publicación de A.
+      **Resultado**: Correcto, la publicación de A aparece (el listado recarga con
+      `useFocusEffect`).
+- [✅] 📱**B** — Postularse a la publicación de A.
       **Esperado:** confirmación y la postulación queda registrada.
-- [ ] 📱**B** — Ir a «Mis postulaciones».
+      **Resultado**: Correcto, confirmación y la postulación queda registrada.
+- [✅] 📱**B** — Ir a «Mis postulaciones».
       **Esperado:** la postulación figura en estado pendiente.
-- [ ] 📱**B** — Intentar postularse **dos veces** a la misma publicación.
+      **Resultado**: Correcto, la postulación figura en estado pendiente.
+- [✅] 📱**B** — Intentar postularse **dos veces** a la misma publicación.
       **Esperado:** bloqueado con un mensaje claro, no un error 409 crudo.
+      **Resultado**: Correcto, abre un modal diciendo que la postulacion ya estaba hecha.
 
 ### 3.2 Notificaciones de la postulación
 
-- [ ] 🎯 📱**A** — Abrir el ícono de campanita → `/notifications`.
+- [✅] 🎯 📱**A** — Abrir el ícono de campanita → `/notifications`.
       **Esperado:** hay una notificación **in-app** de la postulación de B, con
       su badge de no leído.
-- [ ] 📱**A** — Tocar la notificación.
+      **Resultado**: Correcto, hay una notificación in-app de la postulación de B, con
+      su badge de no leído.
+- [✅] 📱**A** — Tocar la notificación.
       **Esperado:** navega al detalle correspondiente y el badge de no leídos
       baja.
-- [ ] 🔔 **PUSH** 🎯 📱**A** — Con la app en **segundo plano**, repetir 3.1
+      **Resultado**: Correcto, navega al detalle correspondiente y el badge de no leídos
+      baja.
+- [❌] 🔔 **PUSH** 🎯 📱**A** — Con la app en **segundo plano**, repetir 3.1
       desde B.
       **Esperado:** llega una **push notification** al system tray.
       Verificá el **ícono pequeño** en la barra de estado: debe verse la
       **silueta de la pelota con la flecha**, no un cuadrado blanco.
       **Fallo a reportar:** cuadrado/círculo blanco sólido → el
       `notification-icon.png` no tiene el alfa correcto.
-- [ ] 🔔 **PUSH** 📱**A** — Desplegar la notificación.
+      **Resultado**: Incorrecto, no llega la notificacion push. 
+- [❌] 🔔 **PUSH** 📱**A** — Desplegar la notificación.
       **Esperado:** el acento de color es el verde de marca (`#53E076`).
+      **Resultado**: Incorrecto, No lleega la notificacion push.
 
 ### 3.3 🎯 Stress test visual del chat
 
@@ -313,86 +366,105 @@ Este es el bloque más importante del módulo. Se valida el fix de
 
 **Chat del Mercado** (`app/market-chats/[id].tsx`):
 
-- [ ] 📱**A** — Abrir el chat de la postulación.
-- [ ] 🎯 📱**A** — **Con el teclado cerrado**, mirar la barra del input.
+- [✅] 📱**A** — Abrir el chat de la postulación.
+      **Resultado**: Correcto, abre el chat de la postulación.
+- [✅] 🎯 📱**A** — **Con el teclado cerrado**, mirar la barra del input.
       **Esperado:** hay aire entre el borde inferior del input y el borde de la
       pantalla. En un equipo con **gesture bar**, el input **no** debe quedar
       pisado por la barra del sistema.
       **Fallo a reportar:** el input pegado al borde o tapado por la barra.
-- [ ] 🎯 📱**A** — Tocar el input para **abrir el teclado**.
+      **Resultado**: Correcto, tapado por la barra pero no hay aire entre la barra y el input, faltaria un pequeño paffing inferior
+- [✅] 🎯 📱**A** — Tocar el input para **abrir el teclado**.
       **Esperado:** el input **sube** y queda **inmediatamente** sobre el
       teclado. Sin franja muerta entre el input y el teclado, y sin que el input
       quede tapado.
       **Fallo a reportar:** hueco visible (se estaría sumando el inset al empuje
       del KAV) o input debajo del teclado (el KAV no estaría empujando).
-- [ ] 📱**A** — Escribir un mensaje **multilínea** largo (el input es `multiline`).
+      **Resultado**: Correcto, el input sube con el teclado y se agranda junto con el mensaje, este funcinoamiento es correcto, lo que funciona mas o menos es que al bajar el teclado el input ahi si queda con muchisimo aire entre la barra y el input, nose porque, queda muy despegado y arriba de la barra, deberia quedar igual que cuando ingreso al chat por primera vez
+- [✅] 📱**A** — Escribir un mensaje **multilínea** largo (el input es `multiline`).
       **Esperado:** el input crece hacia arriba, el botón de enviar sigue
       alineado y visible.
-- [ ] 📱**A** — Cerrar el teclado con el botón atrás.
+      **Resultado**: Correcto, nada que aclarar
+- [❌] 📱**A** — Cerrar el teclado con el botón atrás.
       **Esperado:** el input vuelve a su posición con el aire del inset.
       **Sin salto brusco ni parpadeo.**
-- [ ] 📱**A** — Rotar el dispositivo si la orientación lo permite (la app está
+      **Resultado**: Es lo que comente en uno de los puntos anteriores lo que funciona mas o menos es que al bajar el teclado el input ahi si queda con muchisimo aire entre la barra y el input, nose porque, queda muy despegado y arriba de la barra, deberia quedar igual que cuando ingreso al chat por primera vez
+- [✅] 📱**A** — Rotar el dispositivo si la orientación lo permite (la app está
       fijada en `portrait`, así que debería ignorarse).
       **Esperado:** no rota; nada se rompe.
+      **Resultado**: Correcto, no rota
 
 **Chat del Partido** (`app/(modals)/chat.tsx`) — repetir los mismos chequeos
 cuando exista un partido (después del módulo 4):
 
-- [ ] 🎯 📱**A** — Repetir los 4 chequeos de arriba en el chat del partido.
+- [✅] 🎯 📱**A** — Repetir los 4 chequeos de arriba en el chat del partido.
       **Esperado:** comportamiento idéntico. El header muestra
       `Equipo A vs Equipo B` y el código del partido.
+      **Resultado**: Mismo compoertamiento que el modulo anterior, hay que ajustar exactamente lo mismo
 
 **Concurrencia y tiempo real:**
 
-- [ ] 🎯 ⏱️ 📱**A** + 📱**B** — Con **el chat abierto en los dos**, escribir
+- [✅] 🎯 ⏱️ 📱**A** + 📱**B** — Con **el chat abierto en los dos**, escribir
       desde A.
       **Esperado:** el mensaje aparece en **B en menos de ~2 s** sin tocar nada
       (WebSocket de `postgres_changes` sobre `messages`).
-- [ ] ⏱️ 📱**B** — Responder desde B.
+- [✅] ⏱️ 📱**B** — Responder desde B.
       **Esperado:** aparece en A igual de rápido.
-- [ ] 🎯 📱**A** + 📱**B** — **Escribir y enviar a la vez** en ambos (contá
+      **Resultado**: Perfecto
+- [✅] 🎯 📱**A** + 📱**B** — **Escribir y enviar a la vez** en ambos (contá
       3-2-1 y toquen enviar juntos).
       **Esperado:** los dos mensajes aparecen en ambos dispositivos, **sin
       duplicados** y en orden coherente por `created_at`. El mensaje propio no
       se duplica al volver por realtime (se filtra por `sender_profile_id`).
-- [ ] 🎯 📱**A** — Activar **modo avión**, escribir y enviar.
+      **Resultado**: Perfecto
+- [✅] 🎯 📱**A** — Activar **modo avión**, escribir y enviar.
       **Esperado:** el mensaje aparece **atenuado** (optimista, `opacity-60`) y
       luego **desaparece** al fallar el envío.
       **Nota de QA:** hoy desaparece **sin aviso al usuario** — está comentado
       como problema conocido en el código. Reportalo si querés que se priorice,
       pero no como regresión.
-- [ ] ↩️ 📱**A** — Desactivar modo avión.
-- [ ] 📱**B** — Estando en el chat, matar la app y reabrirla en el chat.
+      **Resultado**: Desaparece en un parpadeo pero no informa nada
+- [✅] ↩️ 📱**A** — Desactivar modo avión.
+- [✅] 📱**B** — Estando en el chat, matar la app y reabrirla en el chat.
       **Esperado:** el historial se recarga completo y el badge de no leídos
       queda en 0.
+      **Resultado**: Perfecto
 
 ### 3.4 Camino infeliz del chat
 
-- [ ] 🎯 📱**A** — Con modo avión activo, entrar a un chat **desde cero**.
+- [✅] 🎯 📱**A** — Con modo avión activo, entrar a un chat **desde cero**.
       **Esperado:** estado de error explícito («No se pudo cargar el chat») con
       botón **Reintentar** — **no** un chat vacío indistinguible de uno sin
       mensajes.
-- [ ] 📱**A** — Desactivar avión y tocar **Reintentar**.
+      **Resultado**: Informa el error correctamente
+- [✅] 📱**A** — Desactivar avión y tocar **Reintentar**.
       **Esperado:** carga correctamente.
+      **Resultado**: Recarga correctamente
 
 ### 3.5 Traspaso / incorporación del jugador
 
-- [ ] 📱**A** — Aceptar la postulación de B (o del jugador de prueba).
+- [✅] 📱**A** — Aceptar la postulación de B (o del jugador de prueba).
       **Esperado:** confirmación; el jugador pasa a integrar el plantel.
-- [ ] ⏱️ 📱**B** — Sin tocar nada, mirar la campanita.
+      **Resultado**: Correcto, el jugador pasa a integrar el plantel
+- [✅] ⏱️ 📱**B** — Sin tocar nada, mirar la campanita.
       **Esperado:** notificación in-app de aceptación.
-- [ ] 📱**A** — Gestión de equipo → lista de jugadores.
+      **Resultado**: Correcto, llega la notificacion IN APP
+- [✅] 📱**A** — Gestión de equipo → lista de jugadores.
       **Esperado:** el nuevo jugador aparece con su rol, posición y **edad**.
-- [ ] 🎯 📱**A** — **Volver ahora al bloque [2.3](#23--promedio-de-edad-del-plantel)**
+- [✅] 🎯 📱**A** — **Volver ahora al bloque [2.3](#23--promedio-de-edad-del-plantel)**
       y completarlo: con 2+ jugadores el promedio ya es verificable.
-- [ ] 📱**A** — Cambiar el **rol** del jugador a `SUBCAPITAN`.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Cambiar el **rol** del jugador a `SUBCAPITAN`.
       **Esperado:** se refleja en la lista.
-- [ ] 🎯 📱**B** — Intentar, desde una cuenta con rol `JUGADOR`, cambiar roles o
+      **Resultado**: Correcto y para destacar que en este caso SI ME LLEGO LA NOTIFICACION POR FUERA DE LA APP EN EL OTRO CELU DONDE SE ME INFORMO QUE AHORA TENGO UN NUEVO ROL Y SOY SUBCAPITAN, PARA TOMARLO COMO BASE CON RESPECTO A TODO EL RESTO DE NOTIFICAICON QUE SE PRUEBAN Y DEBEN LLEGAR POR FUERA DE LA APP PERO NO LLEGAN, ESTA FUNCIONO PERFECTO
+- [✅] 🎯 📱**B** — Intentar, desde una cuenta con rol `JUGADOR`, cambiar roles o
       expulsar a otro.
       **Esperado:** los botones de gestión no están disponibles. La restricción
       debe ser **server-side**, no sólo visual.
-- [ ] 📱**A** — Expulsar al jugador del equipo.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Expulsar al jugador del equipo.
       **Esperado:** sale del plantel y el promedio de edad se recalcula.
+      **Resultado**: Correcto, tambien llega la notificacion fuer ade la app
 
 ---
 
@@ -403,67 +475,87 @@ el cooldown de 30 días.
 
 ### 4.1 Envío del desafío
 
-- [ ] 📱**A** — Pestaña **Ranking**.
+- [✅] 📱**A** — Pestaña **Ranking**.
       **Esperado:** el listado muestra los equipos con su PR. Los equipos dados
       de baja (`is_active = false`) **no** aparecen.
-- [ ] 📱**A** — Buscar el **Equipo B** y enviarle un desafío de tipo
+      **Resultado**: Correcto
+- [✅] 📱**A** — Buscar el **Equipo B** y enviarle un desafío de tipo
       **`RANKING`**.
       **Esperado:** confirmación de envío.
-- [ ] 🎯 📱**A** — Intentar enviar **otro desafío al mismo equipo** de inmediato.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Intentar enviar **otro desafío al mismo equipo** de inmediato.
       **Esperado:** bloqueado — ya hay un desafío activo con ese rival
       (`uq_challenges_active_pair`). Mensaje legible.
+      **Resultado**: Correcto
 
 ### 4.2 🎯 Recepción en segundo plano (Celu B)
 
-- [ ] 🔔 **PUSH** 🎯 📱**B** — Poner la app **en segundo plano** (botón home, no
+- [❌] 🔔 **PUSH** 🎯 📱**B** — Poner la app **en segundo plano** (botón home, no
       matarla). Que A envíe el desafío.
       **Esperado:** llega una **push notification** al system tray con el título
       del desafío. Al tocarla, la app abre directo en `/challenge-inbox`.
-- [ ] 🔔 **PUSH** 🎯 📱**B** — Repetir con la app **completamente cerrada**
+      **Resultado**: Incorrecto, no llega la notificaicon por fuera del app
+- [❌] 🔔 **PUSH** 🎯 📱**B** — Repetir con la app **completamente cerrada**
       (cold start: deslizar de recientes).
       **Esperado:** llega la push. Al tocarla, la app arranca de cero y —una vez
       hidratada la sesión— navega al desafío. El deep link queda **pendiente**
       hasta que hay sesión y se consume una sola vez (`useDeepLinkStore`).
       **Fallo a reportar:** que abra en Home y se pierda el destino, o que
       navegue dos veces.
-- [ ] 🎯 📱**B** — Verificar el **canal de notificación**: Ajustes → Apps →
+      **Resultado**: Incorrecto. el hecho de qu eno llegue no me permite testear
+- [✅] 🎯 📱**B** — Verificar el **canal de notificación**: Ajustes → Apps →
       TorneAR → Notificaciones.
       **Esperado:** existe el canal **`default`** (lo declara el plugin y lo crea
       el código con importancia máxima). **Fallo a reportar:** que las
       notificaciones caigan en un canal «Miscellaneous».
-- [ ] 📱**B** — Abrir la app y mirar la campanita.
+      **Resultado**: Correcto
+- [✅] 📱**B** — Abrir la app y mirar la campanita.
       **Esperado:** también hay notificación **in-app** del desafío. Push e
       in-app son dos canales distintos; ambos deben existir.
-- [ ] 🗄️ **SQL** — Confirmar que el token quedó registrado:
+      **Resultado**: Correcto, esta in app, no por fuera
+- [✅] 🗄️ **SQL** — Confirmar que el token quedó registrado:
       `select expo_push_token from profiles where username = '<usuario-B>';`
       **Esperado:** un valor `ExponentPushToken[…]`.
       **Si está `NULL`** el build no tiene FCM o falta el permiso — volvé a 0.1
       antes de reportar nada como bug de producto.
+      **Resultado**: Correcto, si esta en la bd
 
 ### 4.3 Aceptación del desafío
 
-- [ ] 📱**B** — Ir a la bandeja de desafíos (`/challenge-inbox`).
+- [✅] 📱**B** — Ir a la bandeja de desafíos (`/challenge-inbox`).
       **Esperado:** el desafío de A aparece como `ENVIADA`.
-- [ ] 📱**B** — **Aceptar** el desafío.
+      **Resultado**: Correcto
+- [✅] 📱**B** — **Aceptar** el desafío.
       **Esperado:** se crea el partido en estado **`PENDIENTE`**.
-- [ ] ⏱️ 📱**A** — Sin tocar nada, mirar la pestaña **Partidos**.
+      **Resultado**: Correcto
+- [✅] ⏱️ 📱**A** — Sin tocar nada, mirar la pestaña **Partidos**.
       **Esperado:** el partido aparece. Notificación in-app de la aceptación.
-- [ ] 📱**A** — Abrir el detalle del partido y **proponer** fecha, hora, sede
+      **Resultado**: Correcto
+- [✅] 📱**A** — Abrir el detalle del partido y **proponer** fecha, hora, sede
       (venue) y costos.
       **Esperado:** la propuesta queda `PENDIENTE` de respuesta.
       **Importante:** elegí una **sede con coordenadas cargadas** — sin `venue`
       el check-in con geofence del módulo 5 no se puede probar
       (error `VENUE_REQUIRED`).
-- [ ] ⏱️ 📱**B** — Sin salir del detalle del partido.
+      **Resultado**: Correcto
+- [✅] ⏱️ 📱**B** — Sin salir del detalle del partido.
       **Esperado:** la propuesta aparece **sola** (realtime sobre
       `match_proposals`).
-- [ ] 🎯 📱**B** — Aceptar la propuesta.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**B** — Aceptar la propuesta.
       **Esperado:** el partido pasa a **`CONFIRMADO`** y se genera el
       `unique_code`. ⏱️ En 📱**A** el estado cambia solo.
-- [ ] 📱**A** — Probar el camino infeliz: proponer un horario que **se solape**
+      **Resultado**: Correcto, aunque cabe aclarar que el unique code ya se gneera y se muestra luego de aceptar el desafio, no luego de confirmar y aceptar la propuesta de partido con detalles
+- [✅] 📱**A** — Probar el camino infeliz: proponer un horario que **se solape**
       con otro partido confirmado del mismo equipo.
       **Esperado:** rechazado server-side (guarda D13, ventana de
       `match_default_duration_minutes` = 90 min).
+      **Resultado**: Correcto
+
+Acalaracion que dejo por aqui, en una de las cuetnas pertencecia a dosequipos, ariba en el header aparece un selector de equipos que abre un modal para seleccionarlos, este modal muestr los equipos a los que pertenezco y falta que muestre la foto de los escudos si es que tienen si no tienen un escudo por defaul, ademas el modal necesita un poco mas de aires/padding por debajo ya que a penas un alto del segundo equipo es tapado por la barra del celular. y por ultimo, mientras pertenecia a estos dos equpos me echaron de uno y podia seguir abriendo el seleccionable, y no se actualizo hasta que cerre la app por compelto y la volvi a abrir par aque recargue
+Agrego tambien que el modal que se abre cuento te invitaron a un partido tambien necesita un poco de aire abajo
+
+Otra aclaracoin que quiero hacer es que a lo largo de la app el concepto pmas importante de la app que es el ELO, divaga en distintos nombres a lo largo de la app y yo lo unificaria en un nombre comun mas atractivo, a lo largo de la app aparece como ELO, como PR, como RATING, debemos unificar eso asi queda mas claro y mejro
 
 ### 4.4 🎯 Cooldown de 30 días
 
@@ -472,22 +564,28 @@ farmear PR. **Se mide sobre la fecha en que se JUGÓ** el partido
 (`coalesce(finished_at, scheduled_at, created_at)`), no sobre cuándo se creó la
 fila — ese fue el agujero que arregló E9.
 
-- [ ] 🗄️ **SQL** — Simular un partido de ranking **ya jugado ayer** entre A y B
+- [✅] 🗄️ **SQL** — Simular un partido de ranking **ya jugado ayer** entre A y B
       ([Anexo A.2](#a2--forzar-el-cooldown-de-desafíos)).
-- [ ] 🎯 📱**A** — Intentar enviar un **nuevo desafío de RANKING** al Equipo B.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Intentar enviar un **nuevo desafío de RANKING** al Equipo B.
       **Esperado:** **bloqueado** con un mensaje que explique el cooldown, no un
       error genérico.
-- [ ] 🎯 📱**A** — Intentar enviar un desafío **`AMISTOSO`** al mismo equipo.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Intentar enviar un desafío **`AMISTOSO`** al mismo equipo.
       **Esperado:** **permitido** — el cooldown aplica sólo a RANKING.
-- [ ] 🎯 🗄️ **SQL** — El caso exacto de E9: dejar el partido con
+      **Resultado**: Correcto
+- [✅] 🎯 🗄️ **SQL** — El caso exacto de E9: dejar el partido con
       `created_at` de hace **40 días** pero `finished_at` de **ayer**
       ([Anexo A.2](#a2--forzar-el-cooldown-de-desafíos), variante B).
       Reintentar el desafío RANKING desde 📱**A**.
       **Esperado:** **sigue bloqueado.** Con el filtro viejo (sobre `created_at`)
       este caso pasaba de largo — es la regresión que este paso protege.
-- [ ] 🗄️ **SQL** — Poner el partido con más de 30 días jugados.
+      **Resultado**: Correcto
+- [✅] 🗄️ **SQL** — Poner el partido con más de 30 días jugados.
       **Esperado:** el desafío RANKING ahora **sí** se puede enviar.
-- [ ] ↩️ 🗄️ **SQL** — Borrar el partido de prueba del cooldown.
+      **Resultado**: Correcto
+- [✅] ↩️ 🗄️ **SQL** — Borrar el partido de prueba del cooldown.
+      **Resultado**: Correcto
 
 ---
 
@@ -499,51 +597,66 @@ a `EN_VIVO`.
 **Precondición:** partido `CONFIRMADO` con **venue con coordenadas**.
 **Radio del geofence:** `checkin_geofence_radius_m` = **150 m**.
 
+Aclaracion que hago por aqui, a veces al enviar la propuesta de para partido apresto el boton de enviar propuesta y se cierra y se abre el modal de para completar los detalles de envio de la propuesta, debo cerrarlo manualmente y ahi se ve el modal de "propuesta enviada", deberia cerrarse al enviarse la propuesta
+
+El modal para armar la convocatoria, tambien el botno de confirmar lista es un poco tapado por la barra inferior, tener en cuenta esto para otros modales e interfaces UI
 ### 5.1 🎯 Prueba anti-fantasmas
 
-- [ ] 🎯 📱**A** — **Apagar la ubicación** del dispositivo. Intentar el check-in.
+- [✅] 🎯 📱**A** — **Apagar la ubicación** del dispositivo. Intentar el check-in.
       **Esperado:** falla con el mensaje de **`LOCATION_REQUIRED`** — un texto
       que pida activar la ubicación, no un error genérico de Supabase.
-- [ ] 🎯 📱**A** — Activar la ubicación pero **denegar el permiso** a la app.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Activar la ubicación pero **denegar el permiso** a la app.
       Intentar el check-in.
       **Esperado:** falla con un mensaje que explique el permiso faltante y,
       preferentemente, ofrezca ir a Ajustes.
-- [ ] 🎯 📱**A** — Con ubicación y permiso OK, pero estando **lejos** de la sede
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Con ubicación y permiso OK, pero estando **lejos** de la sede
       (a más de 150 m). Intentar el check-in.
       **Esperado:** falla con **`GEOFENCE_FAILED`** →
       *«Estás demasiado lejos de la cancha para hacer el check-in.»*
       **Este es el corazón del anti-fantasmas: si esto pasa, es un bug crítico
       de seguridad.**
-- [ ] 🗄️ **SQL** — Si no podés desplazarte físicamente, movés la sede en vez del
+      **Resultado**: Correcto
+- [✅] 🗄️ **SQL** — Si no podés desplazarte físicamente, movés la sede en vez del
       celular: reubicá el `venue` lejos de vos
       ([Anexo A.3](#a3--mover-el-venue-para-probar-el-geofence)).
       **Esperado:** mismo `GEOFENCE_FAILED`.
-- [ ] 🎯 📱**A** — Probar con una **app de ubicación falsa (mock location)** si
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Probar con una **app de ubicación falsa (mock location)** si
       tenés opciones de desarrollador habilitadas.
       **Esperado:** el check-in se hace igual — **es una limitación conocida**
       del geofence por GPS del cliente. Anotalo como riesgo, no como bug nuevo.
+      **Resultado**: Correcto
 
 ### 5.2 Check-in exitoso y quórum
 
-- [ ] ↩️ 🗄️ **SQL** — Restaurar las coordenadas del venue a tu ubicación real
+- [✅] ↩️ 🗄️ **SQL** — Restaurar las coordenadas del venue a tu ubicación real
       (o acercate físicamente).
-- [ ] 📱**A** — Como capitán, presentar la **convocatoria** (lista de buena fe)
+      **Resultado**: Correcto
+- [✅] 📱**A** — Como capitán, presentar la **convocatoria** (lista de buena fe)
       y hacer el check-in.
       **Esperado:** check-in registrado. La sección de check-in muestra
       **`N/M`** presentes, con M salido de `format_rules` del formato.
-- [ ] ⏱️ 📱**B** — Sin tocar nada.
+- [✅] ⏱️ 📱**B** — Sin tocar nada.
       **Esperado:** el contador de presentes del rival se actualiza solo
       (realtime sobre `match_participants`).
-- [ ] 🎯 📱**B** — Hacer el check-in del Equipo B hasta alcanzar el quórum.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**B** — Hacer el check-in del Equipo B hasta alcanzar el quórum.
       **Esperado:** cuando **ambos** equipos alcanzan el mínimo, el partido pasa
       a **`EN_VIVO`**.
-- [ ] 🎯 ⏱️ 📱**A** — **Sin tocar la pantalla.**
+      **Resultado**: Correcto
+- [✅] 🎯 ⏱️ 📱**A** — **Sin tocar la pantalla.**
       **Esperado:** el detalle pasa a `EN_VIVO` **solo**, aparece el cronómetro
       en vivo (`LiveTimer`) y se habilita el botón de cargar resultado.
       **Fallo a reportar:** si hay que salir y volver a entrar, el realtime del
       partido no está funcionando.
-- [ ] 📱**A** — Verificar el **badge de estado** del partido.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Verificar el **badge de estado** del partido.
       **Esperado:** dice `EN VIVO` con su estilo distintivo.
+      **Resultado**: Correcto
+
+Quiero destacar en esta seccion que a veces el checkin_geofence_radius_m falla, yo pienso que limitarlo a 150m es muy propenso a fallas, quizas extenderlo a un radio de 500m o 1000m, analicemos eso, porque creo que para una version inicial es preferible que tengan mas radioo, apostando por la honestidad de los usuarios y registrando mediante logs como esta funcionando, y vemos si en un futuro lo reducimos. Ademas pienso que en el momento de mandar el detalle de la propuesta, estaria bueno que al cargar los complejos de una zona te diga la distancia a la que estas de los complejos, nose si es mucho trabajo pesado¿
 
 ---
 
@@ -561,21 +674,25 @@ dejaba **entrar** pero no dejaba **mirar**.
 
 ### 6.1 Generación del código
 
-- [ ] 📱**A** — Con el partido `EN_VIVO`, abrir el detalle y localizar el
+- [✅] 📱**A** — Con el partido `EN_VIVO`, abrir el detalle y localizar el
       **código único** del partido.
       **Esperado:** el código se ve y se puede copiar con un toque.
-- [ ] 📱**A** — Verificar la leyenda de **vencimiento** junto al código.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Verificar la leyenda de **vencimiento** junto al código.
       **Esperado:** indica hasta cuándo vale (TTL = `guest_code_ttl_hours` =
       **48 h** desde el horario pactado).
+      **Resultado**: Correcto
 
 ### 6.2 Preparación del invitado
 
-- [ ] 📱**B** — **Cerrar sesión** por completo.
+- [✅] 📱**B** — **Cerrar sesión** por completo.
       **Esperado:** vuelve a `/login`. Al matar y reabrir la app **no** debe
       recuperar la sesión anterior.
-- [ ] 📱**B** — Entrar con la **tercera cuenta** (`qa.invitado@…`), **ajena a
+      **Resultado**: Correcto
+- [✅] 📱**B** — Entrar con la **tercera cuenta** (`qa.invitado@…`), **ajena a
       los dos equipos**. Completar onboarding si es nueva.
       **Esperado:** llega a `/(tabs)` sin pertenecer a ningún equipo.
+      **Resultado**: Correcto
 
 ### 6.3 🎯 La prueba del fix
 
@@ -600,6 +717,10 @@ dejaba **entrar** pero no dejaba **mirar**.
 - [ ] ⏱️ 📱**A** — Sin tocar nada.
       **Esperado:** el invitado aparece en el plantel/convocatoria del lado
       elegido.
+
+En general de esta seccion, las pruebas fueron completas y completas, solo cabe aclarar que SOLO me deja unirme cuando el partido esta CONFIRMADO, es decir que se ACEPTA la prupuesta pero aun no se hace el checkin y asi debe ser, no se puede unir cuando esta en propuesta o en vivo o cancelado o etc, por lo que el codigo de partido de invitacion solo debe aparecer para los partidos cuando el estado esta confirmado, ese debe ser el ajuste a hacer
+
+OTRA COSA QUE HYA EN RELACION A esto es que cuando entro al partido correctamnte, despues no me aparece el detalle del partido, ni desde la seccion de partidos ni desde inicio, deberia aparecerme en la seccion de partido y en inicio para la cuena regresiva o en proximos partidos, por mas que no sea mi equipo. ten en cuena que el estado del partido no rompa con lo que te comente antes, una cosa es visualizar el detalle del partido como jugador y otra es unirme al partido en otro estado al comentado
 
 ### 6.4 🎯 Que el fix no haya abierto de más
 
@@ -626,6 +747,8 @@ el 6.3.
 - [ ] ↩️ 📱**B** — Cerrar sesión de la cuenta invitada y volver a entrar como
       **capitán B** para continuar con el módulo 7.
 
+TODO CORRECTO EN ESTE MODULO
+
 ---
 
 ## Módulo 7 — Resultados, Modales y Disputas
@@ -639,43 +762,54 @@ transparente de disputas y la resolución desde el panel admin.
 > entera; el `ScrollView` interno, sin altura acotada por la que desbordar,
 > nunca llegaba a scrollear. Ahora `maxHeight: 88%` + padding de safe area.
 
-- [ ] 📱**A** — Abrir el modal de **cargar resultado**.
-- [ ] 🎯 📱**A** — **Observar el alto del modal.**
+- [✅] 📱**A** — Abrir el modal de **cargar resultado**
+      **Resultado**: Correcto.
+- [✅] 🎯 📱**A** — **Observar el alto del modal.**
       **Esperado:** es un **sheet**, no una pantalla completa. Se ve el fondo
       oscurecido por encima del modal.
       **Fallo a reportar:** el modal ocupa el 100 % de la pantalla.
-- [ ] 🎯 📱**A** — **Observar el borde inferior.**
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — **Observar el borde inferior.**
       **Esperado:** el botón «Confirmar resultado» **no** queda pisado por la
       gesture bar. Hay aire proporcional al inset del dispositivo.
-- [ ] 🎯 📱**A** — Cargar un marcador alto (ej. **7-2**) y asignar goleadores a
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Cargar un marcador alto (ej. **7-2**) y asignar goleadores a
       **muchos jugadores del plantel** para estirar el contenido.
       **Esperado:** el contenido **scrollea dentro del modal**, el header
       («Cargar resultado» + ✕) queda fijo arriba, y se puede llegar al botón de
       confirmar.
       **Fallo a reportar:** contenido cortado sin poder scrollear.
-- [ ] 📱**A** — Probar la validación: poner marcador **3** pero asignar goles a
+      **Resultado**: Correcto
+- [✅] 📱**A** — Probar la validación: poner marcador **3** pero asignar goles a
       goleadores que **sumen 5**.
       **Esperado:** alert de goles inconsistentes indicando ambos números.
       **El alert debe verse por encima del modal**, no quedar detrás.
-- [ ] 🎯 📱**A** — **Doble tap rápido** en «Confirmar resultado».
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — **Doble tap rápido** en «Confirmar resultado».
       **Esperado:** se envía **una sola vez** (guard síncrono por `ref`).
       Verificá en la base que no haya dos filas en `match_results`.
-- [ ] 📱**A** — Cerrar el modal sin enviar, y reabrirlo.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Cerrar el modal sin enviar, y reabrirlo.
       **Esperado:** los campos vuelven a **cero** — no arrastra la carga previa.
-- [ ] 📱**A** — Cargar el resultado definitivo: **A gana 2-0**.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Cargar el resultado definitivo: **A gana 2-0**.
       **Esperado:** se registra y la pantalla lo refleja.
+      **Resultado**: Correcto
 
 ### 7.2 Entrada en disputa
 
-- [ ] ⏱️ 📱**B** — Sin tocar nada.
+- [✅] ⏱️ 📱**B** — Sin tocar nada.
       **Esperado:** B ve que el rival ya cargó su resultado.
-- [ ] 🎯 📱**B** — Cargar un resultado **distinto**: **B gana 2-0**
+      **Resultado**: Correcto
+- [✅] 🎯 📱**B** — Cargar un resultado **distinto**: **B gana 2-0**
       (es decir, B se adjudica 2 y le pone 0 a A).
       **Esperado:** los marcadores no coinciden → el partido pasa a
       **`EN_DISPUTA`**.
-- [ ] 🎯 ⏱️ 📱**A** — **Sin tocar la pantalla.**
+      **Resultado**: Correcto
+- [✅] 🎯 ⏱️ 📱**A** — **Sin tocar la pantalla.**
       **Esperado:** el estado cambia a `EN_DISPUTA` solo y aparece el panel de
       disputa.
+      **Resultado**: Correcto
 
 ### 7.3 🎯 UI transparente de la disputa
 
@@ -683,7 +817,7 @@ transparente de disputas y la resolución desde el panel admin.
 > nombres de los equipos y ningún marcador, así que votar era elegir un nombre
 > sin saber qué resultado se estaba votando.
 
-- [ ] 🎯 📱**A** — Observar el bloque **«Marcadores cargados»**.
+- [✅] 🎯 📱**A** — Observar el bloque **«Marcadores cargados»**.
       **Esperado:** una leyenda con el eje (`Equipo A – Equipo B`) y **dos
       filas**, una por equipo, con el marcador **completo** que propuso cada uno,
       ambos en el **mismo orden**:
@@ -695,73 +829,110 @@ transparente de disputas y la resolución desde el panel admin.
       **Fallo a reportar:** que sólo se vean nombres sin marcadores, o que los
       dos marcadores estén en ejes distintos (uno «mis goles» y otro «goles del
       rival»), que es justamente lo que hacía imposible comparar.
-- [ ] 🎯 📱**B** — Mirar **la misma disputa desde B**.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**B** — Mirar **la misma disputa desde B**.
       **Esperado:** **los mismos dos marcadores, en el mismo orden A–B.** Lo
       único que cambia es cuál fila lleva la marca `(tu equipo)`.
       **Fallo a reportar:** que A y B vean marcadores distintos o invertidos.
-- [ ] 🎯 📱**A** — Observar los **botones de voto**.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Observar los **botones de voto**.
       **Esperado:** cada botón dice «Votar por <equipo>» **y debajo el marcador
       que se está votando** («Su marcador: 2 – 0»). Se vota un **resultado**, no
       un nombre.
-- [ ] 📱**A** — Verificar el aviso de **cierre automático**.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Verificar el aviso de **cierre automático**.
       **Esperado:** explica que a las **24 h** (`sweep_dispute_timeout_hours`)
       se hace el escrutinio y que **nadie puede adelantarlo**.
-- [ ] 🎯 📱**A** — Verificar quién puede votar: sólo los que hicieron check-in.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** — Verificar quién puede votar: sólo los que hicieron check-in.
       **Esperado:** con check-in, aparecen los botones. Sin check-in, aparece el
       aviso de que no puede votar.
-- [ ] 📱**A** — Emitir el voto.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Emitir el voto.
       **Esperado:** pasa a «Voto registrado», indicando por qué equipo **y con
       qué marcador** votó. Los botones desaparecen (no se vota dos veces).
-- [ ] ⏱️ 📱**B** — Sin tocar nada.
+      **Resultado**: Correcto
+- [✅] ⏱️ 📱**B** — Sin tocar nada.
       **Esperado:** el contador de votos se actualiza.
-- [ ] 📱**B** — Con los votos **empatados**, verificar el aviso de desempate.
+      **Resultado**: Correcto
+- [✅] 📱**B** — Con los votos **empatados**, verificar el aviso de desempate.
       **Esperado:** explica que desempata el **Fair Play** y hacia qué lado
       caería, o avisa que ambos tienen el mismo FP y el partido pasará a
       revisión de un administrador.
+      **Resultado**: Correcto
 
 ### 7.4 🎯 Resolución desde el Panel Admin
 
-- [ ] 🗄️ **SQL** — Darle rol admin a una de las cuentas
+- [✅] 🗄️ **SQL** — Darle rol admin a una de las cuentas
       ([Anexo A.6](#a6--habilitar-el-panel-de-administración)).
-- [ ] 📱**A** — Reiniciar la app y entrar a `/admin/dispute-review`.
+      **Resultado**: Correcto
+- [✅] 📱**A** — Reiniciar la app y entrar a `/admin/dispute-review`.
       **Esperado:** el panel carga.
-- [ ] 🎯 📱**B** — Intentar entrar al panel con una cuenta **sin** `is_admin`.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**B** — Intentar entrar al panel con una cuenta **sin** `is_admin`.
       **Esperado:** pantalla **«Acceso denegado»**. Y la RPC
       `get_disputed_matches` debe rechazar server-side, no sólo ocultar la UI.
-- [ ] 🎯 📱**A** (admin) — Observar la tarjeta del partido en disputa.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** (admin) — Observar la tarjeta del partido en disputa.
       **Esperado:** bajo la leyenda `Marcadores cargados (A – B)`, **cada
       columna muestra el marcador completo** que cargó ese equipo
       (`2 – 0` y `0 – 2`), más sus votos y su Fair Play.
       **Fallo a reportar:** que se vea **un solo número por equipo** (ej. `2` y
       `2`). Eso era el bug: dos cifras de dos planillas distintas, que juntas
       parecen un marcador y no lo son.
-- [ ] 🎯 📱**A** (admin) — **Contrastar con lo que ve el jugador** en 7.3.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** (admin) — **Contrastar con lo que ve el jugador** en 7.3.
       **Esperado:** **exactamente los mismos dos marcadores.** Admin y jugador
       leen de RPCs distintas pero comparten el normalizador.
-- [ ] 📱**A** (admin) — Si el caso lo amerita, verificar el aviso de
+      **Resultado**: Correcto
+- [✅] 📱**A** (admin) — Si el caso lo amerita, verificar el aviso de
       **«Empate total»** (mismos votos y mismo Fair Play).
       **Esperado:** explica que la resolución automática no puede desempatar y
       que ese partido sólo se cierra desde el panel.
-- [ ] 📱**A** (admin) — Resolver con **«Gana Equipo A»**, escribiendo un motivo
+      **Resultado**: Correcto
+- [✅] 📱**A** (admin) — Resolver con **«Gana Equipo A»**, escribiendo un motivo
       en el campo de notas.
       **Esperado:** diálogo de confirmación advirtiendo que se aplican ELO,
       estadísticas y Fair Play, y que no se puede deshacer.
-- [ ] 🎯 📱**A** (admin) — Confirmar.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** (admin) — Confirmar.
       **Esperado:** el partido pasa a **`FINALIZADO`** con el marcador del
       ganador, desaparece de la lista de disputas, y el marcador del perdedor se
       corrige al espejo.
-- [ ] ⏱️ 📱**B** — Sin tocar nada.
+      **Resultado**: Correcto
+- [✅] ⏱️ 📱**B** — Sin tocar nada.
       **Esperado:** el partido se ve resuelto y llega notificación in-app con la
       nota del admin.
-- [ ] 🗄️ **SQL** — Verificar el impacto competitivo:
+      **Resultado**: Correcto
+- [✅] 🗄️ **SQL** — Verificar el impacto competitivo:
       `select elo_rating, matches_played, season_wins from teams where id in (…);`
       **Esperado:** el ELO se movió **una sola vez** para cada equipo.
-- [ ] 🎯 📱**A** (admin) — Repetir en otro partido con la opción **«Anular»**.
+      **Resultado**: Correcto
+- [✅] 🎯 📱**A** (admin) — Repetir en otro partido con la opción **«Anular»**.
       **Esperado:** queda `CANCELADO`, **sin** ELO, sin estadísticas y sin
       ganador.
-- [ ] ↩️ 🗄️ **SQL** — Quitar `is_admin` si la cuenta no debe conservarlo.
+      **Resultado**: Correcto
+- [✅] ↩️ 🗄️ **SQL** — Quitar `is_admin` si la cuenta no debe conservarlo.
+      **Resultado**: Correcto
 
 ---
+
+En el detalle de la evolucion de elo no aparece nada dice que no tiene partidos por el ranking jugados. nose si  es prque no nhay temporada inciada, que de paso tampoco me deja hacerlo
+
+{
+    "scope": "admin.season.handleConfirmTransition",
+    "newSeasonName": "Clausura 2026",
+    "startsAt": "2026-08-10",
+    "endsAt": "2026-12-31",
+    "error": {
+        "code": "21000",
+        "details": null,
+        "hint": null,
+        "message": "UPDATE requires a WHERE clause"
+    }
+}
+
+
 
 ## Módulo 8 — Walkover (WO)
 
@@ -791,6 +962,8 @@ presentó. Podés generarlo repitiendo el módulo 4 con un partido nuevo.
 - [ ] 📱**A** — Verificar que el header del modal (título + ✕) **queda fijo**
       mientras se scrollea.
       **Esperado:** no se va con el scroll.
+
+      TODO CORRECTO PARA ESTE MODULO
 
 ### 8.2 Reclamo y validaciones
 
@@ -826,6 +999,8 @@ presentó. Podés generarlo repitiendo el módulo 4 con un partido nuevo.
       reintentar sin rehacer todo.
 - [ ] ↩️ 📱**A** — Desactivar modo avión y enviar correctamente.
 
+TODO CORRECTO PARA ESTE MODULO
+
 ### 8.3 Resolución del WO
 
 - [ ] ⏱️ 📱**B** — Sin tocar nada.
@@ -839,6 +1014,8 @@ presentó. Podés generarlo repitiendo el módulo 4 con un partido nuevo.
 - [ ] 🗄️ **SQL** — Verificar el Fair Play del equipo sancionado.
       **Esperado:** bajó **15** puntos si el motivo fue `NO_PRESENTACION`, o
       **5** si fue `FALTA_QUORUM`.
+
+TODO CORRECTO PARA ESTE MODULO
 
 ---
 
@@ -895,6 +1072,8 @@ build y que el modal es **realmente** imposible de esquivar.
       **Esperado:** el bloqueo aplica **con y sin sesión** — el modal se monta
       como hermano de la navegación, por encima de cualquier ruta.
 
+TODO CORRECTO PARA ESTE MODULO
+
 ### 9.3 🎯 Verificar que no bloquea de más
 
 - [ ] ↩️ 🎯 🗄️ **SQL** — Volver la mínima a `1.0.0`
@@ -914,6 +1093,8 @@ build y que el modal es **realmente** imposible de esquivar.
       **🚨 FALLO CRÍTICO:** si la app se cuelga esperando la consulta o muestra
       el modal sin haber podido consultar.
 - [ ] ↩️ 📱**A** — Desactivar modo avión.
+
+TODO CORRECTO PARA ESTE MODULO
 
 ### 9.4 🎯 Las guardas de la base
 
@@ -944,6 +1125,8 @@ afuera por un dedazo.
 - [ ] ↩️ 🗄️ **SQL** — Confirmar el estado final:
       `select * from public.app_versions;` → ambas filas en `1.0.0`.
 
+TODO CORRECTO PARA ESTE MODULO
+
 ### 9.5 ⚠️ Hallazgo conocido a confirmar
 
 - [ ] ⚠️ 🗄️ **SQL** — Mirar el `update_url` de **iOS**.
@@ -953,6 +1136,8 @@ afuera por un dedazo.
       de subir la mínima de iOS alguna vez**, o los usuarios de iOS verían un
       botón «Actualizar» que no lleva a ningún lado, sin poder cerrar el modal.
       Marcá este ítem como **confirmado** y dejá el aviso en el reporte.
+
+TODO CORRECTO PARA ESTE MODULO
 
 ---
 

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { fetchGuestMatchSides } from '@/lib/guest-matches-data';
 import type { Database } from '@/types/supabase';
 import type {
   HomeViewData,
@@ -187,7 +188,14 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
     (r) => !myTeamIds.has(r.team_id),
   ).length;
 
-  if (memberRows.length === 0) {
+  // Partidos donde entré con código de invitado. Se resuelve ANTES del corte por
+  // "no tiene equipos" por el mismo motivo que los traspasos: el invitado no
+  // pertenece a ningún plantel, así que más abajo nunca se calcularía justo para
+  // quien sólo tiene estos partidos (auditoría E2E, módulo 6.3).
+  const guestSideByMatchId = await fetchGuestMatchSides(profileId);
+  const guestMatchIds = Object.keys(guestSideByMatchId);
+
+  if (memberRows.length === 0 && guestMatchIds.length === 0) {
     return { myTeams: [], upcomingMatches: [], pendingActions: [], pendingTransfers };
   }
 
@@ -196,9 +204,19 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
     .filter((r) => r.role === 'CAPITAN' || r.role === 'SUBCAPITAN')
     .map((r) => r.team_id);
 
-  // Supabase .or() filter string for matches involving any of my teams
-  const teamInFilter = teamIds.join(',');
-  const matchOrFilter = `team_a_id.in.(${teamInFilter}),team_b_id.in.(${teamInFilter})`;
+  // Filtro .or() de los partidos que me incumben: los de mis equipos y los que
+  // canjeé como invitado. Se arma por partes porque cualquiera de las dos puede
+  // venir vacía —un invitado sin club, o un jugador que nunca usó un código— y
+  // un `in.()` sin elementos es sintaxis inválida para PostgREST.
+  const matchOrClauses: string[] = [];
+  if (teamIds.length > 0) {
+    const teamInFilter = teamIds.join(',');
+    matchOrClauses.push(`team_a_id.in.(${teamInFilter})`, `team_b_id.in.(${teamInFilter})`);
+  }
+  if (guestMatchIds.length > 0) {
+    matchOrClauses.push(`id.in.(${guestMatchIds.join(',')})`);
+  }
+  const matchOrFilter = matchOrClauses.join(',');
 
   // El equipo del que soy CAPITAN/SUBCAPITAN es el único que puede responder
   // propuestas, cancelaciones, desafíos y disputas. Sin este filtro la bandeja
@@ -229,11 +247,15 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
       : Promise.resolve({ data: [], error: null }),
 
     // C: received challenges (ENVIADA → requires captain action)
-    supabase
-      .from('challenges')
-      .select('id')
-      .in('to_team_id', teamIds)
-      .eq('status', 'ENVIADA'),
+    // Guardado por equipos: un invitado sin club llega hasta acá desde el corte
+    // de arriba, y `in.()` vacío es sintaxis inválida.
+    teamIds.length > 0
+      ? supabase
+          .from('challenges')
+          .select('id')
+          .in('to_team_id', teamIds)
+          .eq('status', 'ENVIADA')
+      : Promise.resolve({ data: [], error: null }),
 
     // D: pending team join requests (captains/subcaptains only)
     captainTeamIds.length > 0
@@ -396,7 +418,15 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
     .slice(0, 5);
 
   const upcomingMatches: HomeMatchEntry[] = sortedMatches.map((m) => {
-    const myTeamId = myTeamIdSet.has(m.team_a_id) ? m.team_a_id : m.team_b_id;
+    // `HomeMatchEntry.myTeamId` ya era por entrada, así que el invitado entra sin
+    // tocar el tipo: cuando ninguno de los dos equipos es mío, el lado sale de
+    // por dónde entré. Sin esto caía siempre en `team_b_id` y la tarjeta se
+    // orientaba desde el rival.
+    const myTeamId = myTeamIdSet.has(m.team_a_id)
+      ? m.team_a_id
+      : myTeamIdSet.has(m.team_b_id)
+        ? m.team_b_id
+        : guestSideByMatchId[m.id] ?? m.team_b_id;
     const teamAData = teamsMap.get(m.team_a_id);
     const teamBData = teamsMap.get(m.team_b_id);
     return {

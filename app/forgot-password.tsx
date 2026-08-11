@@ -9,12 +9,15 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { sendPasswordReset } from '@/lib/auth-data';
 import { Logger } from '@/lib/logger';
+import { useMinimumVisible } from '@/hooks/useMinimumVisible';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const { showAlert, AlertComponent } = useCustomAlert();
+  // Flag de presentación; el guard de reentrada sigue siendo `loading`.
+  const showLoader = useMinimumVisible(loading);
 
   const handleResetPassword = async () => {
     const trimmedEmail = email.trim();
@@ -49,7 +52,7 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  if (loading) {
+  if (showLoader) {
     return <GlobalLoader label="Enviando correo..." />;
   }
 

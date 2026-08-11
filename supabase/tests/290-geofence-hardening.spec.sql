@@ -69,15 +69,22 @@ $fn$;
 -- ════════════════════════════════════════════════════════════════════════════
 -- G1 — El radio vive en app_settings, no hardcodeado
 -- ════════════════════════════════════════════════════════════════════════════
+-- El radio pasó de 150 m a 500 m en la migración 20260810120000 (quick wins de
+-- la auditoría E2E): 150 m resultó demasiado estricto en campo y el check-in
+-- fallaba con GPS honesto.
+--
+-- G3 (~5 km) y G4 (~50 m) siguen siendo válidos con el radio nuevo: el primero
+-- queda muy afuera y el segundo muy adentro de los 500 m, así que ninguno de
+-- los dos pasó a probar algo distinto de lo que probaba antes.
 select is(
   (select value from app_settings where key = 'checkin_geofence_radius_m'),
-  150::numeric,
-  'G1-1: el radio por defecto sigue siendo 150 m'
+  500::numeric,
+  'G1-1: el radio por defecto es de 500 m'
 );
 
 select is(
   public.checkin_geofence_radius_m(),
-  150::numeric,
+  500::numeric,
   'G1-2: el helper devuelve el radio configurado'
 );
 

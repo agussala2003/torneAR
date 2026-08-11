@@ -108,7 +108,7 @@ export function TeamRecentMatches({ matches }: TeamRecentMatchesProps) {
                     className={`font-uiBold text-[10px] ${match.prDelta >= 0 ? 'text-brand-primary' : 'text-danger-error'}`}
                     style={{ fontVariant: ['tabular-nums'] }}
                   >
-                    {match.prDelta >= 0 ? '+' : ''}{match.prDelta} PR
+                    {match.prDelta >= 0 ? '+' : ''}{match.prDelta} Rating
                   </Text>
                 )}
               </View>

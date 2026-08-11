@@ -23,9 +23,26 @@ import { ProfileFormFields } from '@/components/profile/ProfileFormFields';
 import { FAVORITE_TEAM_OPTIONS } from '@/lib/favorite-teams';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
 import { saveOnboardingProfile } from '@/lib/onboarding-data';
+import { useUsernameAvailability } from '@/hooks/useUsernameAvailability';
 import { Logger } from '@/lib/logger';
 
 const STEP_WIDTH = ['w-1/3', 'w-2/3', 'w-full'] as const;
+
+/**
+ * Campos que habilitan cada paso.
+ *
+ * El botón se apoya en estos sub-schemas y no en `formState.isValid`, que mira
+ * el formulario COMPLETO: en el paso 1 los campos de los pasos 2 y 3 todavía
+ * están vacíos, así que `isValid` sería `false` siempre y «Siguiente» nunca se
+ * habilitaría. Recortar el mismo schema mantiene una sola fuente de reglas.
+ */
+const STEP_SCHEMAS = [
+  userProfileSchema.pick({ fullName: true, username: true, zone: true }),
+  userProfileSchema.pick({ dateOfBirth: true, gender: true, strongFoot: true, favoriteTeam: true }),
+  // El paso 3 valida el formulario COMPLETO: es el que envía, así que su botón
+  // sólo debe habilitarse si todo lo anterior sigue en pie.
+  userProfileSchema,
+] as const;
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -56,6 +73,10 @@ export default function OnboardingScreen() {
     formState: { errors },
   } = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
+    // `onTouched`: no reta mientras se escribe por primera vez, pero una vez que
+    // el campo se tocó revalida en cada tecla, así el error inline desaparece
+    // apenas se corrige (antes quedaba colgado; módulo 1.2).
+    mode: 'onTouched',
     defaultValues: {
       fullName: googleFullName,
       username: '',
@@ -74,6 +95,15 @@ export default function OnboardingScreen() {
   const selectedZone = useWatch({ control, name: 'zone' });
   const selectedPosition = useWatch({ control, name: 'position' });
   const selectedFavoriteTeam = useWatch({ control, name: 'favoriteTeam' });
+
+  // Validez del paso actual, calculada sobre los valores en vivo. Ver STEP_SCHEMAS.
+  const values = useWatch({ control });
+  const usernameAvailability = useUsernameAvailability(values.username ?? '');
+  const isStepValid =
+    STEP_SCHEMAS[step - 1].safeParse(values).success &&
+    // El paso 1 espera además al chequeo de unicidad. `error` (sin red) no
+    // bloquea: decide el índice único al guardar.
+    (step !== 1 || (usernameAvailability !== 'taken' && usernameAvailability !== 'checking'));
 
   const handleNextStep = async () => {
     if (step === 1) {
@@ -212,7 +242,7 @@ export default function OnboardingScreen() {
                   name="username"
                   render={({ field: { onChange, onBlur, value } }) => (
                     <TextInput
-                      className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.username ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
+                      className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.username || usernameAvailability === 'taken' ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                       placeholder="Ej: leomessi"
                       placeholderTextColor="#3A3939"
                       autoCapitalize="none"
@@ -222,9 +252,21 @@ export default function OnboardingScreen() {
                     />
                   )}
                 />
-                {errors.username && (
+                {errors.username ? (
                   <Text className="text-red-500 text-xs mt-1">{errors.username.message}</Text>
-                )}
+                ) : usernameAvailability === 'checking' ? (
+                  <Text className="font-ui text-xs mt-1 text-neutral-on-surface-variant">
+                    Verificando disponibilidad...
+                  </Text>
+                ) : usernameAvailability === 'taken' ? (
+                  <Text className="text-red-500 text-xs mt-1">
+                    Ese usuario ya está en uso, probá con otro.
+                  </Text>
+                ) : usernameAvailability === 'available' ? (
+                  <Text className="font-ui text-xs mt-1 text-brand-primary">
+                    ¡Disponible!
+                  </Text>
+                ) : null}
               </View>
 
               {/* ZONE */}
@@ -257,7 +299,7 @@ export default function OnboardingScreen() {
               </View>
             </View>
 
-            <HeroButton onPress={handleNextStep} label="Siguiente" style={{ width: '100%' }} />
+            <HeroButton onPress={handleNextStep} disabled={!isStepValid} label="Siguiente" style={{ width: '100%' }} />
           </View>
         )}
 
@@ -284,7 +326,7 @@ export default function OnboardingScreen() {
               />
             </View>
 
-            <HeroButton onPress={handleNextStep} label="Siguiente" style={{ width: '100%' }} />
+            <HeroButton onPress={handleNextStep} disabled={!isStepValid} label="Siguiente" style={{ width: '100%' }} />
           </View>
         )}
 
@@ -345,6 +387,7 @@ export default function OnboardingScreen() {
             <HeroButton
               onPress={handleSubmit(onSubmit)}
               isLoading={loading}
+              disabled={!isStepValid}
               label="Comenzar"
               style={{ width: '100%' }}
             />

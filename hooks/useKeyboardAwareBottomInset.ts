@@ -1,43 +1,61 @@
 import { useEffect, useState } from 'react';
-import { Keyboard, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 
 /**
- * Padding inferior para una barra fija (el input de los chats).
+ * Padding inferior de una barra fija anclada al fondo (el input de los chats).
  *
- * Resuelve las dos mitades del mismo problema:
+ * Devuelve **todo** el espacio que la barra necesita abajo, tanto en reposo como
+ * con el teclado abierto. Es el único dueño de ese espacio: en Android el
+ * `KeyboardAvoidingView` NO debe empujar además, o se suman dos empujes.
  *
- * 1. **Teclado cerrado.** La barra usaba un padding fijo, así que en los
- *    teléfonos con gesture bar quedaba literalmente pegada al borde y el botón
- *    de enviar competía con el gesto de "volver" del sistema. Se usa
- *    `insets.bottom`, que es la altura real de esa barra en cada dispositivo.
+ * ## Por qué el cálculo no se delega en el KeyboardAvoidingView (Android)
  *
- * 2. **Teclado abierto.** Acá `insets.bottom` deja de corresponder: el teclado
- *    ya tapa la gesture bar, y el `KeyboardAvoidingView` encima empuja la barra
- *    la altura del teclado. Sumarle además el inset abre un hueco muerto entre
- *    el input y el teclado. Por eso al abrirse el teclado el padding cae al
- *    mínimo.
+ * La app corre edge-to-edge (`app.json` → `android.edgeToEdgeEnabled`), así que
+ * la ventana no se redimensiona con el teclado y el KAV tiene que empujar. Pero
+ * el KAV deriva ese empuje de su propio frame contra `endCoordinates.screenY`,
+ * y en edge-to-edge el frame se extiende por debajo de la barra de navegación
+ * mientras el evento de cierre reporta la coordenada por encima de ella: al
+ * replegarse el teclado queda un **residuo** del alto de la barra que nunca
+ * vuelve a cero. Ese residuo se sumaba al inset de reposo y dejaba el input
+ * flotando muy por encima de la barra — visiblemente distinto de cómo se veía
+ * al entrar al chat (auditoría E2E, módulo 3.3).
  *
- * `keyboardWillShow` en iOS (llega antes de la animación, así que el cambio va
- * en el mismo frame) y `keyboardDidShow` en Android, que es el único que
- * dispara.
+ * Acá el empuje se calcula desde el alto real del teclado, que sí vuelve a 0 de
+ * forma determinista, y el KAV queda sólo para iOS (donde `padding` sí se
+ * comporta bien y el evento llega antes de la animación).
+ *
+ * ## El inset de reposo se congela
+ *
+ * Con el IME abierto el teclado es un system inset más, y el provider puede
+ * reportar `insets.bottom` inflado con su altura. Por eso el valor de reposo se
+ * captura sólo mientras el teclado está cerrado: la posición de descanso no
+ * depende de lo que informe el provider durante la animación.
+ *
+ * @param gap Aire mínimo entre la barra y lo que tenga debajo (gesture bar o
+ *            teclado). Sin esto el input quedaba flush contra la barra del
+ *            sistema y el botón de enviar competía con el gesto de "volver".
  */
-export function useKeyboardAwareBottomInset(minimum = 8): number {
+export function useKeyboardAwareBottomInset(gap = 8): number {
   const insets = useSafeAreaInsets();
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
+  const [restingInset, setRestingInset] = useState(insets.bottom);
 
+  // Sólo se actualiza con el teclado cerrado (ver "el inset de reposo se congela").
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    if (keyboardHeight === 0 && insets.bottom !== restingInset) {
+      setRestingInset(insets.bottom);
+    }
+  }, [insets.bottom, keyboardHeight, restingInset]);
 
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+  // Reposo: la altura real de la gesture bar (o de los botones) más el aire.
+  if (keyboardHeight === 0) {
+    return restingInset + gap;
+  }
 
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  return keyboardVisible ? minimum : Math.max(insets.bottom, minimum);
+  // Teclado abierto: el inset de reposo ya no corresponde — el teclado tapa la
+  // barra del sistema. En iOS el KAV hace el empuje y acá sólo va el aire; en
+  // Android el empuje es este padding.
+  return Platform.OS === 'ios' ? gap : keyboardHeight + gap;
 }

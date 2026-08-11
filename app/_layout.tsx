@@ -8,6 +8,7 @@ import { DarkTheme, ThemeProvider, Theme } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
@@ -19,6 +20,7 @@ import { isProfileComplete } from '@/lib/auth-utils';
 import { deepLinkToHref, resolveDeepLink } from '@/lib/deep-linking';
 import { initLogger } from '@/lib/logger';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
+import { useSignupGateStore } from '@/stores/signupGateStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { UIProvider } from '../context/UIContext';
@@ -34,6 +36,9 @@ void SplashScreen.preventAutoHideAsync();
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+/** Cuánto se ve el intro animado, ya con el splash nativo fuera de pantalla. */
+const INTRO_DURATION_MS = 2300;
 
 /**
  * torneAR es dark-only.
@@ -58,6 +63,9 @@ const navigationTheme: Theme = {
 
 function RootNavigation() {
   const { session, profile, loading, hydrated } = useAuth();
+  // Suscripción reactiva (y no `getState()` como el deep link, que se consume de
+  // forma atómica): soltar la retención tiene que volver a correr el guard.
+  const isHoldingOnboardingRedirect = useSignupGateStore((s) => s.isHoldingOnboardingRedirect);
   const segments = useSegments();
   const router = useRouter();
   const [showIntro, setShowIntro] = useState(true);
@@ -66,10 +74,20 @@ function RootNavigation() {
   // Gating) y refresca el expo_push_token del perfil. Se auto-gatea por sesión.
   usePushNotifications();
 
+  // El intro se cuenta desde que el splash NATIVO se fue, no desde el montaje.
+  //
+  // Antes arrancaba al montar, pero hasta `hydrated` la pantalla la seguía
+  // ocupando el splash nativo: los 2,3 s corrían por debajo, invisibles. Sin
+  // sesión eso no se notaba (hidratar es inmediato), pero con sesión guardada
+  // hay que leer AsyncStorage y traer el perfil, así que la hidratación se comía
+  // el intro — o entero, si tardaba más que la cuenta. De ahí el «a veces no
+  // aparece, sobre todo con la sesión iniciada» del módulo 1.1.
   useEffect(() => {
-    const timer = setTimeout(() => setShowIntro(false), 2300);
+    if (!hydrated) return;
+
+    const timer = setTimeout(() => setShowIntro(false), INTRO_DURATION_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [hydrated]);
 
   // Soltamos el splash nativo recién cuando leímos la sesión inicial. Para ese
   // momento este componente ya está montado renderizando <AppIntroSplash />,
@@ -131,7 +149,11 @@ function RootNavigation() {
         router.replace('/login');
       }
     } else if (session && !isProfileComplete(profile)) {
-      if (!inOnboarding) {
+      // `isHoldingOnboardingRedirect`: recién registrado, la sesión ya existe y
+      // sin esta espera el guard mandaba a /onboarding por detrás del modal de
+      // bienvenida, que se desmontaba con la pantalla de login antes de que el
+      // usuario pudiera tocar «Aceptar». Ver stores/signupGateStore.ts.
+      if (!inOnboarding && !isHoldingOnboardingRedirect) {
         router.replace('/onboarding');
       }
     } else if (session && isProfileComplete(profile)) {
@@ -152,7 +174,7 @@ function RootNavigation() {
         router.replace('/(tabs)');
       }
     }
-  }, [session, profile, loading, segments, router, showIntro, hydrated]);
+  }, [session, profile, loading, segments, router, showIntro, hydrated, isHoldingOnboardingRedirect]);
 
   if (showIntro) {
     return <AppIntroSplash />;
@@ -167,6 +189,7 @@ function RootNavigation() {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="profile-stats" />
       <Stack.Screen name="faq" />
+      <Stack.Screen name="censo" />
       <Stack.Screen name="team-create" />
       <Stack.Screen name="team-join" />
       <Stack.Screen name="team-requests" />
@@ -215,19 +238,34 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={navigationTheme}>
-      <AuthProvider>
-        <UIProvider>
-          <RootNavigation />
-          <AppUpdateModal
-            visible={forceUpdate.required}
-            currentVersion={forceUpdate.currentVersion}
-            latestVersion={forceUpdate.latestVersion}
-            updateUrl={forceUpdate.updateUrl}
-          />
-          <StatusBar style="light" />
-        </UIProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    /**
+     * `SafeAreaProvider` es el que habilita `useSafeAreaInsets()` en toda la app
+     * (lo consume `GlobalHeader` para no meterse debajo de la barra de estado).
+     *
+     * `initialWindowMetrics` no es opcional: sin él, el provider arranca sin
+     * conocer los insets, el primer frame se renderiza con `top: 0` y el header
+     * SALTA hacia abajo apenas llega la medición nativa. Con las métricas
+     * iniciales, el primer frame ya sale en su lugar definitivo.
+     *
+     * Va por fuera del ThemeProvider a propósito: los modales y las pantallas
+     * que se montan antes de que el AuthContext hidrate (splash, login) también
+     * necesitan insets.
+     */
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <ThemeProvider value={navigationTheme}>
+        <AuthProvider>
+          <UIProvider>
+            <RootNavigation />
+            <AppUpdateModal
+              visible={forceUpdate.required}
+              currentVersion={forceUpdate.currentVersion}
+              latestVersion={forceUpdate.latestVersion}
+              updateUrl={forceUpdate.updateUrl}
+            />
+            <StatusBar style="light" />
+          </UIProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

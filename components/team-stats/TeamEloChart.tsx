@@ -42,7 +42,7 @@ export function TeamEloChart({ history, currentElo }: TeamEloChartProps) {
   return (
     <View className="mt-6">
       <Text className="font-display mb-3 px-1 text-sm uppercase tracking-wider text-neutral-on-surface-variant">
-        Evolución de ELO
+        Evolución del Rating
       </Text>
 
       {history.length < 2 ? (

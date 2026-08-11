@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  Modal,
   ScrollView,
   TouchableOpacity,
   TextInput,
   Platform,
   ActivityIndicator,
-  KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Location from 'expo-location';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { distanceInMeters, formatDistance } from '@/lib/geo';
+import { SafeAreaBottomSheet } from '@/components/ui/SafeAreaBottomSheet';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getProposalErrorMessage } from '@/lib/match-actions';
 import type { MatchProposalFormData } from '@/components/matches/types';
@@ -70,6 +71,8 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
   const [selectedVenue, setSelectedVenue] = useState<VenueEntry | null>(null);
   const [loadingVenues, setLoadingVenues] = useState(false);
   const [zonesLoaded, setZonesLoaded] = useState(false);
+  /** A14: `venueId` → metros. Vacío si no hay ubicación disponible. */
+  const [venueDistances, setVenueDistances] = useState<Record<string, number>>({});
 
   // Alert propio, renderizado DENTRO del <Modal> (ver abajo). Un <Modal> nativo se
   // presenta en una ventana del sistema por encima de todo el arbol React, asi que
@@ -92,6 +95,54 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
       })
       .finally(() => setZonesLoaded(true));
   }, [visible, zonesLoaded]);
+
+  /*
+   * A14 — distancia a cada complejo.
+   *
+   * Se calcula en el cliente: `venues.lat/lng` ya viaja en la consulta que arma
+   * el selector, así que una RPC geoespacial sería un round-trip extra por un
+   * dato que ya está en memoria.
+   *
+   * `getLastKnownPositionAsync` y NO `getCurrentPositionAsync`: la última
+   * posición conocida es instantánea y no enciende el GPS. Y sólo se consulta si
+   * el permiso YA está concedido — elegir cancha no justifica pedir un permiso
+   * nuevo, así que sin permiso la lista se ve igual que antes, sin distancias.
+   */
+  useEffect(() => {
+    if (venues.length === 0) {
+      setVenueDistances({});
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const { granted } = await Location.getForegroundPermissionsAsync();
+        if (!granted) return;
+
+        const position = await Location.getLastKnownPositionAsync();
+        if (!position || cancelled) return;
+
+        const from = { lat: position.coords.latitude, lng: position.coords.longitude };
+        const distances: Record<string, number> = {};
+        for (const venue of venues) {
+          if (venue.lat === null || venue.lng === null) continue;
+          distances[venue.id] = distanceInMeters(from, { lat: venue.lat, lng: venue.lng });
+        }
+
+        if (!cancelled) setVenueDistances(distances);
+      } catch (err) {
+        // Sin distancias la pantalla funciona igual: es información de apoyo.
+        Logger.warn('No se pudo calcular la distancia a los complejos', {
+          scope: 'ProposalModal.venueDistances',
+          error: err,
+        });
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [venues]);
 
   // Load venues when zone changes
   useEffect(() => {
@@ -204,305 +255,308 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
         : null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        className="flex-1 justify-end bg-black/60"
+    <SafeAreaBottomSheet
+      visible={visible}
+      onClose={handleClose}
+      maxHeight="90%"
+      avoidKeyboard
+      /* Dentro del <Modal>: si se montara en la pantalla padre quedaría detrás
+         de esa ventana nativa y el error sería invisible. */
+      overlay={AlertComponent}
+    >
+      {/* Header */}
+      <View className="flex-row items-center justify-between px-5 py-4">
+        <Text className="font-uiBold text-lg text-neutral-on-surface">Proponer detalles</Text>
+        <TouchableOpacity
+          onPress={handleClose}
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <AppIcon family="material-community" name="close" size={22} color="#869585" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        className="px-5"
+        contentContainerStyle={{ paddingBottom: 16 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* maxHeight acota el sheet para que el ScrollView tenga un alto finito y
-            pueda desplazarse hasta el fondo: los campos de seña y costo total
-            estan al final y con el teclado abierto quedaban fuera de alcance. */}
-        <View className="rounded-t-3xl bg-surface-container pb-10" style={{ maxHeight: '90%' }}>
-          {/* Header */}
-          <View className="flex-row items-center justify-between px-5 py-4">
-            <Text className="font-uiBold text-lg text-neutral-on-surface">Proponer detalles</Text>
-            <TouchableOpacity
-              onPress={handleClose}
-              activeOpacity={0.7}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <AppIcon family="material-community" name="close" size={22} color="#869585" />
-            </TouchableOpacity>
-          </View>
+        {/* ── Date ── */}
+        <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
+          Fecha
+        </Text>
+        <TouchableOpacity
+          onPress={() => setShowDatePicker(true)}
+          activeOpacity={0.8}
+          className="mb-4 rounded-xl bg-surface-high px-4 py-3"
+        >
+          <Text className="font-ui text-sm text-neutral-on-surface">
+            {formatDateDisplay(scheduledDate)}
+          </Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={scheduledDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            minimumDate={new Date()}
+            onChange={(_e, d) => {
+              setShowDatePicker(false);
+              if (d) {
+                const merged = new Date(scheduledDate);
+                merged.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+                setScheduledDate(merged);
+              }
+            }}
+          />
+        )}
 
-          <ScrollView
-            className="px-5"
-            contentContainerStyle={{ paddingBottom: 16 }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* ── Date ── */}
-            <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-              Fecha
-            </Text>
+        {/* ── Time ── */}
+        <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
+          Hora
+        </Text>
+        <TouchableOpacity
+          onPress={() => setShowTimePicker(true)}
+          activeOpacity={0.8}
+          className="mb-4 rounded-xl bg-surface-high px-4 py-3"
+        >
+          <Text className="font-ui text-sm text-neutral-on-surface">
+            {formatTimeDisplay(scheduledDate)}
+          </Text>
+        </TouchableOpacity>
+        {showTimePicker && (
+          <DateTimePicker
+            value={scheduledDate}
+            mode="time"
+            is24Hour
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={(_e, d) => {
+              setShowTimePicker(false);
+              if (d) {
+                const merged = new Date(scheduledDate);
+                merged.setHours(d.getHours(), d.getMinutes());
+                setScheduledDate(merged);
+              }
+            }}
+          />
+        )}
+
+        {/* ── Duration ── */}
+        <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
+          Duración
+        </Text>
+        <View className="mb-4 flex-row gap-2">
+          {DURATIONS.map((d) => (
             <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
+              key={d}
+              onPress={() => setDurationMinutes(d)}
               activeOpacity={0.8}
-              className="mb-4 rounded-xl bg-surface-high px-4 py-3"
-            >
-              <Text className="font-ui text-sm text-neutral-on-surface">
-                {formatDateDisplay(scheduledDate)}
-              </Text>
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={scheduledDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                minimumDate={new Date()}
-                onChange={(_e, d) => {
-                  setShowDatePicker(false);
-                  if (d) {
-                    const merged = new Date(scheduledDate);
-                    merged.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
-                    setScheduledDate(merged);
-                  }
-                }}
-              />
-            )}
-
-            {/* ── Time ── */}
-            <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-              Hora
-            </Text>
-            <TouchableOpacity
-              onPress={() => setShowTimePicker(true)}
-              activeOpacity={0.8}
-              className="mb-4 rounded-xl bg-surface-high px-4 py-3"
-            >
-              <Text className="font-ui text-sm text-neutral-on-surface">
-                {formatTimeDisplay(scheduledDate)}
-              </Text>
-            </TouchableOpacity>
-            {showTimePicker && (
-              <DateTimePicker
-                value={scheduledDate}
-                mode="time"
-                is24Hour
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(_e, d) => {
-                  setShowTimePicker(false);
-                  if (d) {
-                    const merged = new Date(scheduledDate);
-                    merged.setHours(d.getHours(), d.getMinutes());
-                    setScheduledDate(merged);
-                  }
-                }}
-              />
-            )}
-
-            {/* ── Duration ── */}
-            <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-              Duración
-            </Text>
-            <View className="mb-4 flex-row gap-2">
-              {DURATIONS.map((d) => (
-                <TouchableOpacity
-                  key={d}
-                  onPress={() => setDurationMinutes(d)}
-                  activeOpacity={0.8}
-                  className={`flex-1 rounded-xl py-2.5 ${
-                    durationMinutes === d ? 'bg-brand-primary' : 'bg-surface-high'
-                  }`}
-                >
-                  <Text
-                    className={`font-uiBold text-center text-sm ${
-                      durationMinutes === d ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
-                    }`}
-                  >
-                    {d} min
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* ── Format ── */}
-            <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-              Formato
-            </Text>
-            <View className="mb-4 flex-row flex-wrap gap-2">
-              {FORMATS.map((f) => (
-                <TouchableOpacity
-                  key={f.value}
-                  onPress={() => setFormat(f.value)}
-                  activeOpacity={0.8}
-                  className={`rounded-xl px-4 py-2.5 ${
-                    format === f.value ? 'bg-brand-primary' : 'bg-surface-high'
-                  }`}
-                >
-                  <Text
-                    className={`font-uiBold text-sm ${
-                      format === f.value ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
-                    }`}
-                  >
-                    {f.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* ── Zone ── */}
-            <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-              Zona
-            </Text>
-            {!zonesLoaded ? (
-              <ActivityIndicator color="#53E076" style={{ marginBottom: 16, alignSelf: 'flex-start' }} />
-            ) : zones.length === 0 ? (
-              <View className="mb-4 rounded-xl bg-surface-high px-4 py-3">
-                <Text className="font-ui text-sm text-neutral-on-surface-variant">
-                  Todavía no hay zonas con complejos cargados.
-                </Text>
-              </View>
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                className="mb-4"
-                contentContainerStyle={{ gap: 8, paddingRight: 4 }}
-              >
-                {zones.map((z) => (
-                  <TouchableOpacity
-                    key={z.id}
-                    onPress={() => setSelectedZoneId(z.id === selectedZoneId ? null : z.id)}
-                    activeOpacity={0.8}
-                    className={`rounded-xl px-4 py-2.5 ${
-                      selectedZoneId === z.id
-                        ? 'bg-brand-primary'
-                        : 'bg-surface-high'
-                    }`}
-                  >
-                    <Text
-                      className={`font-uiBold text-sm ${
-                        selectedZoneId === z.id ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
-                      }`}
-                    >
-                      {z.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-
-            {/* ── Venue (shown after zone is selected) ── */}
-            {selectedZoneId && (
-              <>
-                <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-                  Complejo en {selectedZoneName}
-                </Text>
-                {loadingVenues ? (
-                  <ActivityIndicator color="#53E076" style={{ marginBottom: 16, alignSelf: 'flex-start' }} />
-                ) : venues.length === 0 ? (
-                  <View className="mb-1 rounded-xl bg-surface-high px-4 py-3">
-                    <Text className="font-ui text-sm text-neutral-on-surface-variant">
-                      Los complejos de esta zona ya no están disponibles. Elegí otra zona.
-                    </Text>
-                  </View>
-                ) : (
-                  <View className="mb-1 gap-2">
-                    {venues.map((v) => (
-                      <TouchableOpacity
-                        key={v.id}
-                        onPress={() => setSelectedVenue(selectedVenue?.id === v.id ? null : v)}
-                        activeOpacity={0.8}
-                        className={`rounded-xl p-3 ${
-                          selectedVenue?.id === v.id
-                            ? 'border border-brand-primary/40 bg-brand-primary/10'
-                            : 'bg-surface-high'
-                        }`}
-                      >
-                        <View className="flex-row items-center gap-3">
-                          <View
-                            className={`h-5 w-5 items-center justify-center rounded-full border-2 ${
-                              selectedVenue?.id === v.id
-                                ? 'border-brand-primary'
-                                : 'border-neutral-outline'
-                            }`}
-                          >
-                            {selectedVenue?.id === v.id && (
-                              <View className="h-2.5 w-2.5 rounded-full bg-brand-primary" />
-                            )}
-                          </View>
-                          <View className="flex-1">
-                            <Text className="font-uiBold text-sm text-neutral-on-surface">
-                              {v.name}
-                            </Text>
-                            {v.address && (
-                              <Text className="font-ui text-xs text-neutral-on-surface-variant">
-                                {v.address}
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-                <View className="mb-4" />
-              </>
-            )}
-
-            {/* ── Costs ── */}
-            <View className="mb-4 flex-row gap-2">
-              <View className="flex-1">
-                <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-                  Seña ($)
-                </Text>
-                <TextInput
-                  value={signalAmount}
-                  onChangeText={setSignalAmount}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor="#869585"
-                  className="rounded-xl bg-surface-high px-4 py-3 text-sm text-neutral-on-surface"
-                />
-              </View>
-              <View className="flex-1">
-                <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
-                  Costo total ($)
-                </Text>
-                <TextInput
-                  value={totalCost}
-                  onChangeText={setTotalCost}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor="#869585"
-                  className="rounded-xl bg-surface-high px-4 py-3 text-sm text-neutral-on-surface"
-                />
-              </View>
-            </View>
-
-            {/* ── Submit ── */}
-            {/* Motivo inline en vez de alert: el usuario ve por qué no puede
-                enviar sin tener que tocar el botón para descubrirlo. */}
-            {blockReason && (
-              <View className="mb-2 flex-row items-start gap-2 rounded-xl bg-warning-tertiary/10 px-3 py-2">
-                <AppIcon family="material-community" name="alert-circle-outline" size={14} color="#FABD32" />
-                <Text className="font-ui flex-1 text-xs text-warning-tertiary">{blockReason}</Text>
-              </View>
-            )}
-            <TouchableOpacity
-              onPress={() => void handleSubmit()}
-              disabled={loading || blockReason !== null}
-              activeOpacity={0.8}
-              className={`rounded-xl py-3.5 ${
-                loading || blockReason !== null ? 'bg-surface-high' : 'bg-brand-primary'
+              className={`flex-1 rounded-xl py-2.5 ${
+                durationMinutes === d ? 'bg-brand-primary' : 'bg-surface-high'
               }`}
             >
               <Text
                 className={`font-uiBold text-center text-sm ${
-                  loading || blockReason !== null ? 'text-neutral-outline' : 'text-[#003914]'
+                  durationMinutes === d ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
                 }`}
               >
-                {loading ? 'Enviando...' : 'Enviar propuesta'}
+                {d} min
               </Text>
             </TouchableOpacity>
-          </ScrollView>
+          ))}
         </View>
-      </KeyboardAvoidingView>
 
-      {/* Dentro del <Modal>: si se montara en la pantalla padre quedaria detras
-          de esta ventana nativa y el error seria invisible. */}
-      {AlertComponent}
-    </Modal>
+        {/* ── Format ── */}
+        <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
+          Formato
+        </Text>
+        <View className="mb-4 flex-row flex-wrap gap-2">
+          {FORMATS.map((f) => (
+            <TouchableOpacity
+              key={f.value}
+              onPress={() => setFormat(f.value)}
+              activeOpacity={0.8}
+              className={`rounded-xl px-4 py-2.5 ${
+                format === f.value ? 'bg-brand-primary' : 'bg-surface-high'
+              }`}
+            >
+              <Text
+                className={`font-uiBold text-sm ${
+                  format === f.value ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
+                }`}
+              >
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── Zone ── */}
+        <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
+          Zona
+        </Text>
+        {!zonesLoaded ? (
+          <ActivityIndicator color="#53E076" style={{ marginBottom: 16, alignSelf: 'flex-start' }} />
+        ) : zones.length === 0 ? (
+          <View className="mb-4 rounded-xl bg-surface-high px-4 py-3">
+            <Text className="font-ui text-sm text-neutral-on-surface-variant">
+              Todavía no hay zonas con complejos cargados.
+            </Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="mb-4"
+            contentContainerStyle={{ gap: 8, paddingRight: 4 }}
+          >
+            {zones.map((z) => (
+              <TouchableOpacity
+                key={z.id}
+                onPress={() => setSelectedZoneId(z.id === selectedZoneId ? null : z.id)}
+                activeOpacity={0.8}
+                className={`rounded-xl px-4 py-2.5 ${
+                  selectedZoneId === z.id
+                    ? 'bg-brand-primary'
+                    : 'bg-surface-high'
+                }`}
+              >
+                <Text
+                  className={`font-uiBold text-sm ${
+                    selectedZoneId === z.id ? 'text-[#003914]' : 'text-neutral-on-surface-variant'
+                  }`}
+                >
+                  {z.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* ── Venue (shown after zone is selected) ── */}
+        {selectedZoneId && (
+          <>
+            <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
+              Complejo en {selectedZoneName}
+            </Text>
+            {loadingVenues ? (
+              <ActivityIndicator color="#53E076" style={{ marginBottom: 16, alignSelf: 'flex-start' }} />
+            ) : venues.length === 0 ? (
+              <View className="mb-1 rounded-xl bg-surface-high px-4 py-3">
+                <Text className="font-ui text-sm text-neutral-on-surface-variant">
+                  Los complejos de esta zona ya no están disponibles. Elegí otra zona.
+                </Text>
+              </View>
+            ) : (
+              <View className="mb-1 gap-2">
+                {venues.map((v) => (
+                  <TouchableOpacity
+                    key={v.id}
+                    onPress={() => setSelectedVenue(selectedVenue?.id === v.id ? null : v)}
+                    activeOpacity={0.8}
+                    className={`rounded-xl p-3 ${
+                      selectedVenue?.id === v.id
+                        ? 'border border-brand-primary/40 bg-brand-primary/10'
+                        : 'bg-surface-high'
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <View
+                        className={`h-5 w-5 items-center justify-center rounded-full border-2 ${
+                          selectedVenue?.id === v.id
+                            ? 'border-brand-primary'
+                            : 'border-neutral-outline'
+                        }`}
+                      >
+                        {selectedVenue?.id === v.id && (
+                          <View className="h-2.5 w-2.5 rounded-full bg-brand-primary" />
+                        )}
+                      </View>
+                      <View className="flex-1">
+                        <View className="flex-row items-center justify-between gap-2">
+                          <Text className="font-uiBold flex-1 text-sm text-neutral-on-surface">
+                            {v.name}
+                          </Text>
+                          {/* A14: sólo si ya teníamos la ubicación. Elegir cancha
+                              no justifica pedir un permiso nuevo. */}
+                          {venueDistances[v.id] !== undefined && (
+                            <Text className="font-ui text-[11px] text-brand-primary">
+                              {formatDistance(venueDistances[v.id])}
+                            </Text>
+                          )}
+                        </View>
+                        {v.address && (
+                          <Text className="font-ui text-xs text-neutral-on-surface-variant">
+                            {v.address}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <View className="mb-4" />
+          </>
+        )}
+
+        {/* ── Costs ── */}
+        <View className="mb-4 flex-row gap-2">
+          <View className="flex-1">
+            <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
+              Seña ($)
+            </Text>
+            <TextInput
+              value={signalAmount}
+              onChangeText={setSignalAmount}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor="#869585"
+              className="rounded-xl bg-surface-high px-4 py-3 text-sm text-neutral-on-surface"
+            />
+          </View>
+          <View className="flex-1">
+            <Text className="font-ui mb-2 text-xs uppercase tracking-widest text-neutral-outline">
+              Costo total ($)
+            </Text>
+            <TextInput
+              value={totalCost}
+              onChangeText={setTotalCost}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor="#869585"
+              className="rounded-xl bg-surface-high px-4 py-3 text-sm text-neutral-on-surface"
+            />
+          </View>
+        </View>
+
+        {/* ── Submit ── */}
+        {/* Motivo inline en vez de alert: el usuario ve por qué no puede
+            enviar sin tener que tocar el botón para descubrirlo. */}
+        {blockReason && (
+          <View className="mb-2 flex-row items-start gap-2 rounded-xl bg-warning-tertiary/10 px-3 py-2">
+            <AppIcon family="material-community" name="alert-circle-outline" size={14} color="#FABD32" />
+            <Text className="font-ui flex-1 text-xs text-warning-tertiary">{blockReason}</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          onPress={() => void handleSubmit()}
+          disabled={loading || blockReason !== null}
+          activeOpacity={0.8}
+          className={`rounded-xl py-3.5 ${
+            loading || blockReason !== null ? 'bg-surface-high' : 'bg-brand-primary'
+          }`}
+        >
+          <Text
+            className={`font-uiBold text-center text-sm ${
+              loading || blockReason !== null ? 'text-neutral-outline' : 'text-[#003914]'
+            }`}
+          >
+            {loading ? 'Enviando...' : 'Enviar propuesta'}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaBottomSheet>
   );
 }

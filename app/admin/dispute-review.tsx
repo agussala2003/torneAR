@@ -70,20 +70,20 @@ const CONFIRM_COPY: Record<DisputeResolution, { title: string; message: string; 
     title: 'Dar por ganador al equipo A',
     message:
       'El partido se va a finalizar con el marcador que cargó ese equipo (o 3-0 si nunca lo cargó). ' +
-      'Se aplican ELO, estadísticas de temporada y Fair Play. Esta acción no se puede deshacer.',
+      'Se aplican el Rating, las estadísticas de temporada y el Fair Play. Esta acción no se puede deshacer.',
     label: 'Confirmar',
   },
   WIN_B: {
     title: 'Dar por ganador al equipo B',
     message:
       'El partido se va a finalizar con el marcador que cargó ese equipo (o 3-0 si nunca lo cargó). ' +
-      'Se aplican ELO, estadísticas de temporada y Fair Play. Esta acción no se puede deshacer.',
+      'Se aplican el Rating, las estadísticas de temporada y el Fair Play. Esta acción no se puede deshacer.',
     label: 'Confirmar',
   },
   CANCEL: {
     title: 'Anular el partido',
     message:
-      'El partido queda cancelado y NO computa: sin ELO, sin estadísticas y sin ganador. ' +
+      'El partido queda cancelado y NO computa: sin Rating, sin estadísticas y sin ganador. ' +
       'Se libera a los jugadores convocados. Esta acción no se puede deshacer.',
     label: 'Anular',
   },
@@ -138,7 +138,7 @@ export default function DisputeReviewScreen() {
         'Disputa resuelta',
         dialog.resolution === 'CANCEL'
           ? 'El partido fue anulado y no computa.'
-          : 'Se finalizó el partido y se aplicaron ELO, estadísticas y Fair Play.',
+          : 'Se finalizó el partido y se aplicaron el Rating, las estadísticas y el Fair Play.',
         undefined,
         'success',
       );

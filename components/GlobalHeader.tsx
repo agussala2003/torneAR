@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from './ui/AppIcon';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
@@ -17,7 +18,18 @@ type GlobalHeaderProps = {
   isRankingTab?: boolean; // NUEVO
 };
 
+/**
+ * Aire entre la barra de estado del sistema y los íconos del header.
+ *
+ * Se suma al inset real en vez de reemplazarlo: `insets.top` es exactamente lo
+ * que ocupa el sistema (24 en Android sin notch, ~59 con Dynamic Island), así
+ * que solo evita la superposición — sin este extra los íconos quedan pegados al
+ * borde de la hora y la batería, que es lo que se reportó en el testing.
+ */
+const HEADER_BREATHING_ROOM = 12;
+
 export function GlobalHeader({ onNotificationPress, notificationCount, isMarketTab, isRankingTab }: GlobalHeaderProps) {
+  const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   // Selector puntual: el header solo necesita el equipo activo para el badge de
   // desafios. Suscribirse al store entero lo re-renderizaba ante cualquier cambio.
@@ -153,35 +165,57 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
   const handleNotificationPress = onNotificationPress ?? (() => router.push('/notifications'));
 
   return (
-    <View className="relative z-50 flex-row items-center justify-between bg-surface-base/80 px-5 pb-4 pt-12 backdrop-blur-md">
+    /**
+     * `pt-12` fijo (48 px) era el bug: el inset real va de 24 a ~62 según el
+     * dispositivo, así que en unos equipos sobraba y en otros los íconos se
+     * metían debajo de la barra de estado.
+     *
+     * El fondo pasa a `surface-container` (más claro que el `surface-base` de
+     * las pantallas) con borde inferior: es lo que despega al header del fondo.
+     * De paso se va el `backdrop-blur-md`, que en React Native no hace nada —
+     * NativeWind no lo traduce a ningún efecto nativo.
+     */
+    <View
+      className="relative z-50 flex-row items-center justify-between border-b border-neutral-outline/15 bg-surface-container px-5 pb-4 shadow-ambient-sm"
+      style={{ paddingTop: insets.top + HEADER_BREATHING_ROOM }}
+    >
       {/* Logo TorneAR */}
       <View className="flex-row items-center gap-2">
-        <View className="h-8 w-8 items-center justify-center rounded-full">
-          <AppIcon family="material-community" name="soccer" size={20} color='#53E076' />
+        <View className="h-10 w-10 items-center justify-center rounded-full">
+          <AppIcon family="material-community" name="soccer" size={26} color='#53E076' />
         </View>
-        <Text className="font-displayBlack text-lg tracking-wider text-brand-primary">TORNEAR</Text>
+        <Text className="font-displayBlack text-2xl tracking-wider text-brand-primary">TORNEAR</Text>
       </View>
 
-      <View className="flex-1 flex-row items-center justify-end pr-4">
+      {/* `min-w-0` + pr-3 (antes pr-4): con el logo y los íconos más grandes, el
+          presupuesto horizontal del selector se achicó ~40px. */}
+      <View className="min-w-0 flex-1 flex-row items-center justify-end pr-3">
         <ActiveTeamSelector />
       </View>
 
       {/* gap-6 (24px) y no gap-4: con hitSlop de 12 por lado, 16px de separacion
           hacia que las areas tactiles de dos iconos vecinos se solaparan y el tap
-          en la banda intermedia disparara el handler equivocado. */}
+          en la banda intermedia disparara el handler equivocado.
+
+          Los iconos pasaron de 20/21 a 26px, asi que el hitSlop baja de 12 a 8:
+          24px de gap menos 8+8 de expansion deja 8px de aire entre areas
+          tactiles. Con el hitSlop viejo (12+12 = 24) volvian a tocarse justo y
+          se reintroducia aquel bug. El area tactil total por icono queda en
+          26+16 = 42px, arriba del minimo de 44 recomendado contando el padding
+          vertical del header. */}
       <View className="flex-row items-center gap-6">
         {/* Market Chats Icon */}
         {isMarketTab && (
           <TouchableOpacity
             onPress={() => router.push('/market-chats' as any)}
             activeOpacity={0.7}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             className="relative"
           >
-            <AppIcon family="material-icons" name="chat" size={21} />
+            <AppIcon family="material-icons" name="chat" size={26} />
             {chatCount > 0 && (
-              <View className="absolute -right-1.5 -top-1.5 h-4 w-4 items-center justify-center rounded-full border border-[#53E076] bg-[#003914]">
-                <Text className="font-uiBold text-[8px] text-[#53E076]" style={{ fontVariant: ['tabular-nums'] }}>
+              <View className="absolute -right-1.5 -top-1.5 h-[18px] w-[18px] items-center justify-center rounded-full border border-[#53E076] bg-[#003914]">
+                <Text className="font-uiBold text-[9px] text-[#53E076]" style={{ fontVariant: ['tabular-nums'] }}>
                   {chatCount > 9 ? '9+' : chatCount}
                 </Text>
               </View>
@@ -194,13 +228,13 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
           <TouchableOpacity
             onPress={() => router.push('/challenge-inbox' as any)}
             activeOpacity={0.7}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             className="relative"
           >
-            <AppIcon family="material-community" name="sword-cross" size={21} />
+            <AppIcon family="material-community" name="sword-cross" size={26} />
             {challengeCount > 0 && (
-              <View className="absolute -right-1.5 -top-1.5 h-4 min-w-[16px] items-center justify-center rounded-full border border-surface-base bg-danger-error px-1">
-                <Text className="font-uiBold text-[8px] text-surface-base" style={{ fontVariant: ['tabular-nums'] }}>
+              <View className="absolute -right-1.5 -top-1.5 h-[18px] min-w-[18px] items-center justify-center rounded-full border border-surface-container bg-danger-error px-1">
+                <Text className="font-uiBold text-[9px] text-surface-base" style={{ fontVariant: ['tabular-nums'] }}>
                   {challengeCount > 9 ? '9+' : challengeCount}
                 </Text>
               </View>
@@ -212,13 +246,13 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
         <TouchableOpacity
           onPress={handleNotificationPress}
           activeOpacity={0.7}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           className="relative"
         >
-          <AppIcon family="material-community" name="bell" size={20} />
+          <AppIcon family="material-community" name="bell" size={26} />
           {resolvedNotificationCount > 0 && (
-            <View className="absolute -right-1 -top-1 h-4 w-4 items-center justify-center rounded-full bg-brand-primary">
-              <Text className="font-uiBold text-[9px] text-[#003914]" style={{ fontVariant: ['tabular-nums'] }}>
+            <View className="absolute -right-1 -top-1 h-[18px] w-[18px] items-center justify-center rounded-full bg-brand-primary">
+              <Text className="font-uiBold text-[10px] text-[#003914]" style={{ fontVariant: ['tabular-nums'] }}>
                 {resolvedNotificationCount > 9 ? '9+' : resolvedNotificationCount}
               </Text>
             </View>

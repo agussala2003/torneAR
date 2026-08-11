@@ -5,9 +5,11 @@ import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { MatchesSkeleton } from '@/components/matches/MatchesSkeleton';
 import { useTeamStore } from '@/stores/teamStore';
+import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { useTeamMatchesRealtime } from '@/hooks/useTeamMatchesRealtime';
 import { fetchMatchesViewData } from '@/lib/matches-data';
+import { fetchGuestMatchesData, type GuestMatchesData } from '@/lib/guest-matches-data';
 import { acceptProposal, rejectProposal, cancelProposal, getProposalErrorMessage } from '@/lib/match-actions';
 import { isTeamMatchAdmin, isTeamMatchStaff } from '@/lib/match-permissions';
 import { Logger } from '@/lib/logger';
@@ -19,6 +21,8 @@ import type { MatchesViewData } from '@/components/matches/types';
 
 export default function MatchesScreen() {
   const { activeTeamId, activeTeamName, myTeams, setActiveTeam } = useTeamStore();
+  const { profile } = useAuth();
+  const profileId = profile?.id;
   const { showAlert, AlertComponent } = useCustomAlert();
 
   // R2: `get_my_matches` no devuelve el rol, así que las tarjetas mostraban
@@ -35,7 +39,24 @@ export default function MatchesScreen() {
 
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<MatchesViewData | null>(null);
+  const [guestData, setGuestData] = useState<GuestMatchesData>({ entries: [], teamIdByMatchId: {} });
   const [showGuestModal, setShowGuestModal] = useState(false);
+
+  // Los partidos donde entré con código no dependen del equipo activo: un
+  // invitado puede no tener equipo ninguno. Se cargan aparte y en paralelo, así
+  // un fallo acá no se lleva puesta la lista del equipo.
+  const loadGuestData = useCallback(async () => {
+    if (!profileId) return;
+    try {
+      setGuestData(await fetchGuestMatchesData(profileId));
+    } catch (err) {
+      Logger.warn('No se pudieron cargar los partidos como invitado', {
+        scope: 'matches.loadGuestData',
+        profileId,
+        error: err,
+      });
+    }
+  }, [profileId]);
 
   const loadData = useCallback(async () => {
     if (!activeTeamId) {
@@ -65,7 +86,10 @@ export default function MatchesScreen() {
     }
   }, [activeTeamId, showAlert]);
 
-  useFocusEffect(useCallback(() => { void loadData(); }, [loadData]));
+  useFocusEffect(useCallback(() => {
+    void loadData();
+    void loadGuestData();
+  }, [loadData, loadGuestData]));
 
   // Realtime: si el rival acepta, hace check-in o carga el resultado mientras
   // el usuario mira la lista, la tarjeta se actualiza sola. Antes eso sólo se
@@ -166,6 +190,7 @@ export default function MatchesScreen() {
   // Esqueleto solo en la primera carga. Con `if (loading)` a secas, cada regreso
   // a la tab borraba la lista completa y mostraba un loader a pantalla entera.
   const isInitialLoad = loading && !viewData;
+  const hasGuestMatches = guestData.entries.length > 0;
 
   return (
     <View className="flex-1 bg-surface-base">
@@ -187,8 +212,9 @@ export default function MatchesScreen() {
       {/* Carga inicial */}
       {isInitialLoad && <MatchesSkeleton />}
 
-      {/* No team selected */}
-      {!isInitialLoad && !activeTeamId && (
+      {/* Sin equipo Y sin partidos como invitado no hay nada que mostrar. Con
+          partidos de invitado sí lo hay, aunque no pertenezca a ningún club. */}
+      {!isInitialLoad && !activeTeamId && !hasGuestMatches && (
         <View className="flex-1 items-center justify-center px-6">
           <Text className="font-displayBlack text-2xl text-neutral-on-surface">Partidos</Text>
           <Text className="font-ui mt-2 text-center text-neutral-on-surface-variant">
@@ -197,47 +223,49 @@ export default function MatchesScreen() {
         </View>
       )}
 
-      {!isInitialLoad && activeTeamId && (
+      {!isInitialLoad && (activeTeamId || hasGuestMatches) && (
         <ScrollView
           className="px-4"
           contentContainerStyle={{ paddingTop: 18, paddingBottom: 114 }}
           showsVerticalScrollIndicator={false}
         >
           {/* Team selector banner */}
-          <View className="mb-4 flex-row items-center justify-between rounded-2xl bg-surface-container px-4 py-3">
-            <View>
-              <Text className="font-ui text-[10px] uppercase tracking-widest text-neutral-outline">
-                Equipo activo
-              </Text>
-              <Text className="font-uiBold text-[14px] text-neutral-on-surface">
-                {activeTeamName ?? '—'}
-              </Text>
-            </View>
-            {myTeams.length > 1 && (
-              <View className="flex-row gap-2">
-                {myTeams.map((t) => (
-                  t.id !== activeTeamId ? (
-                    <TouchableOpacity
-                      key={t.id}
-                      activeOpacity={0.8}
-                      onPress={() => setActiveTeam(t.id, t.name)}
-                      className="rounded-xl border border-neutral-outline/30 px-3 py-1.5"
-                    >
-                      <Text className="font-uiBold text-[11px] text-neutral-on-surface-variant">
-                        {t.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null
-                ))}
+          {activeTeamId && (
+            <View className="mb-4 flex-row items-center justify-between rounded-2xl bg-surface-container px-4 py-3">
+              <View>
+                <Text className="font-ui text-[10px] uppercase tracking-widest text-neutral-outline">
+                  Equipo activo
+                </Text>
+                <Text className="font-uiBold text-[14px] text-neutral-on-surface">
+                  {activeTeamName ?? '—'}
+                </Text>
               </View>
-            )}
-          </View>
+              {myTeams.length > 1 && (
+                <View className="flex-row gap-2">
+                  {myTeams.map((t) => (
+                    t.id !== activeTeamId ? (
+                      <TouchableOpacity
+                        key={t.id}
+                        activeOpacity={0.8}
+                        onPress={() => setActiveTeam(t.id, t.name)}
+                        className="rounded-xl border border-neutral-outline/30 px-3 py-1.5"
+                      >
+                        <Text className="font-uiBold text-[11px] text-neutral-on-surface-variant">
+                          {t.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Live match banner */}
           {viewData?.liveMatch && (
             <LiveMatchBanner
               match={viewData.liveMatch}
-              myTeamId={activeTeamId}
+              myTeamId={viewData.myTeamId}
               isStaff={isMatchStaff}
               onPress={handleCardPress}
               onLoadResult={handleLoadResult}
@@ -245,18 +273,18 @@ export default function MatchesScreen() {
           )}
 
           {/* Upcoming matches */}
-          {(viewData?.upcomingMatches.length ?? 0) > 0 && (
+          {viewData && viewData.upcomingMatches.length > 0 && (
             <>
               <MatchSectionHeader
                 title="Próximos"
-                count={viewData?.upcomingMatches.length}
+                count={viewData.upcomingMatches.length}
               />
-              {viewData?.upcomingMatches.map((entry, index) => (
+              {viewData.upcomingMatches.map((entry, index) => (
                 <MatchCard
                   key={entry.id}
                   entry={entry}
                   index={index}
-                  myTeamId={activeTeamId}
+                  myTeamId={viewData.myTeamId}
                   canManage={canManageMatches}
                   isStaff={isMatchStaff}
                   onPress={handleCardPress}
@@ -270,19 +298,38 @@ export default function MatchesScreen() {
             </>
           )}
 
-          {/* History */}
-          {(viewData?.historyMatches.length ?? 0) > 0 && (
+          {/* Partidos donde entré con código: no son de mi equipo, así que van
+              en su propia sección y sin acciones de gestión. */}
+          {hasGuestMatches && (
             <>
-              <MatchSectionHeader
-                title="Historial"
-                count={viewData?.historyMatches.length}
-              />
-              {viewData?.historyMatches.map((entry, index) => (
+              <MatchSectionHeader title="Como invitado" count={guestData.entries.length} />
+              {guestData.entries.map((entry, index) => (
                 <MatchCard
                   key={entry.id}
                   entry={entry}
                   index={index}
-                  myTeamId={activeTeamId}
+                  // El lado por el que entró, para que la tarjeta se oriente
+                  // desde su equipo y no desde el rival.
+                  myTeamId={guestData.teamIdByMatchId[entry.id] ?? entry.teamA.id}
+                  onPress={handleCardPress}
+                />
+              ))}
+            </>
+          )}
+
+          {/* History */}
+          {viewData && viewData.historyMatches.length > 0 && (
+            <>
+              <MatchSectionHeader
+                title="Historial"
+                count={viewData.historyMatches.length}
+              />
+              {viewData.historyMatches.map((entry, index) => (
+                <MatchCard
+                  key={entry.id}
+                  entry={entry}
+                  index={index}
+                  myTeamId={viewData.myTeamId}
                   onPress={handleCardPress}
                 />
               ))}
@@ -291,6 +338,7 @@ export default function MatchesScreen() {
 
           {/* Empty state */}
           {!viewData?.liveMatch &&
+            !hasGuestMatches &&
             (viewData?.upcomingMatches.length ?? 0) === 0 &&
             (viewData?.historyMatches.length ?? 0) === 0 && (
               <View className="mt-16 items-center px-6">

@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
+import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
 export type UserTeam = {
   id: string;
   name: string;
   role: string;
+  /** URL pública ya resuelta, o `null` si el equipo no cargó escudo. */
+  shieldUrl: string | null;
 };
 
 interface TeamStore {
@@ -37,7 +40,8 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
           role,
           teams:team_id (
             id,
-            name
+            name,
+            shield_url
           )
         `)
         .eq('profile_id', profileId)
@@ -57,6 +61,9 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
             id: teamData.id,
             name: teamData.name,
             role: row.role,
+            shieldUrl: teamData.shield_url
+              ? getSupabaseStorageUrl('shields', teamData.shield_url)
+              : null,
           };
         });
 
@@ -89,14 +96,23 @@ export const useTeamStore = create<TeamStore>((set, get) => ({
        * array anterior: `Object.is(antes, despues)` sigue siendo true y los
        * consumidores no se enteran de un cambio que no existio.
        *
-       * UserTeam es plano (id/name/role), asi que alcanza con comparar campo a
-       * campo en orden — la query ya viene ordenada por `joined_at`.
+       * UserTeam es plano (id/name/role/shieldUrl), asi que alcanza con comparar
+       * campo a campo en orden — la query ya viene ordenada por `joined_at`.
+       *
+       * `shieldUrl` entra en la comparacion: si se omitiera, subir un escudo
+       * nuevo dejaria el array anterior en el store y el selector seguiria
+       * mostrando el escudo viejo (o la inicial) hasta reiniciar la app.
        */
       const teamsAreEquivalent =
         currentTeams.length === formattedTeams.length &&
         currentTeams.every((team, index) => {
           const next = formattedTeams[index];
-          return team.id === next.id && team.name === next.name && team.role === next.role;
+          return (
+            team.id === next.id &&
+            team.name === next.name &&
+            team.role === next.role &&
+            team.shieldUrl === next.shieldUrl
+          );
         });
 
       // Nada cambio: no publicamos un estado nuevo mas alla de apagar el loader.

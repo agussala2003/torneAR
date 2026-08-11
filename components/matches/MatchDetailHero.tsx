@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Animated } from 'react-native';
-import { TeamShield } from '@/components/matches/TeamShield';
+import { TeamShield } from '@/components/ui/TeamShield';
 import { LiveTimer } from '@/components/matches/LiveTimer';
 import type { MatchDetailViewData } from '@/components/matches/types';
 
@@ -192,7 +192,7 @@ export function MatchDetailHero({ match, myTeamId }: Props) {
           >
             {myTeam.name}
           </Text>
-          <Text className="font-ui text-xs text-neutral-outline">{myTeam.eloRating} ELO</Text>
+          <Text className="font-ui text-xs text-neutral-outline">{myTeam.eloRating} Rating</Text>
         </View>
 
         {/* Center */}
@@ -208,7 +208,7 @@ export function MatchDetailHero({ match, myTeamId }: Props) {
           >
             {opponentTeam.name}
           </Text>
-          <Text className="font-ui text-xs text-neutral-outline">{opponentTeam.eloRating} ELO</Text>
+          <Text className="font-ui text-xs text-neutral-outline">{opponentTeam.eloRating} Rating</Text>
         </View>
       </View>
     </View>

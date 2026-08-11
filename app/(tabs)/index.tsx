@@ -10,21 +10,23 @@ import { HomeSkeleton } from '@/components/home/HomeSkeleton';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { fetchHomeViewData } from '@/lib/home-data';
-import { supabase } from '@/lib/supabase';
-import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { fetchActiveTeamRankingInfo, fetchRankingWithFilters } from '@/lib/ranking-data';
 import { Logger } from '@/lib/logger';
-import type { HomeViewData, MiniRankingEntry, PendingAction } from '@/components/home/types';
-import type { Database } from '@/types/supabase';
-import { TeamShield } from '@/components/matches/TeamShield';
+import type {
+  HomeViewData,
+  MiniRankingContext,
+  MiniRankingEntry,
+  PendingAction,
+} from '@/components/home/types';
+import { TeamShield } from '@/components/ui/TeamShield';
 import { HomeOnboardingState } from '@/components/home/HomeOnboardingState';
 import { HomeOnboardingTour } from '@/components/home/HomeOnboardingTour';
+import { CensusEntryCard } from '@/components/home/CensusEntryCard';
 import { MiniRankingCard } from '@/components/home/MiniRankingCard';
 import { PendingActionsCard } from '@/components/home/PendingActionsCard';
 import { UpcomingMatchesSection } from '@/components/home/UpcomingMatchesSection';
 import { MyTeamsRankingSection } from '@/components/home/MyTeamsRankingSection';
 import { QuickActionsSection } from '@/components/home/QuickActionsSection';
-
-type TeamFormat = Database['public']['Enums']['team_format'];
 
 /** Ventana en la que el partido deja de ser "una fecha" y pasa a ser una cuenta regresiva. */
 const COUNTDOWN_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -60,7 +62,7 @@ export default function HomeScreen() {
 
   // ─── Mini-ranking (top 3 del formato que juega mi equipo) ──────────────────
   const [miniRanking, setMiniRanking] = useState<MiniRankingEntry[]>([]);
-  const [miniRankingFormat, setMiniRankingFormat] = useState<TeamFormat | null>(null);
+  const [miniRankingContext, setMiniRankingContext] = useState<MiniRankingContext | null>(null);
   const [miniRankingLoading, setMiniRankingLoading] = useState(true);
 
   // ─── Guía inicial ──────────────────────────────────────────────────────────
@@ -85,9 +87,9 @@ export default function HomeScreen() {
       // segundo plano, `nowTs` quedó viejo y la cuenta arrancaría atrasada.
       setNowTs(Date.now());
 
-      // ── TAREA 2 — consulta directa a Supabase para el mini-ranking ────────
+      // ── TAREA 2 — mini-ranking del contexto de mi equipo ──────────────────
       // Va acá, dentro de la pantalla, y no en `lib/home-data.ts`: son dos pasos
-      // (formato del equipo → top 3 de ese formato) y un fallo suyo no puede
+      // (contexto del equipo → top 3 de ese contexto) y un fallo suyo no puede
       // tumbar el resto del inicio, así que tiene su propio try/catch.
       const rankedTeamId =
         activeTeamId && data.myTeams.some((team) => team.id === activeTeamId)
@@ -96,48 +98,51 @@ export default function HomeScreen() {
 
       if (!rankedTeamId) {
         setMiniRanking([]);
-        setMiniRankingFormat(null);
+        setMiniRankingContext(null);
         setMiniRankingLoading(false);
       } else {
         setMiniRankingLoading(true);
         try {
-          // Paso 1: el formato principal del equipo (Fútbol 5, 7, 11…).
-          const { data: teamRow, error: teamError } = await supabase
-            .from('teams')
-            .select('preferred_format')
-            .eq('id', rankedTeamId)
-            .maybeSingle();
+          // Paso 1: zona + categoría + formato del equipo.
+          //
+          // Se usa `fetchActiveTeamRankingInfo`, que es EXACTAMENTE la misma
+          // fuente que el bootstrap de la tab Ranking. Antes acá se leía sólo
+          // `preferred_format` y se consultaba el top 3 global de ese formato,
+          // mientras que la tab arrancaba filtrada también por zona y categoría:
+          // el "Ver la tabla completa" llevaba a una lista distinta de la del
+          // widget y parecía que el botón no funcionaba.
+          const teamInfo = await fetchActiveTeamRankingInfo(rankedTeamId);
 
-          if (teamError) throw teamError;
+          const context: MiniRankingContext = {
+            zone: teamInfo?.zone ?? null,
+            category: teamInfo?.category ?? null,
+            format: teamInfo?.format ?? null,
+          };
+          setMiniRankingContext(context);
 
-          const format = teamRow?.preferred_format ?? null;
-          setMiniRankingFormat(format);
-
-          if (!format) {
+          if (!teamInfo) {
             setMiniRanking([]);
           } else {
-            // Paso 2: la misma RPC que alimenta la tab Ranking, acotada al
-            // formato y recortada al podio.
-            const { data: rankingRows, error: rankingError } = await supabase.rpc(
-              'get_team_ranking',
-              { p_format: format },
+            // Paso 2: la misma consulta que alimenta la tab Ranking, recortada
+            // al podio. `activeTeamElo` va en null a propósito: "rivales
+            // ideales" es un filtro de la tab, no del widget.
+            const myTeamIds = data.myTeams.map((team) => team.id);
+            const ranking = await fetchRankingWithFilters(
+              { ...context, rivalesIdeales: false },
+              myTeamIds,
+              null,
             );
 
-            if (rankingError) throw rankingError;
-
-            const myTeamIds = new Set(data.myTeams.map((team) => team.id));
-            const top3 = [...(rankingRows ?? [])]
-              .sort((a, b) => Number(a.rank_position) - Number(b.rank_position))
+            const top3 = [...ranking]
+              .sort((a, b) => a.rankPosition - b.rankPosition)
               .slice(0, 3)
               .map<MiniRankingEntry>((row) => ({
-                rankPosition: Number(row.rank_position),
-                teamId: row.team_id,
-                teamName: row.team_name,
-                shieldUrl: row.shield_url
-                  ? getSupabaseStorageUrl('shields', row.shield_url)
-                  : null,
-                eloRating: row.elo_rating,
-                isMyTeam: myTeamIds.has(row.team_id),
+                rankPosition: row.rankPosition,
+                teamId: row.teamId,
+                teamName: row.teamName,
+                shieldUrl: row.shieldUrl,
+                eloRating: row.eloRating,
+                isMyTeam: row.isMyTeam,
               }));
 
             setMiniRanking(top3);
@@ -279,8 +284,34 @@ export default function HomeScreen() {
     router.push({ pathname: '/team-manage', params: { teamId } });
   };
 
+  /**
+   * El widget y la tab tienen que terminar mostrando la MISMA tabla, así que se
+   * viaja con el contexto exacto con el que se consultó el top 3.
+   *
+   * `ts` es un nonce y no decoración: la tab aplica los params una sola vez por
+   * valor recibido (si no, pisaría los filtros que el usuario toca a mano). Sin
+   * él, volver a entrar desde el widget después de haber cambiado los filtros no
+   * re-aplicaría nada, porque los params serían idénticos a los de la vez
+   * anterior.
+   */
   const handleSeeRanking = () => {
-    router.push('/(tabs)/ranking');
+    // Sin contexto resuelto todavía (carga en vuelo, o usuario sin equipo) se
+    // navega pelado: que la tab aplique SUS defaults es mejor que forzarle un
+    // ranking global que no pidió nadie.
+    if (!miniRankingContext) {
+      router.push('/(tabs)/ranking');
+      return;
+    }
+
+    router.push({
+      pathname: '/(tabs)/ranking',
+      params: {
+        zone: miniRankingContext.zone ?? '',
+        category: miniRankingContext.category ?? '',
+        format: miniRankingContext.format ?? '',
+        ts: String(Date.now()),
+      },
+    });
   };
 
   const handleGoToRanking = () => {
@@ -289,6 +320,10 @@ export default function HomeScreen() {
 
   const handleGoToMarket = () => {
     router.push('/(tabs)/market');
+  };
+
+  const handleGoToCensus = () => {
+    router.push('/censo');
   };
 
   const handleManageTeam = () => {
@@ -481,7 +516,7 @@ export default function HomeScreen() {
           {/* ── TAREA 2 — Mini-ranking del formato de mi equipo ───────────── */}
           <MiniRankingCard
             entries={miniRanking}
-            format={miniRankingFormat}
+            context={miniRankingContext}
             loading={miniRankingLoading}
             onPress={handleSeeRanking}
           />
@@ -503,6 +538,8 @@ export default function HomeScreen() {
             onGoToMarket={handleGoToMarket}
             onManageTeam={handleManageTeam}
           />
+
+          <CensusEntryCard onPress={handleGoToCensus} />
         </ScrollView>
       )}
 

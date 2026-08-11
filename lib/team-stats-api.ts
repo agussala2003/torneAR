@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { Database } from '@/types/supabase';
 import type {
   TeamStatsViewData,
@@ -137,6 +138,17 @@ export async function fetchTeamStatsViewData(
   const team = teamRes.data as TeamRow;
   const matches = ((matchesRes.data as MatchRaw[]) ?? []);
   const memberRows = ((membersRes.data as MemberRaw[]) ?? []).filter((m) => !!m.profiles);
+
+  // El historial es accesorio: si falla, la pantalla se muestra igual con el
+  // gráfico vacío. Pero un fallo silencioso acá miente («todavía no jugó
+  // ningún partido de ranking») — por eso queda registrado, no descartado.
+  if (eloHistoryRes.error) {
+    Logger.warn('No se pudo leer el historial de Rating del equipo', {
+      scope: 'teamStats.fetchTeamStatsViewData',
+      teamId,
+      error: eloHistoryRes.error,
+    });
+  }
   const eloHistory = ((eloHistoryRes.data as EloHistoryRaw[]) ?? []);
 
   // Header

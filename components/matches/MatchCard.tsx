@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import type { MatchCardEntry } from './types';
 import { MatchStatusBadge } from './MatchStatusBadge';
-import { TeamShield } from './TeamShield';
+import { TeamShield } from '@/components/ui/TeamShield';
 import { MatchCardCenter } from './MatchCardCenter';
 import { MatchCardFooter } from './MatchCardFooter';
 

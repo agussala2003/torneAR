@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { canLoadResultFromCard } from '@/lib/match-permissions';
 import type { MatchCardEntry } from './types';
-import { TeamShield } from './TeamShield';
+import { TeamShield } from '@/components/ui/TeamShield';
 
 interface Props {
   match: MatchCardEntry;

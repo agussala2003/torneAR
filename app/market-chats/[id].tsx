@@ -68,6 +68,9 @@ export default function MarketChatScreen() {
   const [matchCode, setMatchCode] = useState<string | null>(null);
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
   const [showInviteConfirmModal, setShowInviteConfirmModal] = useState(false);
+  // A13: mensajes optimistas que no se pudieron entregar. Estado efímero y local
+  // a la pantalla a propósito — no es dominio y no sobrevive a salir del chat.
+  const [failedMessageIds, setFailedMessageIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!profile || !id) return;
@@ -163,6 +166,50 @@ export default function MarketChatScreen() {
     };
   }, [profile, id]);
 
+  /**
+   * Entrega (o reintenta) un mensaje ya pintado de forma optimista.
+   *
+   * Antes, al fallar, la burbuja se borraba de la lista: lo que el usuario había
+   * escrito simplemente se esfumaba, sin aviso ni forma de recuperarlo
+   * (auditoría E2E, módulo 3.3). Ahora queda visible y marcada, y el tap la
+   * reintenta con el mismo contenido.
+   */
+  const deliverMessage = useCallback(
+    async (
+      message: MarketMessage,
+      messageType: 'TEXT' | 'TEAM_INVITE' | 'MATCH_INVITE' = 'TEXT',
+      senderTeamId?: string,
+    ) => {
+      if (!id) return;
+
+      setFailedMessageIds((prev) => prev.filter((failedId) => failedId !== message.id));
+      setIsSending(true);
+      try {
+        const realMsg = await sendMessage(id, message.content, senderTeamId, messageType);
+        Logger.info('Mensaje enviado en el chat del mercado', {
+          scope: 'market-chat.deliverMessage',
+          conversationId: id,
+          messageId: realMsg.id,
+          messageType,
+          senderTeamId: senderTeamId ?? null,
+        });
+        setMessages((prev) => prev.map((m) => (m.id === message.id ? realMsg : m)));
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      } catch (error) {
+        Logger.error('No se pudo enviar el mensaje del chat de mercado', {
+          scope: 'market-chat.deliverMessage',
+          conversationId: id,
+          messageType,
+          error,
+        });
+        setFailedMessageIds((prev) => [...prev, message.id]);
+      } finally {
+        setIsSending(false);
+      }
+    },
+    [id],
+  );
+
   const handleSend = async (
     content?: string,
     messageType: 'TEXT' | 'TEAM_INVITE' | 'MATCH_INVITE' = 'TEXT',
@@ -186,30 +233,7 @@ export default function MarketChatScreen() {
 
     setMessages((prev) => [...prev, tempMsg]);
     if (!content) setInputText('');
-    setIsSending(true);
-
-    try {
-      const realMsg = await sendMessage(id, textToSend, senderTeamId, messageType);
-      Logger.info('Mensaje enviado en el chat del mercado', {
-        scope: 'market-chat.handleSend',
-        conversationId: id,
-        messageId: realMsg.id,
-        messageType,
-        senderTeamId: senderTeamId ?? null,
-      });
-      setMessages((prev) => prev.map((m) => (m.id === tempMsg.id ? realMsg : m)));
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch (error) {
-      setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
-      Logger.error('No se pudo enviar el mensaje del chat de mercado', {
-        scope: 'market-chat.handleSend',
-        conversationId: id,
-        messageType,
-        error,
-      });
-    } finally {
-      setIsSending(false);
-    }
+    await deliverMessage(tempMsg, messageType, senderTeamId);
   };
 
   const handleInviteToTeam = () => {
@@ -229,7 +253,10 @@ export default function MarketChatScreen() {
 
   const renderMessage = useCallback(({ item }: { item: MarketMessage }) => {
     const isMine = item.sender_profile_id === profile?.id;
-    const isTemp = item.id.startsWith('temp-');
+    const hasFailed = failedMessageIds.includes(item.id);
+    // Atenuado sólo mientras viaja: si ya falló, la burbuja vuelve a opacidad
+    // plena y lo que comunica el estado es el aviso de abajo.
+    const isInFlight = item.id.startsWith('temp-') && !hasFailed;
     const isSpecial = item.message_type === 'TEAM_INVITE' || item.message_type === 'MATCH_INVITE';
 
     const roleLabel = formatRole(item.sender_role);
@@ -262,7 +289,7 @@ export default function MarketChatScreen() {
             className={`p-3 rounded-2xl border ${isMine
               ? 'bg-brand-primary border-brand-primary rounded-tr-sm'
               : 'bg-surface-high border-surface-variant rounded-tl-sm'
-              } ${isTemp ? 'opacity-60' : ''}`}
+              } ${isInFlight ? 'opacity-60' : ''} ${hasFailed ? 'border-danger-error/60' : ''}`}
           >
             {isSpecial ? (
               <>
@@ -335,10 +362,27 @@ export default function MarketChatScreen() {
               {time}
             </Text>
           </View>
+
+          {hasFailed && (
+            <TouchableOpacity
+              onPress={() =>
+                void deliverMessage(item, item.message_type, item.sender_team_id ?? undefined)
+              }
+              disabled={isSending}
+              activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              className="mt-1 flex-row items-center justify-end gap-1"
+            >
+              <AppIcon family="material-community" name="alert-circle-outline" size={12} color="#FFB4AB" />
+              <Text className="font-ui text-[10px] text-danger-error">
+                No enviado · Tocá para reintentar
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
-  }, [profile]);
+  }, [profile, failedMessageIds, isSending, deliverMessage]);
 
   const chatTitle = chatData
     ? isCaptainMode
@@ -414,10 +458,12 @@ export default function MarketChatScreen() {
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          /* `padding` también en Android: con edge-to-edge activo (app.json)
-             la ventana ya no se redimensiona sola con el teclado aunque el
-             manifest declare `adjustResize`. */
-          behavior="padding"
+          /* Sólo iOS. En Android el empuje lo hace el padding de la barra
+             (`useKeyboardAwareBottomInset`): con edge-to-edge el KAV mide su
+             frame por debajo de la barra de navegación y al replegarse el
+             teclado deja un residuo que nunca vuelve a cero. Con los dos
+             mecanismos activos ese residuo se sumaba al inset de reposo. */
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
           <FlatList
@@ -437,9 +483,9 @@ export default function MarketChatScreen() {
             }
           />
 
-          {/* Barra de acciones + input. Mismo fix que el chat de partido: el
-              `p-4` fijo dejaba el input pegado al borde en los teléfonos con
-              gesture bar, y el inset se replega cuando sube el teclado. */}
+          {/* Barra de acciones + input. Mismo patrón que el chat de partido: el
+              hook es el único dueño del espacio inferior — aire sobre la gesture
+              bar en reposo, y el alto del teclado cuando está abierto. */}
           <View
             className="px-4 pt-4 bg-surface-low border-t border-surface-high"
             style={{ paddingBottom: inputBottomInset }}

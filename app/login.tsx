@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { AuthError } from '@supabase/supabase-js';
 import { signIn, signInWithGoogle, signUp } from '@/lib/auth-data';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
@@ -11,6 +11,8 @@ import { GoogleAuthButton } from '@/components/ui/GoogleAuthButton';
 import { router } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
+import { useSignupGateStore } from '@/stores/signupGateStore';
+import { useMinimumVisible } from '@/hooks/useMinimumVisible';
 import {
   signInSchema,
   signUpSchema,
@@ -25,17 +27,40 @@ export default function LoginScreen() {
 
   const { showAlert, AlertComponent } = useCustomAlert();
 
+  // Flags de PRESENTACIÓN. Los guards de reentrada de abajo siguen mirando
+  // `loading` / `googleLoading` reales: si usaran estos, el formulario quedaría
+  // bloqueado más tiempo del que dura la operación.
+  const showAuthLoader = useMinimumVisible(loading);
+  const showGoogleLoader = useMinimumVisible(googleLoading);
+
   // El schema depende del modo: login no revalida el largo (cuentas viejas con
   // 6 caracteres deben poder entrar), registro exige PASSWORD_MIN_LENGTH.
   // RHF reasigna control._options en cada render, asi que cambiar el resolver
   // al alternar de modo toma efecto en la validacion siguiente.
   const { control, handleSubmit, clearErrors, formState: { errors } } = useForm<AuthFormData>({
     resolver: zodResolver(isLogin ? signInSchema : signUpSchema),
+    // `onTouched`: el error de contraseña corta desaparece apenas se corrige, en
+    // vez de quedar colgado hasta el próximo envío.
+    mode: 'onTouched',
     defaultValues: {
       email: '',
       password: '',
     },
   });
+
+  // Validez calculada contra el schema ACTIVO y no con `formState.isValid`.
+  // El resolver cambia al alternar login/registro y `isValid` queda con el
+  // veredicto del schema anterior hasta la siguiente validación; parsear los
+  // valores en vivo no tiene ese desfasaje. Habilita el botón —antes se podía
+  // tocar «Crear cuenta» indefinidamente con la contraseña corta y no pasaba
+  // nada (auditoría E2E, módulo 1.1).
+  const values = useWatch({ control });
+  const canSubmit = (isLogin ? signInSchema : signUpSchema).safeParse(values).success;
+
+  // Red de seguridad: la retención del guard se suelta al cerrar el modal, pero
+  // si la pantalla se desmonta antes por cualquier vía, dejarla puesta bloquearía
+  // la redirección a /onboarding de ahí en adelante.
+  useEffect(() => () => useSignupGateStore.getState().releaseOnboardingRedirect(), []);
 
   // Al alternar limpiamos los errores del schema anterior: si no, el mensaje
   // "debe tener al menos 8 caracteres" queda colgado despues de volver a login.
@@ -63,8 +88,18 @@ export default function LoginScreen() {
 
         if (!signUpError) {
           Logger.info('Cuenta creada con email', { scope: 'login.onSubmit' });
-          showAlert('Exito', 'Cuenta creada. Revisa tu correo o inicia sesion.');
-          setIsLogin(true);
+          // El copy anterior mandaba a revisar el correo, pero la confirmación
+          // por email está desactivada en Supabase: la sesión queda activa en el
+          // acto y el usuario sigue derecho al onboarding. Se retiene el guard
+          // para que ese salto sea consecuencia de tocar «Aceptar» y no algo que
+          // pasa por detrás del modal. Ver stores/signupGateStore.ts.
+          useSignupGateStore.getState().holdOnboardingRedirect();
+          showAlert(
+            '¡Ya sos parte!',
+            'Tu cuenta está creada. Ahora completá tu perfil de jugador para salir a la cancha.',
+            () => useSignupGateStore.getState().releaseOnboardingRedirect(),
+            'success',
+          );
         }
 
         error = signUpError;
@@ -229,8 +264,8 @@ export default function LoginScreen() {
 
         <HeroButton
           onPress={handleSubmit(onSubmit)}
-          isLoading={loading}
-          disabled={googleLoading}
+          isLoading={showAuthLoader}
+          disabled={showGoogleLoader || !canSubmit}
           label={isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           style={{ marginBottom: 24, width: '100%', shadowColor: '#53E076', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
         />
@@ -243,8 +278,8 @@ export default function LoginScreen() {
 
         <GoogleAuthButton
           onPress={onGooglePress}
-          isLoading={googleLoading}
-          disabled={loading}
+          isLoading={showGoogleLoader}
+          disabled={showAuthLoader}
           label={isLogin ? 'Continuar con Google' : 'Registrarme con Google'}
         />
 
@@ -258,7 +293,7 @@ export default function LoginScreen() {
 
       {AlertComponent}
 
-      {loading && <GlobalLoader label={isLogin ? 'Iniciando sesion' : 'Creando cuenta'} />}
+      {showAuthLoader && <GlobalLoader label={isLogin ? 'Iniciando sesión' : 'Creando cuenta'} />}
     </KeyboardAvoidingView>
   );
 }

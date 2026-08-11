@@ -553,7 +553,7 @@ export default function TeamManageScreen() {
         nextActive ? 'Equipo reactivado' : 'Equipo dado de baja',
         nextActive
           ? 'Tu equipo vuelve a aparecer en el ranking, el mercado y los desafíos.'
-          : 'El equipo ya no aparece en el ranking, el mercado ni los desafíos. Su historial y su rating quedan intactos, y podés reactivarlo cuando quieras.',
+          : 'El equipo ya no aparece en el ranking, el mercado ni los desafíos. Su historial y su Rating quedan intactos, y podés reactivarlo cuando quieras.',
       );
     } catch (error) {
       Logger.error('No se pudo cambiar el estado activo del equipo', {
@@ -687,7 +687,7 @@ export default function TeamManageScreen() {
             <View className="flex-1">
               <Text className="font-uiBold text-sm text-warning-tertiary">Equipo dado de baja</Text>
               <Text className="font-ui mt-1 text-xs text-neutral-on-surface-variant">
-                No aparece en el ranking, el mercado ni los desafíos. Su historial y su rating
+                No aparece en el ranking, el mercado ni los desafíos. Su historial y su Rating
                 están intactos{myRole === 'CAPITAN' ? '; podés reactivarlo desde el plantel.' : '.'}
               </Text>
             </View>
@@ -1043,7 +1043,7 @@ export default function TeamManageScreen() {
                 <Text className="font-display mb-2 text-lg text-neutral-on-surface">Dar de baja el equipo</Text>
                 <Text className="font-ui text-sm text-neutral-on-surface-variant">
                   El equipo deja de aparecer en el ranking, en el mercado y como rival desafiable.
-                  No se borra nada: su historial, sus partidos y su rating quedan intactos, y podés
+                  No se borra nada: su historial, sus partidos y su Rating quedan intactos, y podés
                   reactivarlo cuando quieras.
                 </Text>
                 <View className="mt-5 flex-row gap-2">

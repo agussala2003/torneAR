@@ -402,6 +402,30 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# ─── Edge functions ──────────────────────────────────────────────────────────
+
+# push-dispatch — entrega de push, disparada por el trigger de `notifications`.
+#
+# `verify_jwt = false` NO es una relajación de seguridad: es la única forma de
+# que el trigger pueda invocarla. El llamador es Postgres vía pg_net, que no
+# tiene sesión de usuario ni JWT que mandar, así que con la verificación activa
+# el gateway respondía 401 UNAUTHORIZED_NO_AUTH_HEADER y la función nunca llegaba
+# a ejecutarse: las push de postulación y de desafío no salían nunca (auditoría
+# E2E, módulos 3.2 y 4.2).
+#
+# La autenticación real la hace la propia función contra un secreto compartido
+# del vault (`x-push-secret` → verify_push_webhook_secret). Un tercero que
+# conozca la URL sigue recibiendo 401, ahora desde la función y no desde el
+# gateway.
+[functions.push-dispatch]
+verify_jwt = false
+
+# notify-market-message — misma situación: la invoca el webhook de la base, no
+# un cliente autenticado. Se declara ahora para que su despliegue no dependa de
+# lo que quedó configurado a mano en el dashboard.
+[functions.notify-market-message]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

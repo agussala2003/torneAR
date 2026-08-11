@@ -1,6 +1,29 @@
 // tornear/lib/schemas/userSchema.ts
 import * as z from 'zod';
 import { isValidFavoriteTeam } from '@/lib/favorite-teams';
+import { calculateAgeFromDate, MINIMUM_SIGNUP_AGE } from '@/lib/age';
+
+/**
+ * `DD/MM/YYYY` → `Date` local, o `null` si ese día no existe en el calendario.
+ *
+ * El round-trip contra los getters es lo que atrapa 31/02: el constructor de
+ * `Date` no falla, desborda al 3 de marzo.
+ */
+function parseLocalDate(value: string): Date | null {
+  const [dd, mm, yyyy] = value.split('/').map(Number);
+  const date = new Date(yyyy, mm - 1, dd);
+
+  const isRealDate =
+    date.getFullYear() === yyyy && date.getMonth() === mm - 1 && date.getDate() === dd;
+
+  return isRealDate ? date : null;
+}
+
+/** Hoy a las 00:00 local: la comparación de fechas de nacimiento es por día. */
+function startOfToday(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
 
 export const userProfileSchema = z.object({
   fullName: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
@@ -13,15 +36,46 @@ export const userProfileSchema = z.object({
   dateOfBirth: z
     .string()
     .regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Formato DD/MM/YYYY requerido')
+    .refine((val) => parseLocalDate(val) !== null, 'Fecha inválida')
+    /**
+     * Cota superior: no se puede haber nacido en el futuro.
+     *
+     * El schema validaba que la fecha existiera en el calendario (rechazaba
+     * 31/02) pero no que fuera pasada, así que 28/02/2027 entraba sin chistar y
+     * el perfil quedaba con una edad negativa (auditoría E2E, módulo 1.2).
+     *
+     * La comparación es por día y en hora local, igual que la máscara de carga:
+     * el cumpleaños de hoy es válido.
+     */
     .refine((val) => {
-      const [dd, mm, yyyy] = val.split('/').map(Number);
-      const d = new Date(yyyy, mm - 1, dd);
-      return (
-        d.getFullYear() === yyyy &&
-        d.getMonth() === mm - 1 &&
-        d.getDate() === dd
-      );
-    }, 'Fecha inválida'),
+      const date = parseLocalDate(val);
+      if (date === null) return true; // Ya lo reporta el refine anterior.
+      return date.getTime() <= startOfToday().getTime();
+    }, 'La fecha de nacimiento no puede ser futura')
+    /**
+     * Cota inferior: 18 años cumplidos.
+     *
+     * El formulario aceptaba un año de nacimiento 2016 (testing con el socio,
+     * 2026-08-11). La edad se calcula con `calculateAgeFromDate` y no con una
+     * resta de años: quien cumple 18 la semana que viene tiene 17, y restar
+     * `getFullYear()` a secas lo dejaría entrar.
+     *
+     * Los dos refines anteriores ya reportan sus propios errores; acá se
+     * devuelve `true` en esos casos para no apilar dos mensajes sobre el mismo
+     * campo — el usuario ve uno solo, el que corresponde.
+     *
+     * Ojo: este schema lo comparten onboarding y `profile-edit`. Es
+     * intencional: un perfil legacy menor de 18 no puede guardar cambios hasta
+     * corregir su fecha (decisión de negocio, aprobada).
+     */
+    .refine((val) => {
+      const date = parseLocalDate(val);
+      if (date === null) return true;
+      if (date.getTime() > startOfToday().getTime()) return true;
+
+      const age = calculateAgeFromDate(date);
+      return age !== null && age >= MINIMUM_SIGNUP_AGE;
+    }, `Debes ser mayor de ${MINIMUM_SIGNUP_AGE} años para registrarte`),
   gender: z.enum(['M', 'F', 'X'], { error: 'Selecciona un género' }),
   strongFoot: z.enum(['RIGHT', 'LEFT', 'BOTH'], {
     error: 'Selecciona tu pierna hábil',

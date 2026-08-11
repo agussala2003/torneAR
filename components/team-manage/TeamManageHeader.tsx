@@ -126,7 +126,7 @@ export function TeamManageHeader({
         </Text>
         <View className="flex-row gap-3">
           <View className="flex-1 rounded-lg bg-surface-high px-3 py-3">
-            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">PR</Text>
+            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">Rating</Text>
             <Text className="font-display mt-1 text-xl text-neutral-on-surface" style={{ fontVariant: ['tabular-nums'] }}>
               {team.elo_rating}
             </Text>

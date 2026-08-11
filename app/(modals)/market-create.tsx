@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { ActiveTeamSelector } from '@/components/ui/ActiveTeamSelector';
 import { useAuth } from '@/context/AuthContext';
 import { useUI } from '@/context/UIContext';
 import { useTeamStore } from '@/stores/teamStore';
+import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 
 import { Logger } from '@/lib/logger';
 import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
@@ -56,6 +57,32 @@ export default function MarketCreateModal() {
 
   // Específicos de Jugador
   const [playerPostType, setPlayerPostType] = useState<PostType>('BUSCA_EQUIPO');
+
+  // ── Teclado vs. campo «Descripción» ──────────────────────────────────────
+  // La descripción es el último campo del formulario y en Android el teclado la
+  // tapaba mientras se escribía. Con edge-to-edge la ventana no se redimensiona,
+  // así que el ScrollView conserva su alto completo: el teclado se dibuja encima
+  // y no hay recorrido extra por el que desplazarse. El `padding` del KAV tampoco
+  // aplica en Android (ver `useKeyboardAwareBottomInset`).
+  //
+  // El padding le da al ScrollView el recorrido que le falta, y el scroll acerca
+  // el campo enfocado. Se scrollea al abrirse el teclado y no en el `onFocus`
+  // porque en Android el alto recién se conoce con `keyboardDidShow`: antes de
+  // eso el recorrido todavía no existe.
+  const scrollRef = useRef<ScrollView>(null);
+  const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
+  const keyboardHeight = useKeyboardHeight();
+
+  useEffect(() => {
+    if (keyboardHeight === 0 || !isDescriptionFocused) return;
+    const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    return () => clearTimeout(timer);
+  }, [keyboardHeight, isDescriptionFocused]);
+
+  // En iOS el KeyboardAvoidingView ya achica el contenedor; sumar el alto acá
+  // abriría un hueco del tamaño del teclado.
+  const scrollBottomPadding =
+    Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight + 24 : 100;
 
   useEffect(() => {
     if (!user) return;
@@ -239,8 +266,9 @@ export default function MarketCreateModal() {
         className="flex-1"
       >
       <ScrollView
+        ref={scrollRef}
         className="flex-1 px-6 pt-6"
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: scrollBottomPadding }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -455,6 +483,8 @@ export default function MarketCreateModal() {
           <TextInput
             value={description}
             onChangeText={setDescription}
+            onFocus={() => setIsDescriptionFocused(true)}
+            onBlur={() => setIsDescriptionFocused(false)}
             multiline
             numberOfLines={4}
             maxLength={MARKET_DESCRIPTION_MAX_LENGTH}
