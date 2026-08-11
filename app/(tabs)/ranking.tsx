@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View, TouchableOpacity } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
 import { GlobalHeader } from '@/components/GlobalHeader';
@@ -31,10 +31,46 @@ const getCategoryLabel = (cat: string | null) => {
   return cat.charAt(0) + cat.slice(1).toLowerCase();
 };
 
+// ── Contexto entrante por navegación (Home → "Ver la tabla completa") ─────────
+// Los params se validan contra los valores conocidos en vez de castearse: van
+// derecho como argumento enum de `get_team_ranking`, y un valor basura (deep
+// link a mano, param viejo) haría fallar la RPC y dejaría la pantalla en error.
+// Lo que no reconocemos vale null = "sin filtro".
+
+const TEAM_CATEGORIES = ['HOMBRES', 'MUJERES', 'MIXTO'] as const;
+const TEAM_FORMATS = [
+  'FUTBOL_5', 'FUTBOL_6', 'FUTBOL_7', 'FUTBOL_8', 'FUTBOL_9', 'FUTBOL_11',
+] as const;
+
+type RouteParam = string | string[] | undefined;
+
+/** Un param vacío es "sin filtro", no un filtro por string vacío. */
+function paramToNullable(value: RouteParam): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const trimmed = raw?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function parseCategoryParam(value: RouteParam): RankingFiltersState['category'] {
+  const raw = paramToNullable(value);
+  return TEAM_CATEGORIES.find((category) => category === raw) ?? null;
+}
+
+function parseFormatParam(value: RouteParam): RankingFiltersState['format'] {
+  const raw = paramToNullable(value);
+  return TEAM_FORMATS.find((format) => format === raw) ?? null;
+}
+
 export default function RankingScreen() {
   const { profile } = useAuth();
   const { activeTeamId, myTeams } = useTeamStore();
   const { showAlert, AlertComponent } = useCustomAlert();
+
+  // Contexto con el que llega el usuario desde el widget del Inicio. `ts` es el
+  // nonce que emite la Home: identifica CADA navegación, y es lo que permite
+  // re-aplicar el contexto sin pisar los filtros que el usuario toca a mano.
+  const { zone: zoneParam, category: categoryParam, format: formatParam, ts: tsParam } =
+    useLocalSearchParams<{ zone?: string; category?: string; format?: string; ts?: string }>();
 
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<RankingMode>('RANKING');
@@ -68,6 +104,10 @@ export default function RankingScreen() {
   // Equipo cuyos filtros por defecto ya aplicamos. Es el guard que impide que un
   // re-render vuelva a pisar la seleccion del usuario.
   const bootstrappedTeamRef = useRef<string | null>(null);
+  // Ultimo nonce de navegacion ya aplicado. Los params quedan pegados en la ruta
+  // despues de consumirlos, asi que sin esto un cambio de equipo activo volveria
+  // a aplicar el contexto viejo de la Home en vez de los defaults del equipo.
+  const consumedNonceRef = useRef<string | null>(null);
   const isFirstFocus = useRef(true);
   // Id incremental de request de busqueda. Solo la respuesta cuyo id coincide con
   // el ultimo emitido puede escribir en el estado.
@@ -85,9 +125,20 @@ export default function RankingScreen() {
   useEffect(() => {
     if (!profile) return;
 
+    // Dos disparadores independientes, cada uno con su guard:
+    //   · cambió el equipo activo            → filtros por defecto de ese equipo
+    //   · llegó una navegación desde la Home → contexto que traen los params
+    // Un focus normal no es ninguno de los dos, y por eso sigue sin tocar los
+    // filtros que el usuario haya elegido a mano.
+    const incomingNonce = paramToNullable(tsParam);
     const teamKey = activeTeamId ?? '__sin-equipo__';
-    if (bootstrappedTeamRef.current === teamKey) return;
+    const hasFreshParams = incomingNonce !== null && consumedNonceRef.current !== incomingNonce;
+    const needsTeamBootstrap = bootstrappedTeamRef.current !== teamKey;
+
+    if (!hasFreshParams && !needsTeamBootstrap) return;
+
     bootstrappedTeamRef.current = teamKey;
+    if (hasFreshParams) consumedNonceRef.current = incomingNonce;
 
     let cancelled = false;
     setBootstrapped(false);
@@ -123,6 +174,19 @@ export default function RankingScreen() {
           }
         }
 
+        // El contexto que viene por navegación gana sobre los defaults del
+        // equipo: el usuario tocó "Ver la tabla completa" en un widget que ya
+        // decía qué tabla era, y tiene que caer en ESA. El ELO ya se resolvió
+        // arriba porque "rivales ideales" lo necesita igual.
+        if (hasFreshParams) {
+          defaults = {
+            zone: paramToNullable(zoneParam),
+            category: parseCategoryParam(categoryParam),
+            format: parseFormatParam(formatParam),
+            rivalesIdeales: false,
+          };
+        }
+
         setActiveTeamElo(elo);
         setFilters(defaults);
         setBootstrapped(true);
@@ -141,7 +205,7 @@ export default function RankingScreen() {
     })();
 
     return () => { cancelled = true; };
-  }, [profile, activeTeamId, refreshToken, showAlert]);
+  }, [profile, activeTeamId, refreshToken, showAlert, tsParam, zoneParam, categoryParam, formatParam]);
 
   // ── 2) Tabla de ranking: sigue a los filtros ─────────────────────────────────
   useEffect(() => {

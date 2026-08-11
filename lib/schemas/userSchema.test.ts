@@ -14,15 +14,38 @@ function dateOffsetByDays(days: number): string {
   ].join('/');
 }
 
+/**
+ * `DD/MM/YYYY` de un cumpleaños que hoy cumple exactamente `years` años,
+ * corrido `dayOffset` días. Se construye relativo a hoy y no con fechas fijas
+ * para que la suite no empiece a fallar sola con el paso del tiempo.
+ */
+function birthDateForAge(years: number, dayOffset = 0): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - years);
+  d.setDate(d.getDate() + dayOffset);
+  return [
+    String(d.getDate()).padStart(2, '0'),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    d.getFullYear(),
+  ].join('/');
+}
+
 describe('userProfileSchema.dateOfBirth', () => {
   it('acepta una fecha pasada', () => {
     expect(dateField.safeParse('18/12/1997').success).toBe(true);
   });
 
-  it('acepta el día de hoy', () => {
-    // El borde es "no futura", no "estrictamente anterior": alguien que carga su
-    // fecha el mismo día tiene 0 años, no una fecha inválida.
-    expect(dateField.safeParse(dateOffsetByDays(0)).success).toBe(true);
+  it('rechaza el día de hoy por edad, no por fecha futura', () => {
+    // El borde de la regla "no futura" sigue siendo "no futura": hoy la pasa.
+    // Lo que ahora frena esa fecha es la cota de 18 años, y el mensaje tiene que
+    // ser ése — si dijera "no puede ser futura" el usuario no entendería nada.
+    const result = dateField.safeParse(dateOffsetByDays(0));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue) => issue.message)).toEqual([
+        'Debes ser mayor de 18 años para registrarte',
+      ]);
+    }
   });
 
   it('rechaza mañana', () => {
@@ -47,5 +70,45 @@ describe('userProfileSchema.dateOfBirth', () => {
   it('sigue rechazando un formato que no es DD/MM/YYYY', () => {
     expect(dateField.safeParse('1997-12-18').success).toBe(false);
     expect(dateField.safeParse('').success).toBe(false);
+  });
+});
+
+describe('userProfileSchema.dateOfBirth — edad mínima', () => {
+  it('rechaza el año de nacimiento del reporte de testing (2016)', () => {
+    const result = dateField.safeParse('15/06/2016');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe(
+        'Debes ser mayor de 18 años para registrarte',
+      );
+    }
+  });
+
+  it('acepta a quien cumple 18 hoy', () => {
+    // El borde es inclusivo: el día del cumpleaños número 18 ya es mayor de edad.
+    expect(dateField.safeParse(birthDateForAge(18)).success).toBe(true);
+  });
+
+  it('rechaza a quien cumple 18 mañana', () => {
+    // Un día antes del cumpleaños todavía tiene 17. Es el caso que una resta de
+    // años a secas (2026 - 2008 = 18) dejaría pasar.
+    expect(dateField.safeParse(birthDateForAge(18, 1)).success).toBe(false);
+  });
+
+  it('acepta a alguien holgadamente mayor', () => {
+    expect(dateField.safeParse(birthDateForAge(35)).success).toBe(true);
+  });
+
+  it('no apila el error de edad sobre el de fecha futura', () => {
+    // Una fecha futura es un solo problema para el usuario: el mensaje de edad
+    // encima sería ruido.
+    const result = dateField.safeParse('28/02/2027');
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toHaveLength(1);
+      expect(result.error.issues[0].message).toBe(
+        'La fecha de nacimiento no puede ser futura',
+      );
+    }
   });
 });
