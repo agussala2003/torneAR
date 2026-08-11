@@ -192,7 +192,7 @@ export function MatchDetailHero({ match, myTeamId }: Props) {
           >
             {myTeam.name}
           </Text>
-          <Text className="font-ui text-xs text-neutral-outline">{myTeam.eloRating} ELO</Text>
+          <Text className="font-ui text-xs text-neutral-outline">{myTeam.eloRating} Rating</Text>
         </View>
 
         {/* Center */}
@@ -208,7 +208,7 @@ export function MatchDetailHero({ match, myTeamId }: Props) {
           >
             {opponentTeam.name}
           </Text>
-          <Text className="font-ui text-xs text-neutral-outline">{opponentTeam.eloRating} ELO</Text>
+          <Text className="font-ui text-xs text-neutral-outline">{opponentTeam.eloRating} Rating</Text>
         </View>
       </View>
     </View>

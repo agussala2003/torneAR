@@ -115,7 +115,7 @@ export function ProfileTeamsSection({ teams, onCreateTeam, onJoinTeam, onOpenReq
                         <Text className={`font-uiBold rounded px-2 py-0.5 text-[9px] uppercase ${roleClass(team.role)}`}>
                           {getTeamRoleLabel(team.role)}
                         </Text>
-                        <Text className="font-ui text-xs text-neutral-on-surface-variant" style={{ fontVariant: ['tabular-nums'] }}>- PR {team.prRating}</Text>
+                        <Text className="font-ui text-xs text-neutral-on-surface-variant" style={{ fontVariant: ['tabular-nums'] }}>- Rating {team.prRating}</Text>
                       </View>
                     </View>
                   </View>

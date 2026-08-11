@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { AuthError } from '@supabase/supabase-js';
 import { signIn, signInWithGoogle, signUp } from '@/lib/auth-data';
@@ -11,6 +11,7 @@ import { GoogleAuthButton } from '@/components/ui/GoogleAuthButton';
 import { router } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
+import { useSignupGateStore } from '@/stores/signupGateStore';
 import {
   signInSchema,
   signUpSchema,
@@ -36,6 +37,11 @@ export default function LoginScreen() {
       password: '',
     },
   });
+
+  // Red de seguridad: la retención del guard se suelta al cerrar el modal, pero
+  // si la pantalla se desmonta antes por cualquier vía, dejarla puesta bloquearía
+  // la redirección a /onboarding de ahí en adelante.
+  useEffect(() => () => useSignupGateStore.getState().releaseOnboardingRedirect(), []);
 
   // Al alternar limpiamos los errores del schema anterior: si no, el mensaje
   // "debe tener al menos 8 caracteres" queda colgado despues de volver a login.
@@ -63,8 +69,18 @@ export default function LoginScreen() {
 
         if (!signUpError) {
           Logger.info('Cuenta creada con email', { scope: 'login.onSubmit' });
-          showAlert('Exito', 'Cuenta creada. Revisa tu correo o inicia sesion.');
-          setIsLogin(true);
+          // El copy anterior mandaba a revisar el correo, pero la confirmación
+          // por email está desactivada en Supabase: la sesión queda activa en el
+          // acto y el usuario sigue derecho al onboarding. Se retiene el guard
+          // para que ese salto sea consecuencia de tocar «Aceptar» y no algo que
+          // pasa por detrás del modal. Ver stores/signupGateStore.ts.
+          useSignupGateStore.getState().holdOnboardingRedirect();
+          showAlert(
+            '¡Ya sos parte!',
+            'Tu cuenta está creada. Ahora completá tu perfil de jugador para salir a la cancha.',
+            () => useSignupGateStore.getState().releaseOnboardingRedirect(),
+            'success',
+          );
         }
 
         error = signUpError;

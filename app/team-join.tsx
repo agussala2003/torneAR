@@ -159,7 +159,7 @@ export default function TeamJoinScreen() {
             <View className="mt-3 flex-row items-center gap-2">
               <Text className="font-uiBold rounded bg-brand-primary/15 px-2 py-1 text-[10px] uppercase tracking-wide text-brand-primary">{getTeamCategoryLabel(team.category)}</Text>
               <Text className="font-uiBold rounded bg-info-secondary/15 px-2 py-1 text-[10px] uppercase tracking-wide text-info-secondary">{getTeamFormatLabel(team.preferred_format)}</Text>
-              <Text className="font-ui text-xs text-neutral-on-surface-variant" style={{ fontVariant: ['tabular-nums'] }}>PR {team.elo_rating}</Text>
+              <Text className="font-ui text-xs text-neutral-on-surface-variant" style={{ fontVariant: ['tabular-nums'] }}>Rating {team.elo_rating}</Text>
             </View>
 
             <TouchableOpacity

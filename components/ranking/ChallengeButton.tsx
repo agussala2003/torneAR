@@ -44,7 +44,7 @@ export function ChallengeButton({
       setLoading(true);
       const result = await sendChallenge(challengerTeamId, opponentTeamId, matchType);
       const extra = result.eloDiffWarning
-        ? '\n\n⚠️ Diferencia de rating > 400 pts. Bajo impacto en el ranking.'
+        ? '\n\n⚠️ Diferencia de Rating > 400 pts. Bajo impacto en el ranking.'
         : '';
       Logger.info('Desafío enviado', {
         scope: 'ChallengeButton.handleConfirm',

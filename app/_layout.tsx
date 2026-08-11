@@ -19,6 +19,7 @@ import { isProfileComplete } from '@/lib/auth-utils';
 import { deepLinkToHref, resolveDeepLink } from '@/lib/deep-linking';
 import { initLogger } from '@/lib/logger';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
+import { useSignupGateStore } from '@/stores/signupGateStore';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { UIProvider } from '../context/UIContext';
@@ -58,6 +59,9 @@ const navigationTheme: Theme = {
 
 function RootNavigation() {
   const { session, profile, loading, hydrated } = useAuth();
+  // Suscripción reactiva (y no `getState()` como el deep link, que se consume de
+  // forma atómica): soltar la retención tiene que volver a correr el guard.
+  const isHoldingOnboardingRedirect = useSignupGateStore((s) => s.isHoldingOnboardingRedirect);
   const segments = useSegments();
   const router = useRouter();
   const [showIntro, setShowIntro] = useState(true);
@@ -131,7 +135,11 @@ function RootNavigation() {
         router.replace('/login');
       }
     } else if (session && !isProfileComplete(profile)) {
-      if (!inOnboarding) {
+      // `isHoldingOnboardingRedirect`: recién registrado, la sesión ya existe y
+      // sin esta espera el guard mandaba a /onboarding por detrás del modal de
+      // bienvenida, que se desmontaba con la pantalla de login antes de que el
+      // usuario pudiera tocar «Aceptar». Ver stores/signupGateStore.ts.
+      if (!inOnboarding && !isHoldingOnboardingRedirect) {
         router.replace('/onboarding');
       }
     } else if (session && isProfileComplete(profile)) {
@@ -152,7 +160,7 @@ function RootNavigation() {
         router.replace('/(tabs)');
       }
     }
-  }, [session, profile, loading, segments, router, showIntro, hydrated]);
+  }, [session, profile, loading, segments, router, showIntro, hydrated, isHoldingOnboardingRedirect]);
 
   if (showIntro) {
     return <AppIntroSplash />;

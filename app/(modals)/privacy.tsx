@@ -29,7 +29,7 @@ export default function PrivacyScreen() {
             1. RECOPILACIÓN DE DATOS
           </Text>
           <Text className="font-ui text-sm text-neutral-on-surface-variant leading-6">
-            Recopilamos información personal (como nombre y correo electrónico) para crear tu perfil de jugador. Además, recopilamos estadísticas de tu rendimiento en la plataforma para generar rankings asimétricos e influyentes en tu ELO.
+            Recopilamos información personal (como nombre y correo electrónico) para crear tu perfil de jugador. Además, recopilamos estadísticas de tu rendimiento en la plataforma para generar rankings asimétricos e influyentes en tu Rating.
           </Text>
         </View>
 

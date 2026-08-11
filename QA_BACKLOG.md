@@ -133,8 +133,8 @@ backend —que corre contra la **base de producción compartida** (`develop` y
 - [x] **A7** — Barrido del resto de sheets aplicando el patrón: `ResultModal`, `WoModal`, `ProposalModal`, `CancellationModal`, `FilterModal` (mercado) y `RankingFilterModal`.
 - [x] **A3** — Teclado tapando la Descripción en el modal de crear publicación del Mercado. *(Misma raíz que A1/A2: en Android edge-to-edge la ventana no se redimensiona, así que el ScrollView no tenía recorrido por el que desplazarse.)*
 - [x] **A5b** — Escudos de equipo en el selector, con fallback a iniciales. *(Requirió traer `shield_url` al `teamStore`; `TeamShield` se movió a `components/ui/` por ser compartido entre `matches`, `home` y `ui`.)*
-- [ ] **A10** — Copy del modal «cuenta creada» + que la navegación al onboarding espere al Aceptar.
-- [ ] **A12** — Decidir el nombre único para ELO/PR/Rating y hacer el barrido de strings.
+- [x] **A10** — Copy del modal «cuenta creada» + que la navegación al onboarding espere al Aceptar. *(La retención del guard vive en `stores/signupGateStore.ts`.)*
+- [x] **A12** — Término unificado: **«Rating»**. Barrido hecho en perfil, mercado, gestión de equipo, ranking, disputas, admin, modales de partido y política de privacidad. Los identificadores internos (`elo_rating`, `prRating`, `eloHistory`) quedan como están a propósito: son el contrato con la base.
 - [ ] **A9** — Duración mínima visible de los loaders de login/registro.
 - [ ] **A11** — Cerrar el modal de propuesta al confirmar el envío.
 - [ ] **A8** — Splash inconsistente con sesión iniciada (el más sutil de reproducir; va al final de la fase).

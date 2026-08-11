@@ -98,7 +98,7 @@ export default function SeasonAdminScreen() {
       await loadSeason();
       showAlert(
         'Temporada iniciada',
-        `Se cerró la temporada anterior y comenzó "${name.trim()}". Los contadores de temporada fueron reseteados; el ELO y el historial de partidos quedaron intactos.`,
+        `Se cerró la temporada anterior y comenzó "${name.trim()}". Los contadores de temporada fueron reseteados; el Rating y el historial de partidos quedaron intactos.`,
         undefined,
         'success',
       );
@@ -247,7 +247,7 @@ export default function SeasonAdminScreen() {
             <Text className="font-ui mt-3 text-[11px] leading-4 text-neutral-outline">
               La transición cierra la temporada activa, pone en 0 las estadísticas de temporada
               (victorias, empates, derrotas y goles) de todos los equipos y pasa los partidos
-              abiertos a la temporada nueva. El ELO y el historial de partidos jugados no se tocan.
+              abiertos a la temporada nueva. El Rating y el historial de partidos jugados no se tocan.
             </Text>
           </View>
         </ScrollView>
