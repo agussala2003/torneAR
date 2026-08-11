@@ -171,14 +171,44 @@ vería en el acto y no en la próxima apertura del selector.
 > ⚠️ Cada cambio con su reversión y validado en local (`supabase start`) antes
 > del `db push`. Ver `docs/WORKFLOW.md`.
 
-- [ ] **E1** — Correr el triage SQL, confirmar la causa raíz y reparar el eslabón roto de la cadena `notifications` → `pg_net` → `push-dispatch`. **Prioridad más alta de la fase:** desbloquea 3.2 y 4.2 y todas las push que comparten esa cadena.
+- [x] ~~Triage de **E1**~~ — **Causa raíz confirmada (2026-08-10), corrección pendiente.**
+  `notifications.pushed_at` está en `NULL` en todas las filas recientes → la edge
+  function nunca llegó a ejecutarse. `net._http_response` devuelve **401
+  `UNAUTHORIZED_NO_AUTH_HEADER` — "Missing authorization header"** en cada
+  intento. Es la primera hipótesis del diagnóstico: el gateway rechaza antes de
+  correr la función porque `verify_jwt` sigue activo (no existe el bloque
+  `[functions.push-dispatch]` en `supabase/config.toml`) y el trigger sólo manda
+  `x-push-secret`, sin `Authorization`. El secreto del vault y `pg_net` quedan
+  descartados: la petición sale y llega, la rebota el gateway.
+- [ ] **E1** — Aplicar la corrección (desactivar `verify_jwt` para `push-dispatch` o mandar el header de servicio desde el trigger) y redesplegar.
 - [ ] **E2** — Revalidar el deep link de la push en cold start (paso 4.2, quedó sin testear por E1).
-- [ ] **D3** — Localizar y acotar el `UPDATE` sin `WHERE` en la RPC de transición de temporada.
-- [ ] **D4** — Re-verificar la evolución de ELO con una temporada ya iniciada (bloqueado por D3).
-- [ ] **D1** — Restringir la visibilidad del `unique_code` al estado `CONFIRMADO`.
-- [ ] **D2** — Subir `checkin_geofence_radius_m` a 500–1000 m + loggear la distancia real medida en cada check-in.
-- [ ] **D5** — `update_url` de iOS con el App ID real, o documentarlo como bloqueante del release de iOS.
-- [ ] **A14** — Mostrar la distancia a cada complejo al elegir sede (cálculo sobre coordenadas ya presentes en `venues`).
+- [ ] ⏸️ **D3** — Localizar y acotar el `UPDATE` sin `WHERE` en la RPC de transición de temporada. *Pausado para la próxima sesión.*
+- [ ] ⏸️ **D4** — Re-verificar la evolución de Rating con una temporada ya iniciada (bloqueado por D3). *Pausado.*
+- [x] **D1** — Visibilidad del `unique_code` restringida a `CONFIRMADO` en `app/match-detail.tsx`.
+- [x] **D2** — `checkin_geofence_radius_m` a 500 m (migración `20260810120000`, validada en local). *El logging de la distancia real queda pendiente: es cambio de RPC, no de configuración.*
+- [x] **D5** — Auditado y **documentado como bloqueante**: no hay App ID real hasta que exista la ficha en App Store Connect, así que no hay valor correcto que cargar. La migración deja el `UPDATE` listo y la guarda operativa escrita (no subir la mínima de iOS).
+- [ ] ⏸️ **A14** — Mostrar la distancia a cada complejo al elegir sede (cálculo sobre coordenadas ya presentes en `venues`). *Pausado para la próxima sesión.*
+
+---
+
+## Estado al cierre de la sesión del 2026-08-10
+
+**Cerrado:** Fases 1, 2 y 3 completas (21 hallazgos) + D1, D2 y D5.
+
+**En pausa para la próxima sesión:**
+
+| ID | Qué falta | Por qué está pausado |
+|---|---|---|
+| **E1** | Aplicar la corrección de `verify_jwt` y redesplegar `push-dispatch` | Causa raíz ya confirmada; la corrección toca el despliegue de la edge function |
+| **E2** | Revalidar el deep link en cold start | Bloqueado por E1 |
+| **D3 / D4** | `UPDATE` sin `WHERE` en la transición de temporada | Requiere leer y corregir la RPC completa |
+| **A14** | Distancia a cada complejo | Cálculo geoespacial + cambio de UI en `ProposalModal` |
+| **C1 (realtime)** | Publicar `team_members` en `supabase_realtime` con `REPLICA IDENTITY FULL` | Migración a producción; la revalidación al abrir el selector ya cubre el caso reportado |
+| **D2 (logging)** | Registrar la distancia real medida en cada check-in | Cambio de RPC, no de configuración |
+
+> ⚠️ **Ninguna migración fue empujada a producción.** `20260810120000` está
+> validada contra el stack local y espera autorización explícita para el
+> `db push`: `develop` y `main` comparten la base de producción.
 
 ---
 

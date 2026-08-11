@@ -527,7 +527,14 @@ export default function MatchDetailScreen() {
         {/* Hero */}
         <MatchDetailHero match={match} myTeamId={myTeamId} />
 
-        {/* Unique code block — tap to copy */}
+        {/* Código de invitado — sólo en CONFIRMADO.
+            `join_match_as_guest` únicamente admite canjes con el partido
+            CONFIRMADO, pero el código se generaba y se mostraba desde que se
+            aceptaba el desafío: se compartía en PENDIENTE (todavía sin fecha
+            pactada) y seguía a la vista en EN_VIVO o FINALIZADO, cuando ya no
+            sirve para nada. Mostrarlo sólo cuando se puede canjear alinea la UI
+            con la regla del servidor (auditoría E2E, módulos 4.3 y 6.3). */}
+        {status === 'CONFIRMADO' && (
         <TouchableOpacity
           onPress={() => void Clipboard.setStringAsync(match.uniqueCode).then(() =>
             showAlert('¡Copiado!', 'El código del partido fue copiado al portapapeles.')
@@ -559,6 +566,7 @@ export default function MatchDetailScreen() {
             </Text>
           ) : null}
         </TouchableOpacity>
+        )}
 
         {/* ─── PENDIENTE ─── */}
         {status === 'PENDIENTE' && (
