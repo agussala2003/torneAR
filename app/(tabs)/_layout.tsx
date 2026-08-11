@@ -3,12 +3,29 @@ import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { Colors } from '@/constants/theme';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { BlurView } from 'expo-blur';
 import { AppState, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
 
+/**
+ * Alto del CONTENIDO de la barra, sin el área segura.
+ *
+ * El default de React Navigation es 49 (`TABBAR_HEIGHT_UIKIT`). Se sube a 62
+ * para que entren los íconos de 26px con su label sin apretarse, en
+ * correlación con el header, que también creció.
+ *
+ * ⚠️ Este número se suma a `insets.bottom` a mano, y NO es opcional hacerlo:
+ * `getTabBarHeight()` de la librería devuelve `49 + insets.bottom`, pero si
+ * `tabBarStyle` trae un `height` numérico lo usa TAL CUAL y descarta el inset.
+ * O sea que un `height: 62` a secas dejaría los íconos pisados por la gesture
+ * bar de Android y por el Home Indicator de iOS — exactamente el bug que este
+ * cambio viene a evitar.
+ */
+const TAB_BAR_CONTENT_HEIGHT = 62;
+
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const fetchMyTeams = useTeamStore((state) => state.fetchMyTeams);
 
@@ -47,25 +64,33 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        // Solo estilos visuales, sin tocar alturas ni paddings nativos
+        /*
+         * Mismo esquema que el GlobalHeader (surface-container + borde sutil),
+         * para que las dos barras se lean como un par.
+         *
+         * Se eliminó el `tabBarBackground` con `<BlurView>`: el
+         * `backgroundColor` de acá es OPACO (alpha 1, pese a que el comentario
+         * viejo decía "at 80%"), así que el blur quedaba tapado y no se veía
+         * nada — pagábamos un blur a pantalla completa por frame para nada.
+         * Mismo caso que el `backdrop-blur-md` muerto que sacamos del header.
+         *
+         * `paddingBottom` NO se declara a propósito: la librería ya le pone
+         * `insets.bottom` y pisarlo acá sólo abre la puerta a duplicarlo.
+         */
         tabBarStyle: {
           position: 'absolute',
-          backgroundColor: 'rgba(32, 31, 31, 1)', // surfaceContainer at 80%
-          borderTopColor: 'transparent',
-          borderTopWidth: 0,
+          backgroundColor: '#201F1F', // surface-container
+          borderTopColor: 'rgba(134, 149, 133, 0.15)', // neutral-outline / 15
+          borderTopWidth: StyleSheet.hairlineWidth,
           elevation: 0,
+          height: TAB_BAR_CONTENT_HEIGHT + insets.bottom,
+          paddingTop: 8,
         },
-        tabBarBackground: () => (
-          <BlurView
-            intensity={12}
-            tint="dark"
-            style={StyleSheet.absoluteFill}
-          />
-        ),
         tabBarActiveTintColor: Colors.dark.tint,
         tabBarInactiveTintColor: Colors.dark.tabIconDefault,
         tabBarLabelStyle: {
-          fontSize: 10,
+          // 11 y no 10: con íconos de 26px, el label de 10 quedaba desbalanceado.
+          fontSize: 11,
           fontFamily: 'BarlowCondensed_700Bold',
           textTransform: 'uppercase',
           letterSpacing: 0.5,
@@ -78,7 +103,7 @@ export default function TabLayout() {
         options={{
           title: 'INICIO',
           tabBarIcon: ({ color, focused }) => (
-            <AppIcon family="material-community" name="home-variant-outline" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="material-community" name="home-variant-outline" size={focused ? 26 : 24} color={color} />
           ),
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
@@ -88,7 +113,7 @@ export default function TabLayout() {
         options={{
           title: 'RANKING',
           tabBarIcon: ({ color, focused }) => (
-            <AppIcon family="material-community" name="trophy-outline" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="material-community" name="trophy-outline" size={focused ? 26 : 24} color={color} />
           ),
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
@@ -98,7 +123,7 @@ export default function TabLayout() {
         options={{
           title: 'PARTIDOS',
           tabBarIcon: ({ color, focused }) => (
-            <AppIcon family="material-community" name="soccer" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="material-community" name="soccer" size={focused ? 26 : 24} color={color} />
           ),
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
@@ -108,7 +133,7 @@ export default function TabLayout() {
         options={{
           title: 'MERCADO',
           tabBarIcon: ({ color, focused }) => (
-            <AppIcon family="ionicons" name="storefront-outline" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="ionicons" name="storefront-outline" size={focused ? 26 : 24} color={color} />
           ),
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
@@ -118,7 +143,7 @@ export default function TabLayout() {
         options={{
           title: 'PERFIL',
           tabBarIcon: ({ color, focused }) => (
-            <AppIcon family="material-community" name="account-outline" size={focused ? 24 : 22} color={color} />
+            <AppIcon family="material-community" name="account-outline" size={focused ? 26 : 24} color={color} />
           ),
         }}
         listeners={{ tabPress: () => Haptics.selectionAsync() }}
