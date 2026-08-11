@@ -37,13 +37,20 @@ export function ActiveTeamSelector() {
 
   return (
     <>
+      {/* `shrink` en el chip y en el texto: en React Native `flexShrink` es 0 por
+          defecto (al revés que en la web), así que sin esto el chip conserva su
+          ancho de contenido y DESBORDA el header en vez de ceder. Se nota desde
+          que el logo y los íconos crecieron: en una pantalla de 360dp, sobre la
+          tab Ranking (dos íconos) y con un nombre de equipo largo, el sobrante
+          empujaba a la campana fuera de la pantalla. Ahora el nombre se trunca,
+          que es la degradación correcta. */}
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={handleOpen}
-        className="flex-row items-center justify-center px-3 py-1.5 rounded-full bg-surface-high border border-neutral-outline-variant/15 gap-1.5"
+        className="shrink flex-row items-center justify-center px-3 py-1.5 rounded-full bg-surface-high border border-neutral-outline-variant/15 gap-1.5"
       >
         <AppIcon family="material-community" name="shield-half-full" size={14} color="#BCCBB9" />
-        <Text className="font-display text-xs uppercase tracking-wider text-neutral-on-surface" numberOfLines={1} style={{ maxWidth: 100 }}>
+        <Text className="shrink font-display text-xs uppercase tracking-wider text-neutral-on-surface" numberOfLines={1} style={{ maxWidth: 100 }}>
           {activeTeamName || 'SELECCIONAR'}
         </Text>
         <AppIcon family="material-icons" name="keyboard-arrow-down" size={16} color="#BCCBB9" />

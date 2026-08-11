@@ -8,6 +8,7 @@ import { DarkTheme, ThemeProvider, Theme } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LogBox } from 'react-native';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
@@ -236,19 +237,34 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={navigationTheme}>
-      <AuthProvider>
-        <UIProvider>
-          <RootNavigation />
-          <AppUpdateModal
-            visible={forceUpdate.required}
-            currentVersion={forceUpdate.currentVersion}
-            latestVersion={forceUpdate.latestVersion}
-            updateUrl={forceUpdate.updateUrl}
-          />
-          <StatusBar style="light" />
-        </UIProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    /**
+     * `SafeAreaProvider` es el que habilita `useSafeAreaInsets()` en toda la app
+     * (lo consume `GlobalHeader` para no meterse debajo de la barra de estado).
+     *
+     * `initialWindowMetrics` no es opcional: sin él, el provider arranca sin
+     * conocer los insets, el primer frame se renderiza con `top: 0` y el header
+     * SALTA hacia abajo apenas llega la medición nativa. Con las métricas
+     * iniciales, el primer frame ya sale en su lugar definitivo.
+     *
+     * Va por fuera del ThemeProvider a propósito: los modales y las pantallas
+     * que se montan antes de que el AuthContext hidrate (splash, login) también
+     * necesitan insets.
+     */
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <ThemeProvider value={navigationTheme}>
+        <AuthProvider>
+          <UIProvider>
+            <RootNavigation />
+            <AppUpdateModal
+              visible={forceUpdate.required}
+              currentVersion={forceUpdate.currentVersion}
+              latestVersion={forceUpdate.latestVersion}
+              updateUrl={forceUpdate.updateUrl}
+            />
+            <StatusBar style="light" />
+          </UIProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }
