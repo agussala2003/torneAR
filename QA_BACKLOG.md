@@ -206,6 +206,15 @@ Tres migraciones esperan autorización explícita para el `db push` (`develop` y
 | `20260810120000_quick_wins_settings` | Geofence 150 → 500 m | ✅ verificado |
 | `20260811120000_realtime_team_members` | Publica `team_members` + `REPLICA IDENTITY FULL` | ✅ verificado (`relreplident = 'f'`) |
 | `20260811121000_fix_transition_season_where` | Acota el `UPDATE` de `transition_season` | ✅ probado end-to-end con rollback |
+| `20260811130000_checkin_distance_telemetry` | Registra la distancia real del check-in en `app_logs` | ✅ check-in real a 120 m registrado |
+| `20260811131000_transition_season_reset_team_rankings` | Resetea también los contadores por formato | ✅ Rating y partidos jugados intactos |
+
+> Las dos últimas reescriben RPCs con `CREATE OR REPLACE`. Sus cuerpos se
+> tomaron de `pg_get_functiondef` sobre la base viva, **no** de los archivos de
+> las migraciones que las crearon: `checkin_team` y `submit_team_checkin` fueron
+> redefinidas después por D9 y R6, y reconstruirlas desde el archivo viejo las
+> habría regresado en silencio. Verificado por diff: lo único que cambia son las
+> 6 líneas del `PERFORM` de telemetría.
 
 Además, **`push-dispatch` necesita redespliegue** (`supabase functions deploy
 push-dispatch`): `verify_jwt` se aplica al desplegar, así que el cambio de
@@ -217,9 +226,12 @@ push-dispatch`): `verify_jwt` se aplica al desplegar, así que el cambio de
 |---|---|---|
 | **E2** | Deep link de la push en cold start | Bloqueado hasta desplegar E1 |
 | **D4** | Evolución de Rating con temporada iniciada | Desbloqueado por D3; a validar en dispositivo |
-| **D2 (logging)** | Registrar la distancia real de cada check-in | Cambio de RPC; permitiría bajar el radio con datos |
-| `team_rankings` | Sus contadores de temporada **nunca se resetean** en `transition_season` | Deuda detectada al arreglar D3; ver el comentario de la migración `20260811121000`. Corregirlo mueve números ya visibles en el ranking — decisión de dominio |
 | **Validación física** | Los 25 hallazgos, en los dos celulares | Ningún test cubre insets, timings ni push reales |
+
+### Cerrado en esta última pasada
+
+- [x] **D2 (logging)** — `log_checkin_distance` registra en `app_logs` la distancia real de cada check-in aceptado (migración `20260811130000`). Probado en local: un check-in a 120 m dejó `{"distance_m": 120, "radius_m": 500, "source": "checkin_team"}`. La consulta de percentiles para decidir el radio definitivo está en el encabezado de la migración.
+- [x] **Deuda `team_rankings`** — `transition_season` ahora resetea también `wins/draws/losses` por formato (migración `20260811131000`). `elo_score` y `matches_played` quedan intactos: verificado en local (Rating 1337 y 9 partidos sobrevivieron, `wins` fue a 0).
 
 ---
 
