@@ -26,6 +26,18 @@ select plan(5);
 -- ── 1. Contrato exacto ──────────────────────────────────────────────────────
 -- Set completo y no "contiene": publicar de más también cuesta (WAL + tráfico
 -- realtime de tablas que nadie escucha).
+--
+-- `team_members` se suma en la migración 20260811120000 (C1 · Realtime de
+-- membresías, con REPLICA IDENTITY FULL) para que una expulsión llegue sola al
+-- selector de equipos en vez de esperar al próximo gesto del usuario.
+--
+-- ⚠️ OJO: al día de hoy NINGÚN componente del cliente se suscribe a esta tabla
+--    (no hay ningún `.on('postgres_changes', { table: 'team_members' })` en el
+--    repo). O sea que hoy se paga el WAL y el tráfico realtime sin que nadie
+--    escuche — justamente lo que este set_eq exacto pretende evitar. Se agrega
+--    igual porque el contrato tiene que reflejar el estado real de la base, pero
+--    queda pendiente: o se agrega el suscriptor que la migración da por hecho, o
+--    se saca la tabla de la publicación.
 select set_eq(
   $$
     select tablename::text
@@ -33,7 +45,7 @@ select set_eq(
     where pubname = 'supabase_realtime' and schemaname = 'public'
   $$,
   $$ values ('matches'), ('match_results'), ('match_proposals'), ('messages'),
-            ('notifications'), ('challenges') $$,
+            ('notifications'), ('challenges'), ('team_members') $$,
   'supabase_realtime publica exactamente las tablas que el cliente escucha'
 );
 
