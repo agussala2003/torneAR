@@ -119,27 +119,52 @@ export async function fetchMarketDistanceIndex(): Promise<MarketDistanceIndex> {
   return buildDistanceIndex((data ?? []) as unknown as VenueRow[]);
 }
 
+/** Ubicación de una publicación, en orden de precisión decreciente. */
+export interface PostLocation {
+  /**
+   * Coordenadas del complejo enlazado por `venue_id`. Es el dato EXACTO y tiene
+   * prioridad sobre todo lo demás.
+   */
+  coords?: Coordinates | null;
+  zone?: string | null;
+  /** Nombre del complejo, para los avisos previos a la FK. */
+  complex?: string | null;
+}
+
 /**
  * Metros entre el usuario y la publicación, o `null` si falta algún extremo.
  *
- * `null` cuando el usuario no cargó zona, cuando la publicación no tiene zona,
- * o cuando ninguna de las dos zonas tiene complejos con coordenadas. El
- * llamador no dibuja el badge: es preferible a mostrar un número inventado.
+ * Tres niveles de precisión para el destino, de mejor a peor:
+ *
+ *   1. `coords` — el aviso está enlazado a un complejo del catálogo por
+ *      `venue_id`. Coordenadas reales de la cancha.
+ *   2. Match del nombre del complejo contra el catálogo, dentro de su zona.
+ *      Cubre los avisos anteriores a la FK que el backfill no alcanzó.
+ *   3. Centroide de la zona del aviso.
+ *
+ * El ORIGEN sigue siendo el centroide de la zona del usuario en los tres
+ * casos: `profiles` no guarda coordenadas y pedir el GPS acá sería un permiso
+ * nuevo en una pantalla de navegación. Por eso la etiqueta lleva "~" aunque el
+ * destino sea exacto.
+ *
+ * `null` cuando el usuario no cargó zona o cuando su zona no tiene complejos
+ * con coordenadas: el llamador no dibuja el badge, que es preferible a mostrar
+ * un número inventado.
  */
 export function resolveDistanceMeters(
   index: MarketDistanceIndex,
   userZone: string | null | undefined,
-  postZone: string | null | undefined,
-  postComplex: string | null | undefined,
+  post: PostLocation,
 ): number | null {
-  if (!userZone || !postZone) return null;
+  if (!userZone) return null;
 
   const from = index.zoneCentroids.get(normalize(userZone));
   if (!from) return null;
 
   const to =
-    (postComplex ? index.venueCoords.get(venueKey(postZone, postComplex)) : undefined) ??
-    index.zoneCentroids.get(normalize(postZone));
+    post.coords ??
+    (post.zone && post.complex ? index.venueCoords.get(venueKey(post.zone, post.complex)) : undefined) ??
+    (post.zone ? index.zoneCentroids.get(normalize(post.zone)) : undefined);
   if (!to) return null;
 
   return distanceInMeters(from, to);
@@ -154,10 +179,9 @@ export function resolveDistanceMeters(
 export function resolveDistanceLabel(
   index: MarketDistanceIndex,
   userZone: string | null | undefined,
-  postZone: string | null | undefined,
-  postComplex: string | null | undefined,
+  post: PostLocation,
 ): string | null {
-  const meters = resolveDistanceMeters(index, userZone, postZone, postComplex);
+  const meters = resolveDistanceMeters(index, userZone, post);
   if (meters === null) return null;
 
   // Misma zona y mismo complejo: "a 100 m" mentiría por redondeo hacia arriba.

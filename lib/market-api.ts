@@ -21,6 +21,8 @@ export interface MarketTeamPost {
   match_time?: string | null;
   zone?: string | null;
   complex?: string | null;
+  /** Complejo del catálogo. `null` en avisos con cancha escrita a mano. */
+  venue_id?: string | null;
   is_active: boolean;
   created_at: string;
   teams: {
@@ -29,6 +31,18 @@ export interface MarketTeamPost {
     zone?: string | null;
     shield_url: string | null;
     is_active: boolean;
+  } | null;
+  /**
+   * Coordenadas del complejo, embebidas para el badge de distancia.
+   *
+   * Viajan en la misma consulta que la lista: resolverlas aparte sería un N+1
+   * por tarjeta. `null` cuando el aviso no está enlazado al catálogo.
+   */
+  venues: {
+    id: string;
+    name: string;
+    lat: number | null;
+    lng: number | null;
   } | null;
 }
 
@@ -82,6 +96,12 @@ export async function fetchTeamPosts(positionFilter?: string, zoneFilter?: strin
         zone,
         shield_url,
         is_active
+      ),
+      venues (
+        id,
+        name,
+        lat,
+        lng
       )
     `)
     .eq('is_active', true)
@@ -152,6 +172,7 @@ export async function createTeamPost(postData: CreateTeamPostInput): Promise<voi
       match_time: postData.matchTime || null,
       zone: postData.zone || null,
       complex: postData.complex || null,
+      venue_id: postData.venueId || null,
       created_by: profileId,
     });
 

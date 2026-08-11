@@ -102,8 +102,33 @@ describe('createTeamPost', () => {
       match_time: '20:00',
       zone: 'CABA',
       complex: 'El Potrero',
+      // Sin complejo del catálogo el aviso se publica igual: pierde la
+      // precisión del badge de distancia, no la posibilidad de existir.
+      venue_id: null,
       created_by: PROFILE.id,
     });
+  });
+
+  it('persiste el venue_id cuando el alta eligió un complejo del catálogo', async () => {
+    const profileBuilder = createQueryBuilder({ data: PROFILE, error: null });
+    const insertBuilder = createQueryBuilder({ data: null, error: null });
+    supabaseMock.from.mockReturnValueOnce(profileBuilder).mockReturnValueOnce(insertBuilder);
+
+    await createTeamPost({
+      teamId: 'team-1',
+      positionWanted: 'ARQUERO',
+      description: 'Buscamos arquero',
+      zone: 'CABA',
+      complex: 'El Potrero',
+      venueId: '11111111-2222-3333-4444-555555555555',
+    });
+
+    expect(insertBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        complex: 'El Potrero',
+        venue_id: '11111111-2222-3333-4444-555555555555',
+      }),
+    );
   });
 
   it('convierte campos opcionales vacíos a null', async () => {

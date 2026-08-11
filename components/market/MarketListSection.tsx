@@ -85,7 +85,17 @@ export function MarketListSection({
           onViewApplications={() => onViewApplications(post.id, 'TEAM')}
           distanceLabel={
             distanceIndex
-              ? resolveDistanceLabel(distanceIndex, userZone, post.zone, post.complex)
+              ? resolveDistanceLabel(distanceIndex, userZone, {
+                  // Coordenadas exactas cuando el aviso está enlazado al
+                  // catálogo por `venue_id`; si no, el helper cae al match por
+                  // nombre y después al centroide de la zona.
+                  coords:
+                    post.venues?.lat != null && post.venues?.lng != null
+                      ? { lat: post.venues.lat, lng: post.venues.lng }
+                      : null,
+                  zone: post.zone,
+                  complex: post.complex,
+                })
               : null
           }
         />
