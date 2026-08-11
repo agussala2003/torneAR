@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { FaqAccordion } from '@/components/faq/FaqAccordion';
 import { FAQ_CATEGORIES } from '@/components/faq/faqContent';
 
@@ -18,7 +18,6 @@ import { FAQ_CATEGORIES } from '@/components/faq/faqContent';
  * categoría tiene su cuerpo montado a la vez.
  */
 export default function FaqScreen() {
-  const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const handleToggle = useCallback((id: string) => {
@@ -26,34 +25,21 @@ export default function FaqScreen() {
   }, []);
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="px-4 pb-2 pt-1">
-        <TouchableOpacity
-          className="w-10"
-          activeOpacity={0.8}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Volver"
-        >
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-      </View>
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader
+        title="Reglas del Juego"
+        subtitle="Todo lo que el sistema decide solo, con los números exactos. Sin letra chica."
+      />
 
       <ScrollView
         className="px-4"
-        contentContainerStyle={{ paddingBottom: 48 }}
+        contentContainerStyle={{ paddingTop: 18, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
-        <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">
-          Reglas del Juego
-        </Text>
-        <Text className="font-ui mt-1 text-sm leading-5 text-neutral-on-surface-variant">
-          Todo lo que el sistema decide solo, con los números exactos. Sin letra chica.
-        </Text>
-
         {/* Nota de honestidad: los números ajustables pueden cambiar sin que se
             actualice la app, y el usuario tiene que saber cuál manda. */}
-        <View className="mt-4 flex-row items-start gap-2.5 rounded-xl bg-surface-low px-3.5 py-3">
+        <View className="flex-row items-start gap-2.5 rounded-xl bg-surface-low px-3.5 py-3">
           <AppIcon
             family="material-community"
             name="information-outline"

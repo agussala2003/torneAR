@@ -9,6 +9,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { useAuth } from '@/context/AuthContext';
@@ -161,22 +162,8 @@ export default function MarketInboxScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* Header */}
-      <View className="px-6 pb-4 pt-10 flex-row items-center border-b border-surface-high bg-surface-base">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-4"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
-        </TouchableOpacity>
-        <View className="flex-1 flex-row items-center justify-between gap-2">
-          <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
-            Mis Chats de Mercado
-          </Text>
-          <ActiveTeamSelector />
-        </View>
-      </View>
+      {/* `pt-10` fijo reemplazado por el inset real que aplica SecondaryHeader. */}
+      <SecondaryHeader title="Mis Chats de Mercado" rightSlot={<ActiveTeamSelector />} />
 
       <View className="px-4 pt-3 pb-3">
         <View className="flex-row gap-2 p-1 bg-surface-low rounded-xl">

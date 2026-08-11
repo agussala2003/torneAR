@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { CensusRow } from '@/components/census/CensusRow';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
@@ -22,7 +22,6 @@ import { Logger } from '@/lib/logger';
  * notificaciones ni el selector de equipo — mismo criterio que `faq.tsx`.
  */
 export default function CensoScreen() {
-  const router = useRouter();
   const { profile } = useAuth();
   const { showAlert, AlertComponent } = useCustomAlert();
 
@@ -66,18 +65,12 @@ export default function CensoScreen() {
   const leaderPercentage = entries[0]?.percentage ?? 0;
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="px-4 pb-2 pt-1">
-        <TouchableOpacity
-          className="w-10"
-          activeOpacity={0.8}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Volver"
-        >
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-      </View>
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader
+        title="Censo del fútbol argentino"
+        subtitle="De qué cuadro es la comunidad de torneAR."
+      />
 
       <FlatList
         className="px-4"
@@ -94,14 +87,7 @@ export default function CensoScreen() {
           />
         }
         ListHeaderComponent={
-          <View className="mb-4">
-            <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">
-              Censo del fútbol argentino
-            </Text>
-            <Text className="font-ui mt-1 text-sm leading-5 text-neutral-on-surface-variant">
-              De qué cuadro es la comunidad de torneAR.
-            </Text>
-
+          <View className="mb-4 mt-4">
             {data && data.totalFans > 0 && (
               <View className="mt-4 flex-row items-center gap-2 rounded-2xl bg-surface-container px-4 py-3">
                 <AppIcon family="material-community" name="account-group" size={18} color="#53E076" />

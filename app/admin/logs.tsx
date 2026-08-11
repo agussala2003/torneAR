@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { Logger, type LogLevel } from '@/lib/logger';
@@ -179,15 +180,7 @@ export default function AdminLogsScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* Header */}
-      <View className="flex-row items-center gap-3 px-4 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-          <AppIcon family="material-community" name="chevron-left" size={26} color="#E5E2E1" />
-        </TouchableOpacity>
-        <Text className="font-displayBlack flex-1 text-xl text-neutral-on-surface" numberOfLines={1}>
-          Logs de la app
-        </Text>
-      </View>
+      <SecondaryHeader title="Logs de la app" />
 
       {/* Filtro por nivel */}
       <View className="flex-row gap-2 px-4 pb-3">

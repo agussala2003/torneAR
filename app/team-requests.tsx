@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { useFocusEffect } from 'expo-router';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
@@ -16,7 +16,6 @@ import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
 
 export default function TeamRequestsScreen() {
-  const router = useRouter();
   const { profile, refreshProfile } = useAuth();
   const { myTeams, fetchMyTeams } = useTeamStore();
   const { showAlert, AlertComponent } = useCustomAlert();
@@ -137,18 +136,15 @@ export default function TeamRequestsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="px-4 pb-2 pt-1">
-        <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-      </View>
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader
+        title="Mis solicitudes"
+        subtitle="Seguimiento de solicitudes para unirte a equipos."
+      />
 
-      <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 36 }}>
-        <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">Mis solicitudes</Text>
-        <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">Seguimiento de solicitudes para unirte a equipos.</Text>
-
-        <View className="mt-5 flex-row flex-wrap gap-2">
+      <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: 36 }}>
+        <View className="flex-row flex-wrap gap-2">
           {(['TODAS', 'PENDIENTE', 'ACEPTADA', 'RECHAZADA'] as const).map((option) => {
             const active = filter === option;
             const optionLabels = {

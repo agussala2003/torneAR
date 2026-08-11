@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { GlobalHeader } from '@/components/GlobalHeader';
 import { GlobalLoader } from '@/components/GlobalLoader';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -124,24 +123,10 @@ export default function TeamStatsScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      <GlobalHeader />
+      {/* Reemplaza al GlobalHeader + boton "Volver" con caja: esta es una
+          pantalla de detalle a la que se llega desde otra, no una tab. */}
+      <SecondaryHeader title="Stats del Equipo" />
       <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 16, paddingBottom: 114 }}>
-
-        {/* Botón Volver */}
-        <View className="mb-4 flex-row items-center justify-between">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            activeOpacity={0.85}
-            className="flex-row items-center gap-1 rounded-lg bg-surface-high px-3 py-2"
-          >
-            <AppIcon family="material-community" name="arrow-left" size={16} color="#BCCBB9" />
-            <Text className="font-ui text-xs text-neutral-on-surface-variant">Volver</Text>
-          </TouchableOpacity>
-          <Text className="font-displayBlack text-xs uppercase tracking-widest text-brand-primary">
-            Stats del Equipo
-          </Text>
-        </View>
-
         <TeamHeader header={viewData.header} />
         <TeamEloChart history={viewData.eloHistory} currentElo={viewData.header.prRating} />
         <TeamFormAndSeason form={viewData.form} season={viewData.season} />

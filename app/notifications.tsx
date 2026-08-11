@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { NotificationsSkeleton } from '@/components/notifications/NotificationsSkeleton';
 import { useAuth } from '@/context/AuthContext';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -234,13 +234,11 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="px-4 pb-2 pt-1">
-        <View className="flex-row items-center justify-between">
-          <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-            <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-          </TouchableOpacity>
-
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader
+        title="Notificaciones"
+        rightSlot={
           <TouchableOpacity
             onPress={markAllAsRead}
             disabled={markingAllRead || unreadCount === 0}
@@ -255,12 +253,23 @@ export default function NotificationsScreen() {
               </Text>
             )}
           </TouchableOpacity>
-        </View>
-      </View>
+        }
+      />
 
-      <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 32 }}>
-        <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">Notificaciones</Text>
-        <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">{unreadCount} sin leer</Text>
+      <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: 32 }}>
+        {/* El conteo pasa de texto gris perdido a badge con peso propio: es el
+            dato que el usuario viene a buscar al entrar. Cuando es 0 no
+            mostramos un "0 sin leer" en verde — ahi el mensaje tranquilizador
+            es el correcto. */}
+        {unreadCount > 0 ? (
+          <View className="self-start rounded-full border border-brand-primary/40 bg-brand-primary/15 px-3 py-1">
+            <Text className="font-uiBold text-xs uppercase tracking-wide text-brand-primary">
+              {unreadCount} sin leer
+            </Text>
+          </View>
+        ) : (
+          <Text className="font-ui text-sm text-neutral-on-surface-variant">Estas al dia</Text>
+        )}
 
         <View className="mt-5 gap-2">
           <NotificationsListSection

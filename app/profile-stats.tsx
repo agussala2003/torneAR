@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { GlobalHeader } from '@/components/GlobalHeader';
+import { ScrollView, Text, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { GlobalLoader } from '@/components/GlobalLoader';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -17,7 +16,6 @@ import { BadgesSection } from '@/components/profile-stats/BadgesSection';
 import { TeamsSection } from '@/components/profile-stats/TeamsSection';
 
 export default function ProfileStatsScreen() {
-  const router = useRouter();
   const { profile } = useAuth();
   const { profileId: paramProfileId } = useLocalSearchParams<{ profileId?: string }>();
   const profileId = paramProfileId ?? profile?.id ?? null;
@@ -66,22 +64,8 @@ export default function ProfileStatsScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      <GlobalHeader />
+      <SecondaryHeader title="Stats" />
       <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 16, paddingBottom: 114 }}>
-        <View className="mb-2 flex-row items-center justify-between">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            activeOpacity={0.85}
-            className="flex-row items-center gap-1 rounded-lg bg-surface-high px-3 py-2"
-          >
-            <AppIcon family="material-icons" name="arrow-back" size={16} color="#BCCBB9" />
-            <Text className="font-ui text-xs text-neutral-on-surface-variant">Volver</Text>
-          </TouchableOpacity>
-          <Text className="font-display text-sm uppercase tracking-widest text-brand-primary">
-            Stats
-          </Text>
-        </View>
-
         <StatsHeader profile={viewData.profile} />
         <StatsOverview stats={viewData.stats} />
         <RecentMatchesSection matches={viewData.recentMatches} />

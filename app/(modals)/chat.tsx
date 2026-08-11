@@ -9,8 +9,9 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -40,7 +41,6 @@ export default function MatchChatScreen() {
     conversationId: string;
     myTeamId?: string;
   }>();
-  const router = useRouter();
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const inputBottomInset = useKeyboardAwareBottomInset();
@@ -302,23 +302,11 @@ export default function MatchChatScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* Header */}
-      <View className="flex-row items-center gap-3 border-b border-surface-high px-4 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} className="p-1">
-          <AppIcon family="material-community" name="arrow-left" size={24} color="#E5E2E1" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="font-uiBold text-base text-neutral-on-surface" numberOfLines={1}>
-            {headerTitle}
-          </Text>
-          {header && (
-            <Text className="font-ui text-[10px] uppercase tracking-widest text-neutral-outline">
-              Código: {header.uniqueCode}
-            </Text>
-          )}
-        </View>
-        <AppIcon family="material-community" name="soccer" size={20} color="#53E076" />
-      </View>
+      <SecondaryHeader
+        title={headerTitle}
+        subtitle={header ? `Código: ${header.uniqueCode}` : undefined}
+        rightSlot={<AppIcon family="material-community" name="soccer" size={20} color="#53E076" />}
+      />
 
       {loadingInit ? (
         <View className="flex-1 items-center justify-center">
