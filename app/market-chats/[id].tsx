@@ -71,6 +71,8 @@ export default function MarketChatScreen() {
   // A13: mensajes optimistas que no se pudieron entregar. Estado efímero y local
   // a la pantalla a propósito — no es dominio y no sobrevive a salir del chat.
   const [failedMessageIds, setFailedMessageIds] = useState<string[]>([]);
+  // Alto real de la cabecera: alimenta el `keyboardVerticalOffset` del KAV.
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   useEffect(() => {
     if (!profile || !id) return;
@@ -410,6 +412,8 @@ export default function MarketChatScreen() {
           y hereda el inset real en lugar del `pt-10` fijo. El avatar va en el
           slot de acciones: es identidad del chat, no una accion, pero es el
           unico lugar donde no compite por ancho con un nombre largo. */}
+      {/* La altura se mide, no se asume: alimenta el offset del KAV. */}
+      <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
       <SecondaryHeader
         title={chatTitle}
         subtitle={chatData ? chatSubtitle : undefined}
@@ -433,6 +437,7 @@ export default function MarketChatScreen() {
           ) : null
         }
       />
+      </View>
 
       {isLoading ? (
         <View className="flex-1 justify-center items-center">
@@ -447,7 +452,10 @@ export default function MarketChatScreen() {
              teclado deja un residuo que nunca vuelve a cero. Con los dos
              mecanismos activos ese residuo se sumaba al inset de reposo. */
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          /* Medido y no fijo: con SecondaryHeader la cabecera va de ~78 a ~115
+             segun el inset del equipo, y un offset corto deja el input debajo
+             del teclado en los dispositivos con notch. */
+          keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
         >
           <FlatList
             ref={flatListRef}

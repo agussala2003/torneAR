@@ -13,7 +13,9 @@ export default function SettingsScreen() {
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
       <SecondaryHeader title="Preferencias" />
 
-      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
+      {/* El `padding: 24` uniforme apretaba las filas contra el centro y
+          desalineaba esta pantalla del resto, que usa px-4. */}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 60 }}>
 
         {/* Settings Block: Legal */}
         <View className="mb-6">

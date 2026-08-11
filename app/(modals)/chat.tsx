@@ -58,6 +58,8 @@ export default function MatchChatScreen() {
   // a la pantalla a propósito — no es dominio y no sobrevive a salir del chat.
   const [failedMessageIds, setFailedMessageIds] = useState<string[]>([]);
   const [retryToken, setRetryToken] = useState(0);
+  // Alto real de la cabecera: alimenta el `keyboardVerticalOffset` del KAV.
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   // Derive effective myTeamId (from param or from match membership)
   const [myTeamId, setMyTeamId] = useState<string>(paramTeamId ?? '');
@@ -302,11 +304,15 @@ export default function MatchChatScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      <SecondaryHeader
-        title={headerTitle}
-        subtitle={header ? `Código: ${header.uniqueCode}` : undefined}
-        rightSlot={<AppIcon family="material-community" name="soccer" size={20} color="#53E076" />}
-      />
+      {/* La altura se mide, no se asume: es lo que el KeyboardAvoidingView
+          necesita como offset y depende del inset del dispositivo. */}
+      <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
+        <SecondaryHeader
+          title={headerTitle}
+          subtitle={header ? `Código: ${header.uniqueCode}` : undefined}
+          rightSlot={<AppIcon family="material-community" name="soccer" size={20} color="#53E076" />}
+        />
+      </View>
 
       {loadingInit ? (
         <View className="flex-1 items-center justify-center">
@@ -331,10 +337,15 @@ export default function MatchChatScreen() {
              teclado deja un residuo que nunca vuelve a cero. Con los dos
              mecanismos activos ese residuo se sumaba al inset de reposo. */
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          /* 0 en Android: el header es una View de esta misma pantalla y el KAV
-             arranca por debajo, así que mide su propia posición y no necesita
-             compensación extra. */
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          /* Antes era un 90 fijo. Ese número describía la cabecera vieja de
+             padding fijo; con SecondaryHeader la altura va de ~78 (Android sin
+             notch) a ~115 (Dynamic Island), y con el offset corto el input
+             quedaba tapado por el teclado justo en los equipos con notch — que
+             es lo que se reporto. Medido, el offset es correcto en cualquiera.
+
+             0 en Android: ahi el empuje lo hace el padding de la barra y el KAV
+             no participa. */
+          keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
         >
           <FlatList
             ref={flatListRef}

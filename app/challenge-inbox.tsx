@@ -170,9 +170,22 @@ export default function ChallengesInboxScreen() {
                 {loading ? (
                     <ActivityIndicator color="#53E076" className="mt-10" />
                 ) : filteredChallenges.length === 0 ? (
-                    <View className="mt-10 items-center">
-                        <Text className="text-4xl">📭</Text>
-                        <Text className="mt-4 font-ui text-sm text-neutral-on-surface-variant">No hay desafíos en esta sección.</Text>
+                    <View className="flex-1 items-center justify-center px-8 py-16">
+                        <AppIcon family="material-community" name="sword-cross" size={64} color="#869585" />
+                        <Text className="font-displayBlack mt-5 text-center text-lg uppercase tracking-wide text-neutral-on-surface">
+                            {tab === 'RECIBIDOS'
+                                ? 'Nadie te desafió todavía'
+                                : tab === 'ENVIADOS'
+                                    ? 'No enviaste desafíos'
+                                    : 'Sin desafíos cerrados'}
+                        </Text>
+                        <Text className="font-ui mt-2 text-center text-sm leading-5 text-neutral-outline">
+                            {tab === 'RECIBIDOS'
+                                ? 'Cuando otro equipo te desafíe, el partido aparece acá para que lo aceptes o lo rechaces.'
+                                : tab === 'ENVIADOS'
+                                    ? 'Buscá un rival en el Ranking y mandale un desafío: te va a quedar listado acá hasta que responda.'
+                                    : 'Acá van a quedar los desafíos que ya se aceptaron, se rechazaron o vencieron.'}
+                        </Text>
                     </View>
                 ) : (
                     filteredChallenges.map(c => (
