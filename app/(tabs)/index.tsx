@@ -21,6 +21,7 @@ import type {
 import { TeamShield } from '@/components/ui/TeamShield';
 import { HomeOnboardingState } from '@/components/home/HomeOnboardingState';
 import { HomeOnboardingTour } from '@/components/home/HomeOnboardingTour';
+import { CensusEntryCard } from '@/components/home/CensusEntryCard';
 import { MiniRankingCard } from '@/components/home/MiniRankingCard';
 import { PendingActionsCard } from '@/components/home/PendingActionsCard';
 import { UpcomingMatchesSection } from '@/components/home/UpcomingMatchesSection';
@@ -321,6 +322,10 @@ export default function HomeScreen() {
     router.push('/(tabs)/market');
   };
 
+  const handleGoToCensus = () => {
+    router.push('/censo');
+  };
+
   const handleManageTeam = () => {
     router.push('/(tabs)/profile');
   };
@@ -533,6 +538,8 @@ export default function HomeScreen() {
             onGoToMarket={handleGoToMarket}
             onManageTeam={handleManageTeam}
           />
+
+          <CensusEntryCard onPress={handleGoToCensus} />
         </ScrollView>
       )}
 

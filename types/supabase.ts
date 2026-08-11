@@ -2114,6 +2114,14 @@ export type Database = {
           team_b_votes: number
         }[]
       }
+      get_favorite_team_census: {
+        Args: never
+        Returns: {
+          team_name: string
+          fans: number
+          percentage: number
+        }[]
+      }
       get_market_inbox: {
         Args: { p_profile_id: string }
         Returns: {

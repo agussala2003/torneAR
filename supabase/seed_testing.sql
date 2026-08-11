@@ -135,17 +135,17 @@ values
 
 -- ─── Perfiles ────────────────────────────────────────────────────────────────
 insert into profiles (id, auth_user_id, username, full_name, zone, preferred_position, is_admin, strong_foot, favorite_team) values
-  ('0b000000-0000-0000-0000-000000000001', '0a000000-0000-0000-0000-000000000001', 'admin_global', 'Admin Global',      'Palermo',  'CUALQUIERA',    true,  'RIGHT',   'River'),
-  ('0b000000-0000-0000-0000-000000000002', '0a000000-0000-0000-0000-000000000002', 'cap_alfa',     'Capitán Alfa',      'Palermo',  'MEDIOCAMPISTA', false, 'RIGHT',   'Boca'),
+  ('0b000000-0000-0000-0000-000000000001', '0a000000-0000-0000-0000-000000000001', 'admin_global', 'Admin Global',      'Palermo',  'CUALQUIERA',    true,  'RIGHT',   'River Plate'),
+  ('0b000000-0000-0000-0000-000000000002', '0a000000-0000-0000-0000-000000000002', 'cap_alfa',     'Capitán Alfa',      'Palermo',  'MEDIOCAMPISTA', false, 'RIGHT',   'Boca Juniors'),
   ('0b000000-0000-0000-0000-000000000003', '0a000000-0000-0000-0000-000000000003', 'cap_beta',     'Capitán Beta',      'Caballito','DEFENSOR',      false, 'LEFT', 'San Lorenzo'),
-  ('0b000000-0000-0000-0000-000000000004', '0a000000-0000-0000-0000-000000000004', 'alfa_jug1',    'Jugador Alfa 1',    'Palermo',  'DELANTERO',     false, 'RIGHT',   'Boca'),
-  ('0b000000-0000-0000-0000-000000000005', '0a000000-0000-0000-0000-000000000005', 'alfa_jug2',    'Jugador Alfa 2',    'Palermo',  'ARQUERO',       false, 'RIGHT',   'Racing'),
-  ('0b000000-0000-0000-0000-000000000006', '0a000000-0000-0000-0000-000000000006', 'alfa_jug3',    'Jugador Alfa 3',    'Palermo',  'DEFENSOR',      false, 'LEFT', 'River'),
+  ('0b000000-0000-0000-0000-000000000004', '0a000000-0000-0000-0000-000000000004', 'alfa_jug1',    'Jugador Alfa 1',    'Palermo',  'DELANTERO',     false, 'RIGHT',   'Boca Juniors'),
+  ('0b000000-0000-0000-0000-000000000005', '0a000000-0000-0000-0000-000000000005', 'alfa_jug2',    'Jugador Alfa 2',    'Palermo',  'ARQUERO',       false, 'RIGHT',   'Racing Club'),
+  ('0b000000-0000-0000-0000-000000000006', '0a000000-0000-0000-0000-000000000006', 'alfa_jug3',    'Jugador Alfa 3',    'Palermo',  'DEFENSOR',      false, 'LEFT', 'River Plate'),
   ('0b000000-0000-0000-0000-000000000007', '0a000000-0000-0000-0000-000000000007', 'beta_jug1',    'Jugador Beta 1',    'Caballito','MEDIOCAMPISTA', false, 'RIGHT',   'Independiente'),
-  ('0b000000-0000-0000-0000-000000000008', '0a000000-0000-0000-0000-000000000008', 'cap_gamma',    'Capitán Gamma',     'Belgrano', 'DELANTERO',     false, 'RIGHT',   'Velez'),
-  ('0b000000-0000-0000-0000-000000000009', '0a000000-0000-0000-0000-000000000009', 'beta_nuevo',   'Refuerzo Beta',     'Caballito','DELANTERO',     false, 'RIGHT',   'Huracan'),
-  ('0b000000-0000-0000-0000-000000000010', '0a000000-0000-0000-0000-000000000010', 'free_agent',   'Agente Libre',      'Palermo',  'MEDIOCAMPISTA', false, 'BOTH','River'),
-  ('0b000000-0000-0000-0000-000000000011', '0a000000-0000-0000-0000-000000000011', 'trotamundos',  'El Trotamundos',    'Recoleta', 'DELANTERO',     false, 'RIGHT',   'Boca');
+  ('0b000000-0000-0000-0000-000000000008', '0a000000-0000-0000-0000-000000000008', 'cap_gamma',    'Capitán Gamma',     'Belgrano', 'DELANTERO',     false, 'RIGHT',   'Vélez Sarsfield'),
+  ('0b000000-0000-0000-0000-000000000009', '0a000000-0000-0000-0000-000000000009', 'beta_nuevo',   'Refuerzo Beta',     'Caballito','DELANTERO',     false, 'RIGHT',   'Huracán'),
+  ('0b000000-0000-0000-0000-000000000010', '0a000000-0000-0000-0000-000000000010', 'free_agent',   'Agente Libre',      'Palermo',  'MEDIOCAMPISTA', false, 'BOTH','River Plate'),
+  ('0b000000-0000-0000-0000-000000000011', '0a000000-0000-0000-0000-000000000011', 'trotamundos',  'El Trotamundos',    'Recoleta', 'DELANTERO',     false, 'RIGHT',   'Boca Juniors');
 
 -- Onboarding: isProfileComplete() (lib/auth-utils.ts) exige también
 -- date_of_birth y gender (M/F/X). Se completan acá para que estos usuarios
