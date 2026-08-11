@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, FlatList } from 'react-native';
 import { useTeamStore } from '@/stores/teamStore';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SafeAreaBottomSheet } from '@/components/ui/SafeAreaBottomSheet';
+import { TeamShield } from '@/components/ui/TeamShield';
 
 export function ActiveTeamSelector() {
   const { activeTeamId, activeTeamName, myTeams, setActiveTeam } = useTeamStore();
@@ -65,16 +66,30 @@ export function ActiveTeamSelector() {
                   onPress={() => handleSelect(item.id, item.name)}
                   className={`w-full flex-row items-center justify-between px-5 py-4 rounded-xl border ${isActive ? 'border-brand-primary bg-brand-primary/15' : 'border-neutral-outline-variant/15 bg-surface-low'}`}
                 >
-                  <View className="flex-row items-center gap-3">
-                    <AppIcon family="material-community" name="shield" size={24} color={isActive ? '#53E076' : '#BCCBB9'} />
-                    <View>
-                      <Text className={`font-display text-base uppercase tracking-wider ${isActive ? 'text-brand-primary' : 'text-neutral-on-surface'}`}>
+                  {/* `flex-1` + `min-w-0`: sin esto un nombre largo empuja al
+                      check de la derecha fuera de la fila en vez de truncarse. */}
+                  <View className="flex-1 min-w-0 flex-row items-center gap-3">
+                    {/* Con `name`, los equipos sin escudo caen en sus iniciales
+                        y no en un ícono genérico repetido fila por fila. */}
+                    <TeamShield
+                      shieldUrl={item.shieldUrl}
+                      size={40}
+                      isMyTeam={isActive}
+                      name={item.name}
+                    />
+                    <View className="flex-1">
+                      <Text
+                        className={`font-display text-base uppercase tracking-wider ${isActive ? 'text-brand-primary' : 'text-neutral-on-surface'}`}
+                        numberOfLines={1}
+                      >
                         {item.name}
                       </Text>
                       <Text className="font-ui text-xs text-neutral-on-surface-variant capitalize">Rol: {item.role.toLowerCase()}</Text>
                     </View>
                   </View>
-                  {isActive && <AppIcon family="material-community" name="check-circle" size={20} color="#53E076" />}
+                  {isActive && (
+                    <AppIcon family="material-community" name="check-circle" size={20} color="#53E076" />
+                  )}
                 </TouchableOpacity>
               );
             }}

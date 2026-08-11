@@ -15,7 +15,7 @@ import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { Logger } from '@/lib/logger';
 import type { HomeViewData, MiniRankingEntry, PendingAction } from '@/components/home/types';
 import type { Database } from '@/types/supabase';
-import { TeamShield } from '@/components/matches/TeamShield';
+import { TeamShield } from '@/components/ui/TeamShield';
 import { HomeOnboardingState } from '@/components/home/HomeOnboardingState';
 import { HomeOnboardingTour } from '@/components/home/HomeOnboardingTour';
 import { MiniRankingCard } from '@/components/home/MiniRankingCard';

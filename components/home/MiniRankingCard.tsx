@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { TeamShield } from '@/components/matches/TeamShield';
+import { TeamShield } from '@/components/ui/TeamShield';
 import type { MiniRankingEntry } from './types';
 import type { Database } from '@/types/supabase';
 

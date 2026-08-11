@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { View, Text, Animated } from 'react-native';
-import { TeamShield } from '@/components/matches/TeamShield';
+import { TeamShield } from '@/components/ui/TeamShield';
 import { LiveTimer } from '@/components/matches/LiveTimer';
 import type { MatchDetailViewData } from '@/components/matches/types';
 

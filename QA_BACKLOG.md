@@ -131,8 +131,8 @@ backend —que corre contra la **base de producción compartida** (`develop` y
 - [x] **A4** — Padding inferior de la barra «Confirmar lista» de la convocatoria. *(No era un modal sino una barra absoluta en `app/match-checkin.tsx` con `pb-8` fijo.)*
 - [x] **A6** — Padding inferior del modal de invitación a partido (`GuestJoinModal`).
 - [x] **A7** — Barrido del resto de sheets aplicando el patrón: `ResultModal`, `WoModal`, `ProposalModal`, `CancellationModal`, `FilterModal` (mercado) y `RankingFilterModal`.
-- [ ] **A3** — Teclado tapando la Descripción en el modal de crear publicación del Mercado.
-- [ ] **A5b** — Escudos de equipo en el selector, con placeholder por defecto.
+- [x] **A3** — Teclado tapando la Descripción en el modal de crear publicación del Mercado. *(Misma raíz que A1/A2: en Android edge-to-edge la ventana no se redimensiona, así que el ScrollView no tenía recorrido por el que desplazarse.)*
+- [x] **A5b** — Escudos de equipo en el selector, con fallback a iniciales. *(Requirió traer `shield_url` al `teamStore`; `TeamShield` se movió a `components/ui/` por ser compartido entre `matches`, `home` y `ui`.)*
 - [ ] **A10** — Copy del modal «cuenta creada» + que la navegación al onboarding espere al Aceptar.
 - [ ] **A12** — Decidir el nombre único para ELO/PR/Rating y hacer el barrido de strings.
 - [ ] **A9** — Duración mínima visible de los loaders de login/registro.

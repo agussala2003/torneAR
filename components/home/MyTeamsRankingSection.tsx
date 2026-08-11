@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { TeamShield } from '@/components/matches/TeamShield';
+import { TeamShield } from '@/components/ui/TeamShield';
 import type { HomeTeamSnapshot } from './types';
 
 const ROLE_LABEL: Record<string, string> = {
