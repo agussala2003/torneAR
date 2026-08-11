@@ -13,6 +13,7 @@ import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { updateProfile } from '@/lib/profile-edit-data';
+import { useUsernameAvailability } from '@/hooks/useUsernameAvailability';
 import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
 import { OptionPickerDialog } from '@/components/ui/OptionPickerDialog';
 import { ProfileFormFields } from '@/components/profile/ProfileFormFields';
@@ -73,6 +74,9 @@ export default function ProfileEditScreen() {
     formState: { errors },
   } = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
+    // Ver onboarding: revalida en cada tecla una vez tocado el campo, así el
+    // error inline se va apenas se corrige.
+    mode: 'onTouched',
     defaultValues: buildDefaultValues(profile),
   });
 
@@ -89,6 +93,21 @@ export default function ProfileEditScreen() {
   const selectedZone = useWatch({ control, name: 'zone' });
   const selectedPosition = useWatch({ control, name: 'position' });
   const selectedFavoriteTeam = useWatch({ control, name: 'favoriteTeam' });
+
+  // Validez sobre los valores en vivo. `formState.isValid` acá sí serviría (es
+  // un formulario de un solo paso), pero arrancaría en `false` hasta la primera
+  // validación y el botón se vería deshabilitado con el perfil ya cargado.
+  const values = useWatch({ control });
+  const usernameAvailability = useUsernameAvailability(values.username ?? '', {
+    // El usuario ya "ocupa" su propio username: sin esta exclusión, abrir la
+    // pantalla y no tocar nada lo marcaría como tomado.
+    currentUsername: profile?.username ?? undefined,
+    excludeProfileId: profile?.id,
+  });
+  const canSubmit =
+    userProfileSchema.safeParse(values).success &&
+    usernameAvailability !== 'taken' &&
+    usernameAvailability !== 'checking';
 
   const onSubmit = useCallback(
     async (data: UserProfileFormData) => {
@@ -189,7 +208,7 @@ export default function ProfileEditScreen() {
                 name="username"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <TextInput
-                    className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.username ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
+                    className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${errors.username || usernameAvailability === 'taken' ? 'border-red-500' : 'border-neutral-outline-variant/15'} bg-surface-low`}
                     placeholder="usuario_123"
                     placeholderTextColor="#3A3939"
                     autoCapitalize="none"
@@ -200,7 +219,19 @@ export default function ProfileEditScreen() {
                   />
                 )}
               />
-              {errors.username && <Text className="text-red-500 text-xs mt-1">{errors.username.message}</Text>}
+              {errors.username ? (
+                <Text className="text-red-500 text-xs mt-1">{errors.username.message}</Text>
+              ) : usernameAvailability === 'checking' ? (
+                <Text className="font-ui text-xs mt-1 text-neutral-on-surface-variant">
+                  Verificando disponibilidad...
+                </Text>
+              ) : usernameAvailability === 'taken' ? (
+                <Text className="text-red-500 text-xs mt-1">
+                  Ese usuario ya está en uso, probá con otro.
+                </Text>
+              ) : usernameAvailability === 'available' ? (
+                <Text className="font-ui text-xs mt-1 text-brand-primary">¡Disponible!</Text>
+              ) : null}
             </View>
 
             {/* ZONE */}
@@ -265,6 +296,7 @@ export default function ProfileEditScreen() {
               onPress={handleSubmit(onSubmit)}
               label={loading ? 'Guardando...' : 'Guardar Cambios'}
               isLoading={loading}
+              disabled={!canSubmit}
             />
           </View>
         </ScrollView>

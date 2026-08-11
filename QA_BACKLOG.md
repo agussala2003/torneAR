@@ -144,10 +144,12 @@ celulares físicos: son fallas visuales y de timing que no cubre ningún test.
 
 ### 🟢 Fase 2 — Formularios y Validaciones (Zod + React Hook Form)
 
-- [ ] **B1** — Límite superior de fecha en el schema Zod (onboarding + edición de perfil). *Único fallo funcional del módulo 1.*
-- [ ] **B2** — Validación reactiva por campo para que los errores inline se limpien al corregir.
-- [ ] **B3** — Botones habilitados/deshabilitados según la validez del paso, en registro, los 3 pasos del onboarding y edición de perfil.
-- [ ] **B4** — Validación temprana de unicidad de `username` (debounce) en el paso 1.
+- [x] **B1** — Límite superior de fecha en el schema Zod (onboarding + edición de perfil comparten `userProfileSchema`). Cubierto por `lib/schemas/userSchema.test.ts`.
+- [x] **B2** — `mode: 'onTouched'` en onboarding, edición de perfil y login.
+- [x] **B3** — Botones atados a la validez real. `HeroButton` gana estado visual deshabilitado, que no tenía: `disabled` sólo bloqueaba el press y el botón seguía viéndose verde.
+- [x] **B4** — Validación temprana de unicidad de `username` (→ `hooks/useUsernameAvailability.ts`), aplicada en el paso 1 del onboarding y en edición de perfil.
+
+**✅ Fase 2 completa** — 4/4 tareas.
 
 ### 🟡 Fase 3 — Estado, Caché y Visibilidad (React / Zustand)
 

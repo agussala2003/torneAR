@@ -2,6 +2,28 @@
 import * as z from 'zod';
 import { isValidFavoriteTeam } from '@/lib/favorite-teams';
 
+/**
+ * `DD/MM/YYYY` → `Date` local, o `null` si ese día no existe en el calendario.
+ *
+ * El round-trip contra los getters es lo que atrapa 31/02: el constructor de
+ * `Date` no falla, desborda al 3 de marzo.
+ */
+function parseLocalDate(value: string): Date | null {
+  const [dd, mm, yyyy] = value.split('/').map(Number);
+  const date = new Date(yyyy, mm - 1, dd);
+
+  const isRealDate =
+    date.getFullYear() === yyyy && date.getMonth() === mm - 1 && date.getDate() === dd;
+
+  return isRealDate ? date : null;
+}
+
+/** Hoy a las 00:00 local: la comparación de fechas de nacimiento es por día. */
+function startOfToday(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
 export const userProfileSchema = z.object({
   fullName: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
   username: z
@@ -13,15 +35,22 @@ export const userProfileSchema = z.object({
   dateOfBirth: z
     .string()
     .regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Formato DD/MM/YYYY requerido')
+    .refine((val) => parseLocalDate(val) !== null, 'Fecha inválida')
+    /**
+     * Cota superior: no se puede haber nacido en el futuro.
+     *
+     * El schema validaba que la fecha existiera en el calendario (rechazaba
+     * 31/02) pero no que fuera pasada, así que 28/02/2027 entraba sin chistar y
+     * el perfil quedaba con una edad negativa (auditoría E2E, módulo 1.2).
+     *
+     * La comparación es por día y en hora local, igual que la máscara de carga:
+     * el cumpleaños de hoy es válido.
+     */
     .refine((val) => {
-      const [dd, mm, yyyy] = val.split('/').map(Number);
-      const d = new Date(yyyy, mm - 1, dd);
-      return (
-        d.getFullYear() === yyyy &&
-        d.getMonth() === mm - 1 &&
-        d.getDate() === dd
-      );
-    }, 'Fecha inválida'),
+      const date = parseLocalDate(val);
+      if (date === null) return true; // Ya lo reporta el refine anterior.
+      return date.getTime() <= startOfToday().getTime();
+    }, 'La fecha de nacimiento no puede ser futura'),
   gender: z.enum(['M', 'F', 'X'], { error: 'Selecciona un género' }),
   strongFoot: z.enum(['RIGHT', 'LEFT', 'BOTH'], {
     error: 'Selecciona tu pierna hábil',

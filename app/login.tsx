@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { AuthError } from '@supabase/supabase-js';
 import { signIn, signInWithGoogle, signUp } from '@/lib/auth-data';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
@@ -39,11 +39,23 @@ export default function LoginScreen() {
   // al alternar de modo toma efecto en la validacion siguiente.
   const { control, handleSubmit, clearErrors, formState: { errors } } = useForm<AuthFormData>({
     resolver: zodResolver(isLogin ? signInSchema : signUpSchema),
+    // `onTouched`: el error de contraseña corta desaparece apenas se corrige, en
+    // vez de quedar colgado hasta el próximo envío.
+    mode: 'onTouched',
     defaultValues: {
       email: '',
       password: '',
     },
   });
+
+  // Validez calculada contra el schema ACTIVO y no con `formState.isValid`.
+  // El resolver cambia al alternar login/registro y `isValid` queda con el
+  // veredicto del schema anterior hasta la siguiente validación; parsear los
+  // valores en vivo no tiene ese desfasaje. Habilita el botón —antes se podía
+  // tocar «Crear cuenta» indefinidamente con la contraseña corta y no pasaba
+  // nada (auditoría E2E, módulo 1.1).
+  const values = useWatch({ control });
+  const canSubmit = (isLogin ? signInSchema : signUpSchema).safeParse(values).success;
 
   // Red de seguridad: la retención del guard se suelta al cerrar el modal, pero
   // si la pantalla se desmonta antes por cualquier vía, dejarla puesta bloquearía
@@ -253,7 +265,7 @@ export default function LoginScreen() {
         <HeroButton
           onPress={handleSubmit(onSubmit)}
           isLoading={showAuthLoader}
-          disabled={showGoogleLoader}
+          disabled={showGoogleLoader || !canSubmit}
           label={isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           style={{ marginBottom: 24, width: '100%', shadowColor: '#53E076', shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
         />
