@@ -42,7 +42,7 @@ function TeamRankingCard({ team, onPress }: TeamCardProps) {
       <View className="mb-2 items-center rounded-xl bg-surface-high py-2">
         <Text className="font-displayBlack text-xl text-brand-primary">{team.eloRating}</Text>
         <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-on-surface-variant">
-          Rating
+          Ranking
         </Text>
       </View>
 
@@ -64,22 +64,23 @@ function TeamRankingCard({ team, onPress }: TeamCardProps) {
 interface Props {
   teams: HomeTeamSnapshot[];
   onTeamPress: (teamId: string) => void;
-  onSeeRanking: () => void;
 }
 
-export function MyTeamsRankingSection({ teams, onTeamPress, onSeeRanking }: Props) {
+export function MyTeamsRankingSection({ teams, onTeamPress }: Props) {
   if (teams.length === 0) return null;
 
   return (
     <View className="mb-5">
-      {/* Section header */}
-      <View className="mb-3 flex-row items-center justify-between">
+      {/* Sin enlace "Ver ranking": hacia `router.push` a una TAB, que apila una
+          instancia nueva de Ranking sobre la Home en vez de cambiar de pestaña.
+          Repitiendo el gesto (Home -> Ranking -> Home -> Ranking) la pila crecia
+          sin fin y el retroceso nunca salia — el "loop infinito" del QA. La
+          MiniRankingCard ya ofrece esa entrada, y el QuickAction de abajo llega
+          al ranking por la via correcta. */}
+      <View className="mb-3">
         <Text className="font-displayBlack text-xs uppercase tracking-widest text-neutral-on-surface-variant">
           Mis Equipos
         </Text>
-        <TouchableOpacity activeOpacity={0.7} onPress={onSeeRanking}>
-          <Text className="font-uiBold text-xs text-info-secondary">Ver ranking</Text>
-        </TouchableOpacity>
       </View>
 
       {teams.length === 1 ? (
@@ -108,7 +109,7 @@ export function MyTeamsRankingSection({ teams, onTeamPress, onSeeRanking }: Prop
                   {teams[0].eloRating}
                 </Text>
                 <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-on-surface-variant">
-                  Rating
+                  Ranking
                 </Text>
               </>
               <View className="mt-1 flex-row items-center gap-1">

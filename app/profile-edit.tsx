@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 import { useAuth } from '@/context/AuthContext';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { PitchSelector } from '@/components/ui/PitchSelector';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -159,26 +160,26 @@ export default function ProfileEditScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      {/* El header queda FUERA del KeyboardAvoidingView: adentro, al abrirse el
+          teclado la cabecera se comprimia junto con el formulario y el boton de
+          retroceso se iba debajo de la barra de estado. */}
+      <SecondaryHeader
+        title="Editar Perfil"
+        subtitle="Modifica tus datos personales y tu posicion preferida en la cancha."
+      />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
-        <View className="px-4 pb-2 pt-1">
-          <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-            <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-          </TouchableOpacity>
-        </View>
-
         <ScrollView
           className="px-4"
-          contentContainerStyle={{ paddingBottom: 36 }}
+          contentContainerStyle={{ paddingTop: 18, paddingBottom: 36 }}
           keyboardShouldPersistTaps="handled"
         >
-          <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">Editar Perfil</Text>
-          <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">Modifica tus datos personales y tu posicion preferida en la cancha.</Text>
-
-          <View className="mt-8 gap-4">
+          <View className="gap-4">
             {/* FULL NAME */}
             <View>
               <Text className="font-display text-xs uppercase tracking-wider mb-2 text-neutral-on-surface-variant">Nombre y Apellido</Text>

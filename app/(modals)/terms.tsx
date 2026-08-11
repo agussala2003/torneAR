@@ -1,20 +1,14 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 
 export default function TermsScreen() {
-  const router = useRouter();
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="flex-row items-center px-4 pb-2 pt-2">
-        <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-        <Text className="font-displayBlack text-xl text-neutral-on-surface flex-1 text-center pr-10">TÉRMINOS Y CONDICIONES</Text>
-      </View>
-      
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader title="Términos y Condiciones" />
+
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
         <Text className="font-displayBlack text-2xl text-neutral-on-surface mb-6">
           Términos y Condiciones de Uso

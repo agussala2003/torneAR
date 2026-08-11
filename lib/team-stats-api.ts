@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
+import { averageAge } from '@/lib/age';
 import { Database } from '@/types/supabase';
 import type {
   TeamStatsViewData,
@@ -51,6 +52,7 @@ type MemberRaw = {
     username: string;
     avatar_url: string | null;
     preferred_position: PlayerPosition;
+    date_of_birth: string | null;
   } | null;
 };
 
@@ -123,7 +125,7 @@ export async function fetchTeamStatsViewData(
       .limit(10),
     supabase
       .from('team_members')
-      .select('profile_id, role, profiles(full_name, username, avatar_url, preferred_position)')
+      .select('profile_id, role, profiles(full_name, username, avatar_url, preferred_position, date_of_birth)')
       .eq('team_id', teamId),
     supabase
       .from('elo_history')
@@ -161,6 +163,7 @@ export async function fetchTeamStatsViewData(
     shieldUrl: team.shield_url,
     prRating: team.elo_rating,
     fairPlayScore: Number(team.fair_play_score),
+    squadAge: averageAge(memberRows.map((m) => m.profiles!.date_of_birth)),
   };
 
   // Season record

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { PitchSelector } from '@/components/ui/PitchSelector';
 import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
@@ -242,24 +243,12 @@ export default function MarketCreateModal() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base" edges={['top']}>
-      {/* Header Dinámico */}
-      <View className="px-6 py-4 flex-row items-center border-b border-surface-high bg-surface-base">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-4"
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
-        </TouchableOpacity>
-        <View className="flex-1 flex-row items-center justify-between gap-2">
-          <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
-            {creationType === 'TEAM' ? 'Buscar Jugador' : 'Buscar Equipo / Partido'}
-          </Text>
-          {creationType === 'TEAM' ? <ActiveTeamSelector /> : null}
-        </View>
-      </View>
+    // Sin `edges={['top']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView className="flex-1 bg-surface-base" edges={['bottom']}>
+      <SecondaryHeader
+        title={creationType === 'TEAM' ? 'Buscar Jugador' : 'Buscar Equipo / Partido'}
+        rightSlot={creationType === 'TEAM' ? <ActiveTeamSelector /> : null}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

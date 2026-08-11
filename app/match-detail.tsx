@@ -36,6 +36,7 @@ import {
 import { Logger } from '@/lib/logger';
 import { useMatchRealtime } from '@/hooks/useMatchRealtime';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { MatchDetailSkeleton } from '@/components/matches/MatchDetailSkeleton';
 import { MatchDetailHero } from '@/components/matches/MatchDetailHero';
 import { ProposalSection } from '@/components/matches/ProposalSection';
@@ -510,14 +511,7 @@ export default function MatchDetailScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* Header */}
-      <View className="flex-row items-center gap-3 px-4 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} className="p-1">
-          <AppIcon family="material-community" name="arrow-left" size={24} color="#E5E2E1" />
-        </TouchableOpacity>
-        <Text className="font-uiBold flex-1 text-lg text-neutral-on-surface">Detalle del partido</Text>
-        {renderStatusBadge()}
-      </View>
+      <SecondaryHeader title="Detalle del partido" rightSlot={renderStatusBadge()} />
 
       <ScrollView
         className="px-4"

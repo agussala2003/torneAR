@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Image } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { GlobalHeader } from '@/components/GlobalHeader';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
@@ -21,7 +21,6 @@ import {
 } from '@/components/market/applicationStatus';
 
 export default function MarketApplicationsScreen() {
-  const router = useRouter();
   const { postId, postType } = useLocalSearchParams<{ postId: string; postType: MarketPostType }>();
   const { showAlert, AlertComponent } = useCustomAlert();
 
@@ -126,20 +125,9 @@ export default function MarketApplicationsScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      <GlobalHeader />
-      <View className="px-4 pt-4">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          activeOpacity={0.85}
-          className="mb-4 flex-row items-center gap-1 self-start rounded-lg bg-surface-high px-3 py-2"
-        >
-          <AppIcon family="material-community" name="arrow-left" size={16} color="#BCCBB9" />
-          <Text className="font-ui text-xs text-neutral-on-surface-variant">Volver</Text>
-        </TouchableOpacity>
-        <Text className="font-displayBlack mb-4 text-xl text-neutral-on-surface">
-          Postulaciones {postType === 'TEAM' ? 'de jugadores' : 'de equipos'}
-        </Text>
-      </View>
+      <SecondaryHeader
+        title={`Postulaciones ${postType === 'TEAM' ? 'de jugadores' : 'de equipos'}`}
+      />
 
       <FlatList
         data={applications}

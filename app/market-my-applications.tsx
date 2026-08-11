@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { MyApplicationCard } from '@/components/market/MyApplicationCard';
@@ -99,22 +99,15 @@ export default function MarketMyApplicationsScreen() {
   if (loading) return <GlobalLoader label="Cargando tus postulaciones" />;
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="px-4 pb-2 pt-1">
-        <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-      </View>
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader
+        title="Mis postulaciones"
+        subtitle="Seguimiento de las postulaciones que enviaste en el Mercado."
+      />
 
-      <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 36 }}>
-        <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">
-          Mis postulaciones
-        </Text>
-        <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">
-          Seguimiento de las postulaciones que enviaste en el Mercado.
-        </Text>
-
-        <View className="mt-5 flex-row flex-wrap gap-2">
+      <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: 36 }}>
+        <View className="flex-row flex-wrap gap-2">
           {FILTER_OPTIONS.map((option) => {
             const active = filter === option;
             return (

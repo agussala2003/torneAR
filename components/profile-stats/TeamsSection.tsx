@@ -57,7 +57,7 @@ export function TeamsSection({ teams }: TeamsSectionProps) {
                       className="font-ui text-xs text-neutral-on-surface-variant"
                       style={{ fontVariant: ['tabular-nums'] }}
                     >
-                      PR {team.prRating}
+                      Ranking {team.prRating}
                     </Text>
                   </View>
                 </View>

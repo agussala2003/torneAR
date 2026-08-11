@@ -13,6 +13,14 @@ export type TeamStatsHeader = {
   shieldUrl: string | null;
   prRating: number;
   fairPlayScore: number;
+  /**
+   * Promedio de edad del plantel y sobre cuantos jugadores se calculo.
+   *
+   * `null` cuando ningun miembro cargo su fecha de nacimiento. `counted` viaja
+   * junto al promedio porque `averageAge` ignora a quienes no la cargaron: sin
+   * ese dato la UI no puede aclarar que el numero sale de una parte del plantel.
+   */
+  squadAge: { average: number; counted: number } | null;
 };
 
 export type TeamSeasonRecord = {

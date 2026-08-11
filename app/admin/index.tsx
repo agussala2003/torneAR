@@ -2,6 +2,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 
 interface AdminEntry {
   route: string;
@@ -68,13 +69,9 @@ export default function AdminIndexScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* Header */}
-      <View className="flex-row items-center gap-3 px-4 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-          <AppIcon family="material-community" name="chevron-left" size={26} color="#E5E2E1" />
-        </TouchableOpacity>
-        <Text className="font-displayBlack text-xl text-neutral-on-surface">Panel de administración</Text>
-      </View>
+      {/* `pt-14` fijo (56px) era el bug: en Android sin notch sobraba y en iOS
+          con Dynamic Island el titulo quedaba debajo de la barra de estado. */}
+      <SecondaryHeader title="Panel de administración" />
 
       <View className="px-4 pt-2">
         {ENTRIES.map((entry) => (

@@ -3,8 +3,8 @@ import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator } from 'rea
 import { router, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import { useTeamStore } from '@/stores/teamStore';
-import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { fetchChallengesInbox, acceptChallengeWithNotification, updateChallengeStatus, cancelChallenge } from '@/lib/challenge-actions';
 import type { ChallengeInboxEntry } from '@/components/ranking/types';
@@ -140,15 +140,10 @@ export default function ChallengesInboxScreen() {
 
     return (
         <View className="flex-1 bg-surface-base">
-            <GlobalHeader isRankingTab />
+            {/* Se va el GlobalHeader: mostraba el icono de desafios con su badge
+                estando ya adentro de la bandeja de desafios. */}
+            <SecondaryHeader title="Desafíos" />
             <ScrollView className="px-4 pt-4" contentContainerStyle={{ paddingBottom: 60 }}>
-
-                <View className="mb-4 flex-row items-center gap-3">
-                    <TouchableOpacity onPress={() => router.back()} className="rounded-xl bg-surface-high p-2">
-                        <AppIcon family="material-community" name="arrow-left" size={20} color="#BCCBB9" />
-                    </TouchableOpacity>
-                    <Text className="font-displayBlack text-2xl uppercase tracking-widest text-brand-primary">Desafíos</Text>
-                </View>
 
                 {/* Tabs */}
                 <View className="mb-5 flex-row rounded-xl bg-surface-low p-1">

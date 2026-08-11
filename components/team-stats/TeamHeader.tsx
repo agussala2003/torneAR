@@ -42,13 +42,23 @@ export function TeamHeader({ header }: TeamHeaderProps) {
         <Text className="font-ui text-sm text-neutral-on-surface-variant">{header.zone}</Text>
       </View>
 
-      <View className="mt-3 flex-row flex-wrap justify-center gap-2">
+      <View className="mt-3 flex-row flex-wrap items-center justify-center gap-2">
         <Text className="font-uiBold rounded bg-brand-primary/15 px-2 py-1 text-[10px] uppercase tracking-wide text-brand-primary">
           {getTeamCategoryLabel(header.category)}
         </Text>
         <Text className="font-uiBold rounded bg-info-secondary/15 px-2 py-1 text-[10px] uppercase tracking-wide text-info-secondary">
           {getTeamFormatLabel(header.format)}
         </Text>
+        {/* Promedio de edad del plantel. Se omite entero si nadie cargo su
+            fecha de nacimiento: un "0 años" leeria como dato real. */}
+        {header.squadAge && (
+          <View className="flex-row items-center gap-1 rounded bg-warning-tertiary/15 px-2 py-1">
+            <AppIcon family="material-community" name="cake-variant-outline" size={11} color="#FABD32" />
+            <Text className="font-uiBold text-[10px] uppercase tracking-wide text-warning-tertiary">
+              {header.squadAge.average} años prom.
+            </Text>
+          </View>
+        )}
       </View>
 
       <View className="mt-4 flex-row gap-4">
@@ -60,7 +70,7 @@ export function TeamHeader({ header }: TeamHeaderProps) {
             {header.prRating}
           </Text>
           <Text className="font-uiBold mt-0.5 text-[10px] uppercase tracking-wide text-neutral-on-surface-variant">
-            PR
+            Ranking
           </Text>
         </View>
         <View className="items-center rounded-xl bg-surface-low px-5 py-3">

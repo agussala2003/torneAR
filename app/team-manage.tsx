@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { TeamManageSkeleton } from '@/components/team-manage/TeamManageSkeleton';
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
@@ -642,13 +643,9 @@ export default function TeamManageScreen() {
 
   if (!team) {
     return (
-      <SafeAreaView className="flex-1 bg-surface-base px-6">
-        <View className="pt-4">
-          <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-            <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-          </TouchableOpacity>
-        </View>
-        <View className="flex-1 items-center justify-center">
+      <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+        <SecondaryHeader title="Gestion de equipo" />
+        <View className="flex-1 items-center justify-center px-6">
           <Text className="font-display text-xl text-neutral-on-surface">Equipo no disponible</Text>
           <Text className="font-ui mt-2 text-center text-neutral-on-surface-variant">No encontramos informacion para este equipo.</Text>
         </View>
@@ -658,17 +655,14 @@ export default function TeamManageScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="px-4 pb-2 pt-1">
-        <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-      </View>
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader
+        title="Gestion de equipo"
+        subtitle="Administracion y estado de tu plantel."
+      />
 
-      <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 36 }}>
-        <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">Gestion de equipo</Text>
-        <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">Administracion y estado de tu plantel.</Text>
-
+      <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: 36 }}>
         <TeamManageHeader
           team={team}
           myRole={myRole}

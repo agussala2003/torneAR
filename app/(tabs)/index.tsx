@@ -530,7 +530,6 @@ export default function HomeScreen() {
           <MyTeamsRankingSection
             teams={viewData.myTeams}
             onTeamPress={handleTeamPress}
-            onSeeRanking={handleSeeRanking}
           />
 
           <QuickActionsSection
