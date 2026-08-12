@@ -73,7 +73,7 @@ export default function AdminIndexScreen() {
           con Dynamic Island el titulo quedaba debajo de la barra de estado. */}
       <SecondaryHeader title="Panel de administración" />
 
-      <View className="px-4 pt-2">
+      <View className="px-4 pt-3">
         {ENTRIES.map((entry) => (
           <TouchableOpacity
             key={entry.route}

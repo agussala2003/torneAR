@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
-import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { resolveShieldUrl } from '@/lib/supabase-storage';
 import { Database } from '@/types/supabase';
 import type {
   ProfileStatsViewData,
@@ -47,16 +47,6 @@ type TeamRaw = {
   role: TeamRole;
   teams: { id: string; name: string; elo_rating: number; shield_url: string | null } | null;
 };
-
-/**
- * Los escudos se guardan como path del bucket, salvo los que ya vinieron como
- * URL absoluta de una migracion vieja. Resolverlo en el DAL y no en la pantalla
- * evita repetir el mismo ternario en cada componente que pinta un escudo.
- */
-function resolveShieldUrl(shieldUrl: string | null): string | null {
-  if (!shieldUrl) return null;
-  return shieldUrl.startsWith('http') ? shieldUrl : getSupabaseStorageUrl('shields', shieldUrl);
-}
 
 function percent(n: number, d: number): string {
   if (d <= 0) return '0%';

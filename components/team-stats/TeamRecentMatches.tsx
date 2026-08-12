@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { TeamShield } from '@/components/ui/TeamShield';
 import type { TeamRecentMatch, FormResult } from './types';
 
 function formatDate(dateIso: string | null): string {
@@ -75,10 +76,19 @@ export function TeamRecentMatches({ matches }: TeamRecentMatchesProps) {
               <ResultBadge result={match.result} />
 
               <View className="flex-1">
-                <Text className="font-uiBold text-sm text-neutral-on-surface" numberOfLines={1}>
-                  vs {match.rivalName}
-                </Text>
-                <View className="mt-0.5 flex-row items-center gap-2">
+                {/* Mismo orden que en el historial del jugador: "vs <escudo>
+                    Rival". El escudo delante partia la frase al medio. */}
+                <View className="flex-row items-center gap-2">
+                  <Text className="font-ui text-sm text-neutral-on-surface-variant">vs</Text>
+                  <TeamShield shieldUrl={match.rivalShieldUrl} name={match.rivalName} size={28} />
+                  <Text
+                    className="font-uiBold flex-1 text-sm text-neutral-on-surface"
+                    numberOfLines={1}
+                  >
+                    {match.rivalName}
+                  </Text>
+                </View>
+                <View className="mt-1 flex-row items-center gap-2">
                   <Text className="font-uiBold rounded bg-surface-high px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-neutral-on-surface-variant">
                     {match.matchType === 'RANKING' ? 'Ranking' : 'Amistoso'}
                   </Text>

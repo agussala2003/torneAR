@@ -55,7 +55,7 @@ describe('resolveDistanceMeters', () => {
   const index = buildDistanceIndex(VENUES);
 
   it('mide de la zona del usuario al complejo exacto de la publicación', () => {
-    const meters = resolveDistanceMeters(index, 'Caballito', { zone: 'La Plata', complex: 'Complejo Platense' });
+    const meters = resolveDistanceMeters(index, { zone: 'Caballito' }, { zone: 'La Plata', complex: 'Complejo Platense' });
 
     // ~56 km entre Caballito y La Plata.
     expect(meters).toBeGreaterThan(50_000);
@@ -63,8 +63,8 @@ describe('resolveDistanceMeters', () => {
   });
 
   it('cae al centroide de la zona si el complejo es texto libre', () => {
-    const exact = resolveDistanceMeters(index, 'Caballito', { zone: 'La Plata', complex: 'Complejo Platense' });
-    const libre = resolveDistanceMeters(index, 'Caballito', { zone: 'La Plata', complex: 'la canchita de siempre' });
+    const exact = resolveDistanceMeters(index, { zone: 'Caballito' }, { zone: 'La Plata', complex: 'Complejo Platense' });
+    const libre = resolveDistanceMeters(index, { zone: 'Caballito' }, { zone: 'La Plata', complex: 'la canchita de siempre' });
 
     expect(libre).not.toBeNull();
     // Con un solo complejo en La Plata, centroide y complejo coinciden.
@@ -78,16 +78,16 @@ describe('resolveDistanceMeters', () => {
     ]);
 
     expect(
-      resolveDistanceMeters(conAcento, 'Caballito', { zone: 'La Plata', complex: 'cancha san martin' }),
+      resolveDistanceMeters(conAcento, { zone: 'Caballito' }, { zone: 'La Plata', complex: 'cancha san martin' }),
     ).not.toBeNull();
   });
 
   it('devuelve null si el usuario no cargó zona', () => {
-    expect(resolveDistanceMeters(index, null, { zone: 'La Plata', complex: 'Complejo Platense' })).toBeNull();
+    expect(resolveDistanceMeters(index, { zone: null }, { zone: 'La Plata', complex: 'Complejo Platense' })).toBeNull();
   });
 
   it('devuelve null si la publicación no tiene zona ni coordenadas', () => {
-    expect(resolveDistanceMeters(index, 'Caballito', { zone: null, complex: 'Complejo Platense' })).toBeNull();
+    expect(resolveDistanceMeters(index, { zone: 'Caballito' }, { zone: null, complex: 'Complejo Platense' })).toBeNull();
   });
 
   // ── Camino exacto: el aviso enlazado a `venues` por venue_id ──────────────
@@ -95,7 +95,7 @@ describe('resolveDistanceMeters', () => {
   it('prioriza las coordenadas del venue_id sobre el match por nombre', () => {
     // Coordenadas de un complejo REAL distinto del que nombra el texto: si el
     // helper leyera el nombre en vez de la FK, mediría los ~56 km a La Plata.
-    const cerca = resolveDistanceMeters(index, 'Caballito', {
+    const cerca = resolveDistanceMeters(index, { zone: 'Caballito' }, {
       coords: { lat: -34.6208, lng: -58.4383 },
       zone: 'La Plata',
       complex: 'Complejo Platense',
@@ -105,7 +105,7 @@ describe('resolveDistanceMeters', () => {
   });
 
   it('usa el venue_id aunque el aviso no tenga zona cargada', () => {
-    const meters = resolveDistanceMeters(index, 'Caballito', {
+    const meters = resolveDistanceMeters(index, { zone: 'Caballito' }, {
       coords: { lat: -34.9205, lng: -57.9536 },
       zone: null,
       complex: null,
@@ -115,7 +115,7 @@ describe('resolveDistanceMeters', () => {
   });
 
   it('cae al nombre/centroide cuando el venue no tiene coordenadas cargadas', () => {
-    const meters = resolveDistanceMeters(index, 'Caballito', {
+    const meters = resolveDistanceMeters(index, { zone: 'Caballito' }, {
       coords: null,
       zone: 'La Plata',
       complex: 'Complejo Platense',
@@ -125,13 +125,64 @@ describe('resolveDistanceMeters', () => {
   });
 
   it('devuelve null si la zona del usuario no tiene complejos con coordenadas', () => {
-    expect(resolveDistanceMeters(index, 'Zona Fantasma', { zone: 'La Plata', complex: null })).toBeNull();
+    expect(resolveDistanceMeters(index, { zone: 'Zona Fantasma' }, { zone: 'La Plata', complex: null })).toBeNull();
   });
 
   it('devuelve null con el índice vacío (fallo de red)', () => {
     expect(
-      resolveDistanceMeters(EMPTY_DISTANCE_INDEX, 'Caballito', { zone: 'La Plata', complex: 'Complejo Platense' }),
+      resolveDistanceMeters(EMPTY_DISTANCE_INDEX, { zone: 'Caballito' }, { zone: 'La Plata', complex: 'Complejo Platense' }),
     ).toBeNull();
+  });
+
+  // ── Origen: GPS del dispositivo por encima del centroide de la zona ───────
+  //
+  // Esta es la causa del "100 m acá y 600 m allá" del QA: el destino ya era el
+  // mismo en todas las pantallas, el que cambiaba era el punto de partida.
+
+  it('prioriza las coordenadas del dispositivo sobre el centroide de la zona', () => {
+    // Parado EN la Cancha Norte, pero con el perfil en Caballito: medido desde
+    // el centroide daría ~780 m (la mitad del ancho entre los dos complejos).
+    const enLaPuerta = resolveDistanceMeters(
+      index,
+      { coords: { lat: -34.6158, lng: -58.4333 }, zone: 'Caballito' },
+      { coords: { lat: -34.6158, lng: -58.4333 } },
+    );
+    const desdeLaZona = resolveDistanceMeters(
+      index,
+      { zone: 'Caballito' },
+      { coords: { lat: -34.6158, lng: -58.4333 } },
+    );
+
+    expect(enLaPuerta).toBeLessThan(1);
+    expect(desdeLaZona).toBeGreaterThan(500);
+  });
+
+  it('usa el GPS aunque el perfil no tenga zona cargada', () => {
+    expect(
+      resolveDistanceMeters(
+        index,
+        { coords: { lat: -34.6158, lng: -58.4333 }, zone: null },
+        { coords: { lat: -34.9205, lng: -57.9536 } },
+      ),
+    ).toBeGreaterThan(50_000);
+  });
+
+  it('devuelve null sin GPS y sin zona', () => {
+    expect(
+      resolveDistanceMeters(index, {}, { zone: 'La Plata', complex: 'Complejo Platense' }),
+    ).toBeNull();
+  });
+
+  it('mide igual desde el GPS con índice vacío: no depende del catálogo', () => {
+    // El selector de la propuesta de partido pasa las coordenadas del venue
+    // directo, así que tiene que funcionar aunque el índice no haya cargado.
+    expect(
+      resolveDistanceMeters(
+        EMPTY_DISTANCE_INDEX,
+        { coords: { lat: -34.6158, lng: -58.4333 } },
+        { coords: { lat: -34.9205, lng: -57.9536 } },
+      ),
+    ).toBeGreaterThan(50_000);
   });
 });
 
@@ -139,16 +190,35 @@ describe('resolveDistanceLabel', () => {
   const index = buildDistanceIndex(VENUES);
 
   it('formatea en km para distancias largas', () => {
-    expect(resolveDistanceLabel(index, 'Caballito', { zone: 'La Plata', complex: 'Complejo Platense' })).toMatch(
-      /^📍 a \d+(\.\d)? km$/,
+    expect(resolveDistanceLabel(index, { zone: 'Caballito' }, { zone: 'La Plata', complex: 'Complejo Platense' })).toMatch(
+      /^📍 ~ a \d+(\.\d)? km$/,
     );
   });
 
+  it('marca con "~" lo medido desde la zona y sin tilde lo medido por GPS', () => {
+    const post = { zone: 'La Plata', complex: 'Complejo Platense' };
+
+    expect(resolveDistanceLabel(index, { zone: 'Caballito' }, post)).toContain('~');
+    expect(
+      resolveDistanceLabel(index, { coords: { lat: -34.6158, lng: -58.4333 } }, post),
+    ).not.toContain('~');
+  });
+
   it('dice "En tu zona" en vez de redondear a 100 m', () => {
-    expect(resolveDistanceLabel(index, 'Caballito', { zone: 'Caballito', complex: null })).toBe('📍 En tu zona');
+    expect(resolveDistanceLabel(index, { zone: 'Caballito' }, { zone: 'Caballito', complex: null })).toBe('📍 En tu zona');
+  });
+
+  it('dice "Estás acá" cuando el GPS coincide con el complejo', () => {
+    expect(
+      resolveDistanceLabel(
+        index,
+        { coords: { lat: -34.6158, lng: -58.4333 } },
+        { coords: { lat: -34.6158, lng: -58.4333 } },
+      ),
+    ).toBe('📍 Estás acá');
   });
 
   it('devuelve null cuando no hay distancia que mostrar', () => {
-    expect(resolveDistanceLabel(index, null, { zone: 'La Plata', complex: null })).toBeNull();
+    expect(resolveDistanceLabel(index, { zone: null }, { zone: 'La Plata', complex: null })).toBeNull();
   });
 });

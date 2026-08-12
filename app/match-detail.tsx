@@ -515,7 +515,7 @@ export default function MatchDetailScreen() {
 
       <ScrollView
         className="px-4"
-        contentContainerStyle={{ paddingBottom: 48 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero */}

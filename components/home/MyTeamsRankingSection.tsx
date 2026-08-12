@@ -1,6 +1,7 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { TeamShield } from '@/components/ui/TeamShield';
+import { getTeamFormatShortLabel } from '@/lib/team-options';
 import type { HomeTeamSnapshot } from './types';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -15,6 +16,16 @@ interface TeamCardProps {
   onPress: (teamId: string) => void;
 }
 
+/**
+ * Tarjeta extendida de equipo: ocupa el ancho completo y se apila.
+ *
+ * Antes habia dos disenos —esta para un solo equipo, y una version comprimida
+ * de 176px en scroll horizontal para dos o mas—, asi que sumar un segundo
+ * equipo degradaba la informacion del primero: el record de temporada pasaba a
+ * una linea suelta, el rol perdia jerarquia y el ranking quedaba en una caja
+ * chica. Ademas el carrusel horizontal escondia los equipos a partir del
+ * segundo, que es justo el caso que motivaba el cambio de layout.
+ */
 function TeamRankingCard({ team, onPress }: TeamCardProps) {
   const record = `${team.seasonWins}V ${team.seasonDraws}E ${team.seasonLosses}D`;
 
@@ -22,40 +33,38 @@ function TeamRankingCard({ team, onPress }: TeamCardProps) {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={() => onPress(team.id)}
-      className="mr-3 w-44 overflow-hidden rounded-2xl bg-surface-container p-4"
+      className="w-full flex-row items-center gap-4 overflow-hidden rounded-2xl bg-surface-container p-4"
     >
-      {/* Shield + name */}
-      <View className="mb-3 items-center gap-2">
-        <TeamShield shieldUrl={team.shieldUrl} size={48} isMyTeam />
-        <Text
-          className="font-uiBold text-center text-[13px] text-neutral-on-surface"
-          numberOfLines={1}
-        >
+      <TeamShield shieldUrl={team.shieldUrl} size={52} isMyTeam />
+
+      <View className="flex-1">
+        <Text className="font-uiBold text-[15px] text-neutral-on-surface" numberOfLines={1}>
           {team.name}
         </Text>
-        <Text className="font-ui text-[10px] text-neutral-on-surface-variant">
+        <Text className="font-ui text-[11px] text-neutral-on-surface-variant">
           {ROLE_LABEL[team.role] ?? team.role}
         </Text>
+        <Text className="font-ui mt-1 text-[11px] text-neutral-on-surface-variant">{record}</Text>
       </View>
 
-      {/* ELO rating */}
-      <View className="mb-2 items-center rounded-xl bg-surface-high py-2">
-        <Text className="font-displayBlack text-xl text-brand-primary">{team.eloRating}</Text>
+      <View className="items-end">
+        <Text className="font-displayBlack text-2xl text-brand-primary">{team.eloRating}</Text>
+        {/* "Rating" y no "Ranking": el Rating es el puntaje, el Ranking es la
+            tabla de posiciones. Es el término que usa el resto de la app.
+
+            El formato acompaña a la cifra porque un equipo que juega F5 y F7
+            tiene un puntaje por cada uno: sin el rótulo, comparar este número
+            con el del widget de Top 3 —que sí declara su formato— parecía una
+            incoherencia de la app. */}
         <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-on-surface-variant">
-          Ranking
+          Rating
+          {team.rankingFormat ? ` • ${getTeamFormatShortLabel(team.rankingFormat)}` : ''}
         </Text>
-      </View>
-
-      {/* W/D/L */}
-      <Text className="font-ui text-center text-[11px] text-neutral-on-surface-variant">
-        {record}
-      </Text>
-
-      {/* Fair Play Score */}
-      <View className="mt-2 flex-row items-center justify-center gap-1">
-        <AppIcon family="material-community" name="hand-peace" size={12} color="#53E076" />
-        <Text className="font-uiBold text-[11px] text-brand-primary">{team.fairPlayScore}</Text>
-        <Text className="font-ui text-[10px] text-neutral-outline">FPS</Text>
+        <View className="mt-1 flex-row items-center gap-1">
+          <AppIcon family="material-community" name="hand-peace" size={11} color="#53E076" />
+          <Text className="font-uiBold text-[11px] text-brand-primary">{team.fairPlayScore}</Text>
+          <Text className="font-ui text-[10px] text-neutral-outline">FPS</Text>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -83,53 +92,13 @@ export function MyTeamsRankingSection({ teams, onTeamPress }: Props) {
         </Text>
       </View>
 
-      {teams.length === 1 ? (
-        // Single team: full-width card
-        <View className="overflow-hidden rounded-2xl bg-surface-container">
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => onTeamPress(teams[0].id)}
-            className="flex-row items-center gap-4 p-4"
-          >
-            <TeamShield shieldUrl={teams[0].shieldUrl} size={52} isMyTeam />
-            <View className="flex-1">
-              <Text className="font-uiBold text-[15px] text-neutral-on-surface">
-                {teams[0].name}
-              </Text>
-              <Text className="font-ui text-[11px] text-neutral-on-surface-variant">
-                {ROLE_LABEL[teams[0].role] ?? teams[0].role}
-              </Text>
-              <Text className="font-ui mt-1 text-[11px] text-neutral-on-surface-variant">
-                {`${teams[0].seasonWins}V ${teams[0].seasonDraws}E ${teams[0].seasonLosses}D`}
-              </Text>
-            </View>
-            <View className="items-end">
-              <>
-                <Text className="font-displayBlack text-2xl text-brand-primary">
-                  {teams[0].eloRating}
-                </Text>
-                <Text className="font-ui text-[10px] uppercase tracking-wider text-neutral-on-surface-variant">
-                  Ranking
-                </Text>
-              </>
-              <View className="mt-1 flex-row items-center gap-1">
-                <AppIcon family="material-community" name="hand-peace" size={11} color="#53E076" />
-                <Text className="font-uiBold text-[11px] text-brand-primary">
-                  {teams[0].fairPlayScore}
-                </Text>
-                <Text className="font-ui text-[10px] text-neutral-outline">FPS</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        // Multiple teams: horizontal scroll cards
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {teams.map((team) => (
-            <TeamRankingCard key={team.id} team={team} onPress={onTeamPress} />
-          ))}
-        </ScrollView>
-      )}
+      {/* Mismo layout con 1, 2 o N equipos. La Home ya scrollea en vertical, asi
+          que apilar no obliga a ningun gesto nuevo para ver el ultimo. */}
+      <View className="gap-3">
+        {teams.map((team) => (
+          <TeamRankingCard key={team.id} team={team} onPress={onTeamPress} />
+        ))}
+      </View>
     </View>
   );
 }

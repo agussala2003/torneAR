@@ -9,7 +9,17 @@ export interface HomeTeamSnapshot {
   id: string;
   name: string;
   shieldUrl: string | null;
+  /**
+   * Puntaje del MEJOR formato del equipo, el mismo criterio que el widget de
+   * Top 3 y la tab Ranking. Ver `lib/team-ranking-format`.
+   */
   eloRating: number;
+  /**
+   * Formato al que pertenece ese puntaje. `null` cuando el equipo nunca jugó un
+   * partido de ranking y la cifra es el ELO global de arranque: ahí no hay
+   * formato que rotular.
+   */
+  rankingFormat: TeamFormat | null;
   fairPlayScore: number;
   seasonWins: number;
   seasonDraws: number;

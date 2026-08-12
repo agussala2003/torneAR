@@ -4,6 +4,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
+import { TeamShield } from '@/components/ui/TeamShield';
 import { useAuth } from '@/context/AuthContext';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { getTeamCategoryLabel, getTeamFormatLabel } from '@/lib/team-options';
@@ -151,8 +152,20 @@ export default function TeamJoinScreen() {
 
         {team ? (
           <View className="mt-7 rounded-xl border border-neutral-outline-variant/40 bg-surface-low p-4">
-            <Text className="font-display text-2xl text-neutral-on-surface">{team.name}</Text>
-            <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">{team.zone}</Text>
+            {/* Escudo a la izquierda: antes del "Enviar solicitud" el usuario
+                solo tenia el nombre para confirmar que el codigo lo llevo al
+                club correcto, y los nombres se repiten entre zonas. */}
+            <View className="flex-row items-center gap-3">
+              <TeamShield shieldUrl={team.shieldUrl} name={team.name} size={52} />
+              <View className="flex-1">
+                <Text className="font-display text-2xl text-neutral-on-surface" numberOfLines={1}>
+                  {team.name}
+                </Text>
+                <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">
+                  {team.zone}
+                </Text>
+              </View>
+            </View>
 
             <View className="mt-3 flex-row items-center gap-2">
               <Text className="font-uiBold rounded bg-brand-primary/15 px-2 py-1 text-[10px] uppercase tracking-wide text-brand-primary">{getTeamCategoryLabel(team.category)}</Text>

@@ -1,5 +1,6 @@
 import { Image, Text, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { calculateAge, formatAge } from '@/lib/age';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { getTeamRoleLabel } from '@/lib/team-options';
 import type { TeamMemberStat } from './types';
@@ -43,6 +44,9 @@ export function TeamMembersSection({ members }: TeamMembersSectionProps) {
             const avatarUrl = member.avatarUrl
               ? getSupabaseStorageUrl('avatars', member.avatarUrl)
               : null;
+            // `null` cuando el jugador no cargo la fecha: no se muestra nada en
+            // vez de un "0 años" o un guion, que se leerian como un dato real.
+            const age = formatAge(calculateAge(member.dateOfBirth));
             return (
               <View
                 key={member.profileId}
@@ -80,7 +84,15 @@ export function TeamMembersSection({ members }: TeamMembersSectionProps) {
                     <Text className="font-uiBold rounded bg-surface-high px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-neutral-on-surface-variant">
                       {positionLabel(member.position)}
                     </Text>
-                    <Text className="font-ui text-[11px] text-neutral-on-surface-variant">
+                    {!!age && (
+                      <Text className="font-ui text-[11px] text-neutral-on-surface-variant">
+                        {age}
+                      </Text>
+                    )}
+                    <Text
+                      className="font-ui flex-1 text-[11px] text-neutral-on-surface-variant"
+                      numberOfLines={1}
+                    >
                       @{member.username}
                     </Text>
                   </View>

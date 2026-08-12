@@ -1,7 +1,6 @@
 import { Text, View } from 'react-native';
-import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { getInitials } from '@/lib/market-utils';
+import { TeamShield } from '@/components/ui/TeamShield';
 import type { RecentMatchResult } from './types';
 
 function formatDate(dateIso: string | null): string {
@@ -52,60 +51,42 @@ function ResultBadge({ result }: { result: 'V' | 'E' | 'D' | null }) {
 }
 
 /**
- * Escudo del rival. `expo-image` y no el `Image` de RN: cachea en disco, y esta
- * lista repite los mismos escudos entre partidos.
- */
-function RivalShield({ shieldUrl, rivalName }: { shieldUrl: string | null; rivalName: string }) {
-  if (shieldUrl) {
-    return (
-      <Image
-        source={{ uri: shieldUrl }}
-        style={{ width: 28, height: 28, borderRadius: 14 }}
-        contentFit="cover"
-      />
-    );
-  }
-
-  // Iniciales antes que un escudo generico: en una lista de partidos el icono
-  // repetido no distingue a un rival de otro.
-  return (
-    <View className="h-7 w-7 items-center justify-center rounded-full bg-surface-high">
-      <Text className="font-uiBold text-[10px] text-neutral-on-surface-variant">
-        {getInitials(rivalName)}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * Badge del movimiento de Ranking.
+ * Movimiento de Ranking del partido.
  *
- * El 0 se muestra en gris y sin signo: "no se movio" es informacion, y pintarlo
- * de verde o rojo sugeriria un cambio que no hubo.
+ * Texto plano debajo del marcador y no un badge con caja: al lado de la fecha
+ * competia con el resultado por la atencion, y la caja lo hacia leer como una
+ * etiqueta mas de la fila. El 0 va en gris y sin signo — "no se movio" es
+ * informacion, y pintarlo de verde o rojo sugeriria un cambio que no hubo.
  */
-function RankDeltaBadge({ delta }: { delta: number }) {
+function RankDelta({ delta }: { delta: number }) {
   const tone =
     delta > 0
-      ? 'bg-brand-primary/15 text-brand-primary'
+      ? 'text-brand-primary'
       : delta < 0
-        ? 'bg-danger-error/15 text-danger-error'
-        : 'bg-surface-high text-neutral-on-surface-variant';
+        ? 'text-danger-error'
+        : 'text-neutral-on-surface-variant';
 
   return (
     <Text
-      className={`font-uiBold rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${tone}`}
+      className={`font-uiBold text-[10px] uppercase tracking-wide ${tone}`}
       style={{ fontVariant: ['tabular-nums'] }}
     >
-      {delta > 0 ? `+${delta}` : delta} Rank
+      {delta > 0 ? `+${delta}` : delta} Rating
     </Text>
   );
 }
 
 type RecentMatchesSectionProps = {
   matches: RecentMatchResult[];
+  /**
+   * El perfil que se esta viendo es el del usuario logueado. Define la persona
+   * del copy de goles: "Anotaste 2" contra "Anotó 2". Sin esto, la pantalla
+   * publica le hablaba de vos al que mira el perfil de otro.
+   */
+  isOwnProfile: boolean;
 };
 
-export function RecentMatchesSection({ matches }: RecentMatchesSectionProps) {
+export function RecentMatchesSection({ matches, isOwnProfile }: RecentMatchesSectionProps) {
   return (
     <View className="mt-8">
       <Text className="font-display mb-3 px-1 text-sm uppercase tracking-wider text-neutral-on-surface-variant">
@@ -127,13 +108,16 @@ export function RecentMatchesSection({ matches }: RecentMatchesSectionProps) {
               <ResultBadge result={match.result} />
 
               <View className="flex-1">
+                {/* Orden de lectura natural: "vs <escudo> Rival". Con el escudo
+                    primero, el "vs" quedaba partido al medio de la frase. */}
                 <View className="flex-row items-center gap-2">
-                  <RivalShield shieldUrl={match.rivalShieldUrl} rivalName={match.rivalName} />
+                  <Text className="font-ui text-sm text-neutral-on-surface-variant">vs</Text>
+                  <TeamShield shieldUrl={match.rivalShieldUrl} name={match.rivalName} size={28} />
                   <Text
                     className="font-uiBold flex-1 text-sm text-neutral-on-surface"
                     numberOfLines={1}
                   >
-                    vs {match.rivalName}
+                    {match.rivalName}
                   </Text>
                 </View>
 
@@ -141,7 +125,6 @@ export function RecentMatchesSection({ matches }: RecentMatchesSectionProps) {
                   <Text className="font-uiBold rounded bg-surface-high px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-neutral-on-surface-variant">
                     {match.matchType === 'RANKING' ? 'Ranking' : 'Amistoso'}
                   </Text>
-                  {match.rankDelta !== null && <RankDeltaBadge delta={match.rankDelta} />}
                   {!!match.scheduledAt && (
                     <Text className="font-ui text-[11px] text-neutral-on-surface-variant">
                       {formatDate(match.scheduledAt)}
@@ -155,7 +138,7 @@ export function RecentMatchesSection({ matches }: RecentMatchesSectionProps) {
                   <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
                     {match.playerGoals > 0 && (
                       <Text className="font-uiBold rounded bg-brand-primary/15 px-1.5 py-0.5 text-[9px] text-brand-primary">
-                        ⚽ Anotaste {match.playerGoals}
+                        ⚽ {isOwnProfile ? 'Anotaste' : 'Anotó'} {match.playerGoals}
                       </Text>
                     )}
                     {match.isMvp && (
@@ -167,18 +150,21 @@ export function RecentMatchesSection({ matches }: RecentMatchesSectionProps) {
                 )}
               </View>
 
-              {match.goalsFor !== null && match.goalsAgainst !== null ? (
-                <Text
-                  className="font-displayBlack text-xl text-neutral-on-surface"
-                  style={{ fontVariant: ['tabular-nums'] }}
-                >
-                  {match.goalsFor}-{match.goalsAgainst}
-                </Text>
-              ) : (
-                <Text className="font-ui text-xs uppercase text-neutral-on-surface-variant">
-                  {statusLabel(match.status)}
-                </Text>
-              )}
+              <View className="items-end gap-0.5">
+                {match.goalsFor !== null && match.goalsAgainst !== null ? (
+                  <Text
+                    className="font-displayBlack text-xl text-neutral-on-surface"
+                    style={{ fontVariant: ['tabular-nums'] }}
+                  >
+                    {match.goalsFor}-{match.goalsAgainst}
+                  </Text>
+                ) : (
+                  <Text className="font-ui text-xs uppercase text-neutral-on-surface-variant">
+                    {statusLabel(match.status)}
+                  </Text>
+                )}
+                {match.rankDelta !== null && <RankDelta delta={match.rankDelta} />}
+              </View>
             </View>
           ))}
         </View>

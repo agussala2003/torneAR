@@ -146,7 +146,7 @@ export default function SeasonAdminScreen() {
       {loading ? (
         <GlobalLoader label="Cargando temporada" />
       ) : (
-        <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 12, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Temporada activa */}
           <View className="mb-4 rounded-2xl bg-surface-container p-4">
             <Text className="font-ui mb-2 text-[11px] uppercase tracking-widest text-neutral-outline">

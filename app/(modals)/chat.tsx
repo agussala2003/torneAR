@@ -17,6 +17,7 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 import { useKeyboardAwareBottomInset } from '@/hooks/useKeyboardAwareBottomInset';
+import { useIsKeyboardVisible } from '@/hooks/useKeyboardHeight';
 import { fetchMessages, sendMessage, markConversationAsRead } from '@/lib/chat-api';
 import type { MarketMessage } from '@/lib/chat-api';
 
@@ -44,6 +45,7 @@ export default function MatchChatScreen() {
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const inputBottomInset = useKeyboardAwareBottomInset();
+  const isKeyboardVisible = useIsKeyboardVisible();
 
   const [header, setHeader] = useState<MatchChatHeader | null>(null);
   const [messages, setMessages] = useState<MarketMessage[]>([]);
@@ -344,8 +346,13 @@ export default function MatchChatScreen() {
              es lo que se reporto. Medido, el offset es correcto en cualquiera.
 
              0 en Android: ahi el empuje lo hace el padding de la barra y el KAV
-             no participa. */
-          keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+             no participa.
+
+             Y 0 tambien con el teclado cerrado: el offset describe cuanto hay
+             que descontar del empuje del teclado, asi que en reposo no tiene
+             nada que compensar y lo unico que hace es correr el input hacia
+             arriba. */
+          keyboardVerticalOffset={Platform.OS === 'ios' && isKeyboardVisible ? headerHeight : 0}
         >
           <FlatList
             ref={flatListRef}

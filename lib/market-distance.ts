@@ -3,34 +3,45 @@ import { Logger } from '@/lib/logger';
 import { distanceInMeters, formatDistance, type Coordinates } from '@/lib/geo';
 
 /**
- * Distancia aproximada entre el usuario y una publicación del Mercado.
+ * Distancia entre el usuario y un complejo, para todas las superficies que la
+ * muestran: tarjetas del Mercado, selector de complejo al crear una oferta y
+ * selector de la propuesta de partido.
  *
- * ## De dónde salen las coordenadas
+ * ## Por qué está centralizado
  *
- * Ni el usuario ni la publicación las tienen directamente:
+ * Las tres pantallas mostraban números distintos para el MISMO predio (el
+ * "100 m acá y 600 m allá" del QA). No era el destino: era el ORIGEN. La
+ * propuesta de partido medía desde el GPS real del dispositivo y el Mercado
+ * desde el centroide de la zona del perfil, así que los dos números eran
+ * correctos y respondían a preguntas distintas. Con el cálculo repartido en
+ * cada pantalla, esa diferencia era invisible desde el código.
  *
- *   · `profiles.zone` es el NOMBRE de la zona (texto). `zones` no tiene lat/lng.
- *   · `market_team_posts.complex` es el NOMBRE del complejo (texto). No hay
- *     `venue_id`: la publicación no está enlazada al catálogo.
+ * Acá se resuelven los DOS extremos con una única prioridad.
  *
- * Lo único con coordenadas reales es `venues`. Así que:
+ * ## Destino (`PostLocation`), de mejor a peor
  *
- *   · **Punto del usuario**: centroide de los complejos de su zona. Es una
- *     aproximación, y es la mejor disponible sin pedirle el GPS (permiso que
- *     hoy sólo se pide en el check-in) ni agregarle lat/lng a `zones`.
- *   · **Punto de la publicación**: si el `complex` coincide con un complejo del
- *     catálogo EN ESA ZONA, sus coordenadas exactas. Si no —el campo admite
- *     texto libre—, el centroide de la zona de la publicación.
+ *   1. `coords` — el aviso está enlazado al catálogo por `venue_id`.
+ *      Coordenadas reales de la cancha. Si están, mandan.
+ *   2. Match del nombre del complejo contra el catálogo, dentro de su zona.
+ *      Cubre los avisos anteriores a la FK que el backfill no alcanzó.
+ *   3. Centroide de la zona del aviso.
  *
  * El emparejamiento por nombre es fiable en la práctica porque el alta del
  * aviso usa un selector de complejos y guarda el nombre del catálogo tal cual
  * (`app/(modals)/market-create.tsx`). Los avisos viejos con texto a mano caen
  * al centroide, que sigue siendo un número honesto a nivel zona.
  *
- * ⚠️ Por eso el badge dice "~": es distancia entre zonas cuando no hay match de
- * complejo, y nunca la distancia desde dónde está parado el usuario ahora.
- * Enlazar `market_team_posts` con `venues` por FK es lo que haría exacto este
- * cálculo, y es una migración pendiente.
+ * ## Origen (`DistanceOrigin`), de mejor a peor
+ *
+ *   1. `coords` — última posición conocida del dispositivo. Sólo se usa si el
+ *      permiso de ubicación YA estaba concedido: ver una distancia no justifica
+ *      pedir un permiso nuevo.
+ *   2. Centroide de los complejos de la zona del perfil. Es la mejor
+ *      aproximación sin GPS — `zones` no tiene lat/lng.
+ *
+ * Por eso `hasPreciseOrigin` acompaña al resultado: con GPS la cifra es la
+ * distancia real desde donde está el usuario; sin GPS es distancia entre zonas,
+ * y la UI la marca con "~" para no prometer una precisión que no tiene.
  */
 
 /** Índice en memoria: se arma una vez por carga del Mercado. */
@@ -131,61 +142,95 @@ export interface PostLocation {
   complex?: string | null;
 }
 
+/** Desde dónde se mide, en orden de precisión decreciente. */
+export interface DistanceOrigin {
+  /**
+   * Última posición conocida del dispositivo. Sólo llega con valor cuando el
+   * permiso de ubicación ya estaba concedido: ver `hooks/useDistanceResolver`.
+   */
+  coords?: Coordinates | null;
+  /** `profiles.zone`. Fallback: centroide de los complejos de esa zona. */
+  zone?: string | null;
+}
+
+/**
+ * Punto de origen resuelto, o `null` si no hay ninguno utilizable.
+ *
+ * Se expone aparte de la distancia porque el llamador necesita saber si la
+ * cifra salió del GPS o de un centroide para decidir cómo rotularla.
+ */
+function resolveOrigin(
+  index: MarketDistanceIndex,
+  origin: DistanceOrigin,
+): { coords: Coordinates; precise: boolean } | null {
+  if (origin.coords) return { coords: origin.coords, precise: true };
+
+  if (origin.zone) {
+    const centroid = index.zoneCentroids.get(normalize(origin.zone));
+    if (centroid) return { coords: centroid, precise: false };
+  }
+
+  return null;
+}
+
+/** Destino resuelto siguiendo `coords` > match por nombre > centroide de zona. */
+function resolveDestination(
+  index: MarketDistanceIndex,
+  post: PostLocation,
+): Coordinates | null {
+  return (
+    post.coords ??
+    (post.zone && post.complex ? index.venueCoords.get(venueKey(post.zone, post.complex)) : undefined) ??
+    (post.zone ? index.zoneCentroids.get(normalize(post.zone)) : undefined) ??
+    null
+  );
+}
+
 /**
  * Metros entre el usuario y la publicación, o `null` si falta algún extremo.
  *
- * Tres niveles de precisión para el destino, de mejor a peor:
- *
- *   1. `coords` — el aviso está enlazado a un complejo del catálogo por
- *      `venue_id`. Coordenadas reales de la cancha.
- *   2. Match del nombre del complejo contra el catálogo, dentro de su zona.
- *      Cubre los avisos anteriores a la FK que el backfill no alcanzó.
- *   3. Centroide de la zona del aviso.
- *
- * El ORIGEN sigue siendo el centroide de la zona del usuario en los tres
- * casos: `profiles` no guarda coordenadas y pedir el GPS acá sería un permiso
- * nuevo en una pantalla de navegación. Por eso la etiqueta lleva "~" aunque el
- * destino sea exacto.
- *
- * `null` cuando el usuario no cargó zona o cuando su zona no tiene complejos
- * con coordenadas: el llamador no dibuja el badge, que es preferible a mostrar
- * un número inventado.
+ * `null` cuando no hay origen utilizable (sin GPS y sin zona cargada, o con una
+ * zona sin complejos con coordenadas) o cuando el aviso no ubica en ningún
+ * lado: el llamador no dibuja el badge, que es preferible a mostrar un número
+ * inventado.
  */
 export function resolveDistanceMeters(
   index: MarketDistanceIndex,
-  userZone: string | null | undefined,
+  origin: DistanceOrigin,
   post: PostLocation,
 ): number | null {
-  if (!userZone) return null;
-
-  const from = index.zoneCentroids.get(normalize(userZone));
+  const from = resolveOrigin(index, origin);
   if (!from) return null;
 
-  const to =
-    post.coords ??
-    (post.zone && post.complex ? index.venueCoords.get(venueKey(post.zone, post.complex)) : undefined) ??
-    (post.zone ? index.zoneCentroids.get(normalize(post.zone)) : undefined);
+  const to = resolveDestination(index, post);
   if (!to) return null;
 
-  return distanceInMeters(from, to);
+  return distanceInMeters(from.coords, to);
 }
 
 /**
  * Etiqueta lista para el badge, o `null` si no hay distancia que mostrar.
  *
- * El "~" no es decorativo: avisa que el origen es el centro de la zona del
- * usuario y no su posición real (ver el bloque de arriba).
+ * El "~" no es decorativo: aparece sólo cuando se midió desde el centro de la
+ * zona del usuario y no desde su posición real. Con GPS la cifra va sin tilde
+ * porque sí es la distancia desde donde está parado.
  */
 export function resolveDistanceLabel(
   index: MarketDistanceIndex,
-  userZone: string | null | undefined,
+  origin: DistanceOrigin,
   post: PostLocation,
 ): string | null {
-  const meters = resolveDistanceMeters(index, userZone, post);
-  if (meters === null) return null;
+  const from = resolveOrigin(index, origin);
+  if (!from) return null;
 
-  // Misma zona y mismo complejo: "a 100 m" mentiría por redondeo hacia arriba.
-  if (meters < 50) return '📍 En tu zona';
+  const to = resolveDestination(index, post);
+  if (!to) return null;
 
-  return `📍 ${formatDistance(meters)}`;
+  const meters = distanceInMeters(from.coords, to);
+
+  // Mismo punto: "a 100 m" mentiría por el redondeo hacia arriba de
+  // `formatDistance`.
+  if (meters < 50) return from.precise ? '📍 Estás acá' : '📍 En tu zona';
+
+  return `📍 ${from.precise ? '' : '~ '}${formatDistance(meters)}`;
 }

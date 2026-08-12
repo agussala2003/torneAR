@@ -19,6 +19,7 @@ import { Logger } from '@/lib/logger';
 import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
 import { TEAM_FORMAT_OPTIONS, TeamFormat } from '@/lib/team-options';
 import { fetchVenuesByZoneName, VenueEntry } from '@/lib/venue-data';
+import { useDistanceResolver } from '@/hooks/useDistanceResolver';
 import {
   createTeamPostSchema,
   createPlayerPostSchema,
@@ -54,6 +55,7 @@ export default function MarketCreateModal() {
   const [venues, setVenues] = useState<VenueEntry[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<VenueEntry | null>(null);
   const [loadingVenues, setLoadingVenues] = useState(false);
+  const { label: distanceLabel } = useDistanceResolver();
   const [pitchType, setPitchType] = useState<TeamFormat | null>(null);
 
   // Específicos de Jugador
@@ -374,7 +376,23 @@ export default function MarketCreateModal() {
                               )}
                             </View>
                             <View className="flex-1">
-                              <Text className="font-uiBold text-sm text-neutral-on-surface">{v.name}</Text>
+                              <View className="flex-row items-center justify-between gap-2">
+                                <Text className="font-uiBold flex-1 text-sm text-neutral-on-surface">{v.name}</Text>
+                                {/* Misma resolución que el Mercado y la propuesta
+                                    de partido: sin esto el usuario elegía a ciegas
+                                    y recién veía la distancia con el aviso ya
+                                    publicado. */}
+                                {(() => {
+                                  const distance = distanceLabel({
+                                    coords: v.lat != null && v.lng != null ? { lat: v.lat, lng: v.lng } : null,
+                                    zone,
+                                    complex: v.name,
+                                  });
+                                  return distance ? (
+                                    <Text className="font-ui text-[11px] text-brand-primary">{distance}</Text>
+                                  ) : null;
+                                })()}
+                              </View>
                               {v.address && (
                                 <Text className="font-ui text-xs text-neutral-on-surface-variant">{v.address}</Text>
                               )}

@@ -4,7 +4,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { MarketTeamCard, MarketPlayerCard } from '@/components/market/MarketCards';
 import { MarketCardSkeleton } from '@/components/market/MarketCardSkeleton';
 import { MarketTeamPost, MarketPlayerPost } from '@/lib/market-api';
-import { resolveDistanceLabel, type MarketDistanceIndex } from '@/lib/market-distance';
+import type { PostLocation } from '@/lib/market-distance';
 import { TabType } from './types';
 
 interface MarketListSectionProps {
@@ -22,10 +22,12 @@ interface MarketListSectionProps {
   onViewApplications: (postId: string, postType: 'TEAM' | 'PLAYER') => void;
   memberStatusMap?: Record<string, 'own_team' | 'own_player'>;
   applicationCounts?: Record<string, number>;
-  /** Índice de complejos para el badge de distancia. Ver `lib/market-distance`. */
-  distanceIndex?: MarketDistanceIndex;
-  /** Zona del usuario: el origen desde el que se mide. */
-  userZone?: string | null;
+  /**
+   * Etiqueta de distancia de una publicación. Viene resuelta de
+   * `useDistanceResolver` para que el origen sea el mismo que en los selectores
+   * de complejo. Ver `lib/market-distance`.
+   */
+  resolveDistanceLabel?: (post: PostLocation) => string | null;
 }
 
 export function MarketListSection({
@@ -43,8 +45,7 @@ export function MarketListSection({
   onViewApplications,
   memberStatusMap,
   applicationCounts,
-  distanceIndex,
-  userZone,
+  resolveDistanceLabel,
 }: MarketListSectionProps) {
   if (isLoading) {
     return (
@@ -84,19 +85,17 @@ export function MarketListSection({
           applicationCount={applicationCounts?.[post.id]}
           onViewApplications={() => onViewApplications(post.id, 'TEAM')}
           distanceLabel={
-            distanceIndex
-              ? resolveDistanceLabel(distanceIndex, userZone, {
-                  // Coordenadas exactas cuando el aviso está enlazado al
-                  // catálogo por `venue_id`; si no, el helper cae al match por
-                  // nombre y después al centroide de la zona.
-                  coords:
-                    post.venues?.lat != null && post.venues?.lng != null
-                      ? { lat: post.venues.lat, lng: post.venues.lng }
-                      : null,
-                  zone: post.zone,
-                  complex: post.complex,
-                })
-              : null
+            resolveDistanceLabel?.({
+              // Coordenadas exactas cuando el aviso está enlazado al catálogo
+              // por `venue_id`; si no, el helper cae al match por nombre y
+              // después al centroide de la zona.
+              coords:
+                post.venues?.lat != null && post.venues?.lng != null
+                  ? { lat: post.venues.lat, lng: post.venues.lng }
+                  : null,
+              zone: post.zone,
+              complex: post.complex,
+            }) ?? null
           }
         />
       );

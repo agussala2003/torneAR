@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 import { averageAge } from '@/lib/age';
+import { resolveShieldUrl } from '@/lib/supabase-storage';
 import { Database } from '@/types/supabase';
 import type {
   TeamStatsViewData,
@@ -39,8 +40,8 @@ type MatchRaw = {
   match_type: string;
   team_a_id: string;
   team_b_id: string;
-  team_a: { name: string } | null;
-  team_b: { name: string } | null;
+  team_a: { name: string; shield_url: string | null } | null;
+  team_b: { name: string; shield_url: string | null } | null;
   match_results: { team_id: string; goals_scored: number; goals_against: number }[];
 };
 
@@ -103,7 +104,7 @@ export async function fetchTeamStatsViewData(
   teamId: string,
   currentProfileId: string | null,
 ): Promise<TeamStatsViewData> {
-  const [teamRes, matchesRes, membersRes, eloHistoryRes] = await Promise.all([
+  const [teamRes, matchesRes, membersRes, eloHistoryRes, playedRes] = await Promise.all([
     supabase
       .from('teams')
       .select(
@@ -116,8 +117,8 @@ export async function fetchTeamStatsViewData(
       .select(`
         id, scheduled_at, status, match_type,
         team_a_id, team_b_id,
-        team_a:teams!team_a_id(name),
-        team_b:teams!team_b_id(name),
+        team_a:teams!team_a_id(name, shield_url),
+        team_b:teams!team_b_id(name, shield_url),
         match_results(team_id, goals_scored, goals_against)
       `)
       .or(`team_a_id.eq.${teamId},team_b_id.eq.${teamId}`)
@@ -133,6 +134,14 @@ export async function fetchTeamStatsViewData(
       .eq('team_id', teamId)
       .order('created_at', { ascending: false })
       .limit(10),
+    // Todos los partidos que el equipo efectivamente jugó, sin `limit`: es el
+    // denominador de la presencia y la población sobre la que se cuentan PJ y
+    // goles de cada jugador. Sólo ids, así que traerlos completos es barato.
+    supabase
+      .from('matches')
+      .select('id')
+      .or(`team_a_id.eq.${teamId},team_b_id.eq.${teamId}`)
+      .eq('status', 'FINALIZADO'),
   ]);
 
   if (teamRes.error) throw teamRes.error;
@@ -169,13 +178,16 @@ export async function fetchTeamStatsViewData(
   // Season record
   const totalMatches = team.season_wins + team.season_draws + team.season_losses;
   const season: TeamSeasonRecord = {
+    played: totalMatches,
     wins: team.season_wins,
     draws: team.season_draws,
     losses: team.season_losses,
     goalsFor: team.season_goals_for,
     goalsAgainst: team.season_goals_against,
+    goalDiff: team.season_goals_for - team.season_goals_against,
     winPercent: percent(team.season_wins, totalMatches),
     avgGoals: ratio(team.season_goals_for, totalMatches),
+    avgGoalsAgainst: ratio(team.season_goals_against, totalMatches),
   };
 
   // Build elo delta map for quick lookup
@@ -189,10 +201,8 @@ export async function fetchTeamStatsViewData(
 
   // Recent matches (sorted already by scheduled_at desc)
   const recentMatches: TeamRecentMatch[] = matches.map((match) => {
-    const rivalName =
-      match.team_a_id === teamId
-        ? (match.team_b?.name ?? 'Rival')
-        : (match.team_a?.name ?? 'Rival');
+    const rival = match.team_a_id === teamId ? match.team_b : match.team_a;
+    const rivalName = rival?.name ?? 'Rival';
     const { result, goalsFor, goalsAgainst } = matchResult(teamId, match);
     return {
       id: match.id,
@@ -200,6 +210,7 @@ export async function fetchTeamStatsViewData(
       status: match.status,
       matchType: match.match_type,
       rivalName,
+      rivalShieldUrl: resolveShieldUrl(rival?.shield_url),
       goalsFor,
       goalsAgainst,
       result,
@@ -213,18 +224,58 @@ export async function fetchTeamStatsViewData(
     .slice(0, 5)
     .map((m) => m.result!);
 
-  // Members with participation stats
-  // Fetch match_participants counts per member in this team
-  const profileIds = memberRows.map((m) => m.profile_id);
-  let participationMap = new Map<string, { matchesPlayed: number; goals: number }>();
+  /*
+   * Presencia, PJ y goles del plantel.
+   *
+   * Los tres se miden sobre LA MISMA población: los partidos que el equipo
+   * efectivamente jugó (`FINALIZADO`). Antes cada número salía de un universo
+   * distinto y por eso la presencia daba mal:
+   *
+   *   · El numerador contaba todas las filas de `match_participants` del
+   *     jugador en el equipo, de siempre y sin mirar el estado del partido —
+   *     entraban convocatorias a partidos pendientes, cancelados y de
+   *     temporadas anteriores.
+   *   · El denominador era `season_wins + draws + losses`, que es de la
+   *     temporada EN CURSO y `transition_season` lo resetea a cero.
+   *
+   * Con el reset de temporada el numerador seguía acumulando contra un
+   * denominador en cero, así que el porcentaje se disparaba muy por encima de
+   * 100 apenas empezaba una temporada nueva.
+   *
+   * Acotando el numerador a `playedMatchIds` queda contenido en el denominador
+   * por construcción: la presencia no puede pasar de 100%.
+   *
+   * Los W.O. no cuentan como partido disputado: nadie los jugó, y sumarlos al
+   * denominador bajaría la presencia de todo el plantel por un partido que no
+   * existió.
+   */
+  if (playedRes.error) {
+    Logger.warn('No se pudieron leer los partidos jugados del equipo; presencia y goles quedan en cero', {
+      scope: 'teamStats.fetchTeamStatsViewData',
+      teamId,
+      error: playedRes.error,
+    });
+  }
+  const playedMatchIds = ((playedRes.data as { id: string }[]) ?? []).map((row) => row.id);
+  const totalTeamMatches = playedMatchIds.length;
 
-  if (profileIds.length > 0) {
-    const [participantsRes] = await Promise.all([
+  const profileIds = memberRows.map((m) => m.profile_id);
+  const participationMap = new Map<string, { matchesPlayed: number; goals: number }>();
+
+  if (profileIds.length > 0 && playedMatchIds.length > 0) {
+    const [participantsRes, resultsRes] = await Promise.all([
       supabase
         .from('match_participants')
         .select('profile_id')
         .eq('team_id', teamId)
-        .in('profile_id', profileIds),
+        .in('profile_id', profileIds)
+        .in('match_id', playedMatchIds),
+      // Goals from match_results scorers jsonb
+      supabase
+        .from('match_results')
+        .select('scorers')
+        .eq('team_id', teamId)
+        .in('match_id', playedMatchIds),
     ]);
 
     if (!participantsRes.error) {
@@ -238,36 +289,21 @@ export async function fetchTeamStatsViewData(
       }
     }
 
-    // Goals from match_results scorers jsonb
-    const finishedMatchIds = matches
-      .filter((m) => m.status === 'FINALIZADO')
-      .map((m) => m.id);
-
-    if (finishedMatchIds.length > 0) {
-      const resultsRes = await supabase
-        .from('match_results')
-        .select('scorers')
-        .eq('team_id', teamId)
-        .in('match_id', finishedMatchIds);
-
-      if (!resultsRes.error && resultsRes.data) {
-        for (const row of resultsRes.data as { scorers: { profile_id: string; goals: number }[] }[]) {
-          for (const scorer of row.scorers ?? []) {
-            const current = participationMap.get(scorer.profile_id) ?? {
-              matchesPlayed: 0,
-              goals: 0,
-            };
-            participationMap.set(scorer.profile_id, {
-              ...current,
-              goals: current.goals + (scorer.goals ?? 0),
-            });
-          }
+    if (!resultsRes.error && resultsRes.data) {
+      for (const row of resultsRes.data as { scorers: { profile_id: string; goals: number }[] }[]) {
+        for (const scorer of row.scorers ?? []) {
+          const current = participationMap.get(scorer.profile_id) ?? {
+            matchesPlayed: 0,
+            goals: 0,
+          };
+          participationMap.set(scorer.profile_id, {
+            ...current,
+            goals: current.goals + (scorer.goals ?? 0),
+          });
         }
       }
     }
   }
-
-  const totalTeamMatches = team.season_wins + team.season_draws + team.season_losses;
 
   const members: TeamMemberStat[] = memberRows.map((m) => {
     const stats = participationMap.get(m.profile_id) ?? { matchesPlayed: 0, goals: 0 };
@@ -278,6 +314,7 @@ export async function fetchTeamStatsViewData(
       avatarUrl: m.profiles!.avatar_url,
       position: m.profiles!.preferred_position,
       role: m.role,
+      dateOfBirth: m.profiles!.date_of_birth,
       matchesPlayed: stats.matchesPlayed,
       goals: stats.goals,
       presencePercent: percent(stats.matchesPlayed, totalTeamMatches),

@@ -183,7 +183,7 @@ export default function AdminLogsScreen() {
       <SecondaryHeader title="Logs de la app" />
 
       {/* Filtro por nivel */}
-      <View className="flex-row gap-2 px-4 pb-3">
+      <View className="flex-row gap-2 px-4 pb-3 pt-3">
         {FILTERS.map((option) => {
           const active = option.value === filter;
           return (

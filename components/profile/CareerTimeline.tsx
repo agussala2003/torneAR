@@ -9,6 +9,13 @@ import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
 type CareerTimelineProps = {
   profileId: string;
+  /**
+   * La trayectoria es la misma para todos, pero el vacio no: en la tab de
+   * Perfil el mensaje invita a sumarse a un equipo, y en la pantalla publica de
+   * otro jugador esa invitacion no aplica. Default `true` porque la tab de
+   * Perfil solo muestra el perfil propio.
+   */
+  isOwnProfile?: boolean;
 };
 
 function SectionTitle({ children }: { children: string }) {
@@ -69,7 +76,7 @@ function GuestAppearanceRow({ guest }: { guest: GuestAppearance }) {
   );
 }
 
-export function CareerTimeline({ profileId }: CareerTimelineProps) {
+export function CareerTimeline({ profileId, isOwnProfile = true }: CareerTimelineProps) {
   const { career, loading, error, reload } = usePlayerCareer(profileId);
 
   if (loading) {
@@ -116,7 +123,11 @@ export function CareerTimeline({ profileId }: CareerTimelineProps) {
             compact
             icon="timeline-text-outline"
             title="Sin historial"
-            description="Tu trayectoria se escribe con cada partido: sumate a un equipo y jugá tu primer encuentro para empezar a construirla."
+            description={
+              isOwnProfile
+                ? 'Tu trayectoria se escribe con cada partido: sumate a un equipo y jugá tu primer encuentro para empezar a construirla.'
+                : 'Este jugador todavía no tiene pasos por equipos registrados.'
+            }
           />
         </View>
       </View>

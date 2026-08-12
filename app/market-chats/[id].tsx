@@ -31,6 +31,7 @@ import {
 } from '@/lib/chat-api';
 import { fetchTeamInviteCode } from '@/lib/market-api';
 import { useKeyboardAwareBottomInset } from '@/hooks/useKeyboardAwareBottomInset';
+import { useIsKeyboardVisible } from '@/hooks/useKeyboardHeight';
 
 function formatRole(role: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | null): string {
   if (!role) return '';
@@ -55,6 +56,7 @@ export default function MarketChatScreen() {
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const inputBottomInset = useKeyboardAwareBottomInset();
+  const isKeyboardVisible = useIsKeyboardVisible();
 
   const [messages, setMessages] = useState<MarketMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -454,8 +456,12 @@ export default function MarketChatScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           /* Medido y no fijo: con SecondaryHeader la cabecera va de ~78 a ~115
              segun el inset del equipo, y un offset corto deja el input debajo
-             del teclado en los dispositivos con notch. */
-          keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
+             del teclado en los dispositivos con notch.
+
+             0 con el teclado cerrado: el offset describe cuanto hay que
+             descontar del empuje del teclado, asi que en reposo no tiene nada
+             que compensar y lo unico que hace es correr el input hacia arriba. */
+          keyboardVerticalOffset={Platform.OS === 'ios' && isKeyboardVisible ? headerHeight : 0}
         >
           <FlatList
             ref={flatListRef}

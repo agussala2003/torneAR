@@ -133,7 +133,7 @@ export default function WoReviewScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 12, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {claims.map((c) => (
             <View key={c.claimId} className="mb-4 rounded-2xl bg-surface-container p-4">
               {/* Equipos + fecha */}

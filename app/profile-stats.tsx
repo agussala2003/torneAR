@@ -14,11 +14,17 @@ import { StatsOverview } from '@/components/profile-stats/StatsOverview';
 import { RecentMatchesSection } from '@/components/profile-stats/RecentMatchesSection';
 import { BadgesSection } from '@/components/profile-stats/BadgesSection';
 import { TeamsSection } from '@/components/profile-stats/TeamsSection';
+import { CareerTimeline } from '@/components/profile/CareerTimeline';
 
 export default function ProfileStatsScreen() {
   const { profile } = useAuth();
   const { profileId: paramProfileId } = useLocalSearchParams<{ profileId?: string }>();
   const profileId = paramProfileId ?? profile?.id ?? null;
+
+  // Sin `profileId` en los params la pantalla ya cae en el perfil propio, pero
+  // se compara contra el id resuelto y no contra la ausencia del param: a las
+  // stats propias tambien se llega con el id explicito desde la tab de Perfil.
+  const isOwnProfile = !!profile?.id && profileId === profile.id;
 
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<ProfileStatsViewData | null>(null);
@@ -68,9 +74,12 @@ export default function ProfileStatsScreen() {
       <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 16, paddingBottom: 114 }}>
         <StatsHeader profile={viewData.profile} />
         <StatsOverview stats={viewData.stats} />
-        <RecentMatchesSection matches={viewData.recentMatches} />
+        <RecentMatchesSection matches={viewData.recentMatches} isOwnProfile={isOwnProfile} />
         <BadgesSection badges={viewData.badges} />
         <TeamsSection teams={viewData.teams} />
+        {/* Misma seccion que en la tab de Perfil: la trayectoria es publica y
+            faltaba justo en la pantalla a la que se llega desde el rival. */}
+        <CareerTimeline profileId={viewData.profile.id} isOwnProfile={isOwnProfile} />
       </ScrollView>
       {AlertComponent}
     </View>

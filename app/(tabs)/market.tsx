@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -13,11 +13,7 @@ import { useTeamStore } from '@/stores/teamStore';
 import { fetchMarketViewData } from '@/lib/market-data';
 import { togglePostStatus } from '@/lib/market-api';
 import { filterPostsByDay, resolveApplicantTeam } from '@/lib/market-utils';
-import {
-  fetchMarketDistanceIndex,
-  EMPTY_DISTANCE_INDEX,
-  type MarketDistanceIndex,
-} from '@/lib/market-distance';
+import { useDistanceResolver } from '@/hooks/useDistanceResolver';
 import { useTabBarInset } from '@/hooks/useTabBarInset';
 import { MarketViewData, TabType } from '@/components/market/types';
 import { getOrCreateMarketChat } from '@/lib/chat-api';
@@ -52,9 +48,9 @@ export default function MarketScreen() {
   const [activeCaptainTeamId, setActiveCaptainTeamId] = useState<string | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<{ id: string; isTeamPost: boolean } | null>(null);
   const [applicationCounts, setApplicationCounts] = useState<Record<string, number>>({});
-  // Catálogo de complejos para el badge de distancia. Una sola carga por montaje:
-  // las coordenadas de las canchas no cambian entre refrescos de la lista.
-  const [distanceIndex, setDistanceIndex] = useState<MarketDistanceIndex>(EMPTY_DISTANCE_INDEX);
+  // Badge de distancia. El hook resuelve origen y destino con la misma
+  // prioridad que el selector de complejo y el de la propuesta de partido.
+  const { label: distanceLabel } = useDistanceResolver();
   const fabBottom = useTabBarInset({ gap: 16 });
 
   const loadMarketData = useCallback(async (showFullLoader = true) => {
@@ -113,13 +109,6 @@ export default function MarketScreen() {
       void loadMarketData(true);
     }, [loadMarketData])
   );
-
-  // Fuera del focus effect a propósito: el catálogo de complejos no cambia
-  // entre entradas a la tab, así que se carga una sola vez por montaje en vez
-  // de en cada refresco de la lista.
-  useEffect(() => {
-    void fetchMarketDistanceIndex().then(setDistanceIndex);
-  }, []);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -405,8 +394,7 @@ export default function MarketScreen() {
           onViewApplications={handleViewApplications}
           memberStatusMap={memberStatusMap}
           applicationCounts={applicationCounts}
-          distanceIndex={distanceIndex}
-          userZone={profile?.zone}
+          resolveDistanceLabel={distanceLabel}
         />
       </View>
 

@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { resolveBestFormatRanking, type FormatRankingRow } from '@/lib/team-ranking-format';
 import type { Database } from '@/types/supabase';
 import type {
     RankingFiltersState, RankingTeamEntry, RivalTeamEntry,
@@ -158,21 +159,19 @@ export async function fetchActiveTeamRankingInfo(teamId: string): Promise<Active
         });
     }
 
-    const rankings = (rankingsRes.data ?? []) as {
-        format: Database['public']['Enums']['team_format'];
-        elo_score: number;
-    }[];
-
-    const best = rankings.reduce<(typeof rankings)[number] | null>(
-        (top, row) => (top === null || row.elo_score > top.elo_score ? row : top),
-        null,
-    );
+    // Mismo resolvedor que usa la Home para la tarjeta de Mis Equipos: es lo
+    // que garantiza que las dos pantallas muestren la misma cifra y el mismo
+    // formato para el mismo equipo.
+    const best = resolveBestFormatRanking((rankingsRes.data ?? []) as FormatRankingRow[], {
+        eloRating: data.elo_rating,
+        format: data.preferred_format,
+    });
 
     return {
-        eloRating: best?.elo_score ?? data.elo_rating,
+        eloRating: best.eloRating,
         zone: data.zone,
         category: data.category,
-        format: best?.format ?? data.preferred_format,
+        format: best.format,
     };
 }
 

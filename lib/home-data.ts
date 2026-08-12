@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { fetchGuestMatchSides } from '@/lib/guest-matches-data';
+import { resolveBestFormatRanking, type FormatRankingRow } from '@/lib/team-ranking-format';
 import type { Database } from '@/types/supabase';
 import type {
   HomeViewData,
@@ -28,6 +30,7 @@ type TeamMemberRow = {
     season_wins: number;
     season_draws: number;
     season_losses: number;
+    preferred_format: Database['public']['Enums']['team_format'];
   } | null;
 };
 
@@ -159,7 +162,7 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
   const { data: memberData, error: memberError } = await supabase
     .from('team_members')
     .select(
-      'team_id, role, teams(id, name, elo_rating, shield_url, fair_play_score, season_wins, season_draws, season_losses)',
+      'team_id, role, teams(id, name, elo_rating, shield_url, fair_play_score, season_wins, season_draws, season_losses, preferred_format)',
     )
     .eq('profile_id', profileId);
 
@@ -479,19 +482,63 @@ export async function fetchHomeViewData(profileId: string): Promise<HomeViewData
     { type: 'MARKET_APPLICATION', count: marketApplicationCount },
   ]);
 
-  const myTeams: HomeTeamSnapshot[] = memberRows.map((r) => ({
-    id: r.teams!.id,
-    name: r.teams!.name,
-    shieldUrl: r.teams!.shield_url
-      ? getSupabaseStorageUrl('shields', r.teams!.shield_url)
-      : null,
-    eloRating: r.teams!.elo_rating,
-    fairPlayScore: r.teams!.fair_play_score ?? 100,
-    seasonWins: r.teams!.season_wins ?? 0,
-    seasonDraws: r.teams!.season_draws ?? 0,
-    seasonLosses: r.teams!.season_losses ?? 0,
-    role: r.role,
-  }));
+  /*
+   * RANKING de la tarjeta: el del MEJOR formato, no `teams.elo_rating`.
+   *
+   * El widget de Top 3 de esta misma pantalla resuelve el puntaje contra
+   * `team_rankings` por formato, y la tarjeta leía el ELO global: el mismo
+   * equipo aparecía con 1000 arriba y 961 abajo, a dos bloques de distancia.
+   * Los dos números eran ciertos y por eso la incoherencia parecía un bug de
+   * datos y no de criterio.
+   *
+   * Una sola consulta para todos los equipos del usuario en vez de una por
+   * tarjeta: son pocas filas y ya se conocen los `teamIds`.
+   */
+  const { data: formatRankings, error: formatRankingsError } = await supabase
+    .from('team_rankings')
+    .select('team_id, format, elo_score')
+    .in('team_id', teamIds);
+
+  if (formatRankingsError) {
+    // Degradar al ELO global es exactamente el comportamiento anterior, así que
+    // la Home se muestra igual. Queda registrado porque el síntoma —la cifra
+    // vuelve a discrepar con el widget— es idéntico al bug que esto arregla.
+    Logger.warn('No se pudieron leer los ELO por formato; se usa el ELO global del equipo', {
+      scope: 'home-data.fetchHomeViewData',
+      profileId,
+      error: formatRankingsError,
+    });
+  }
+
+  const rankingsByTeam = new Map<string, FormatRankingRow[]>();
+  for (const row of (formatRankings ?? []) as (FormatRankingRow & { team_id: string })[]) {
+    const current = rankingsByTeam.get(row.team_id) ?? [];
+    current.push({ format: row.format, elo_score: row.elo_score });
+    rankingsByTeam.set(row.team_id, current);
+  }
+
+  const myTeams: HomeTeamSnapshot[] = memberRows.map((r) => {
+    const team = r.teams!;
+    const ranking = resolveBestFormatRanking(rankingsByTeam.get(team.id) ?? [], {
+      eloRating: team.elo_rating,
+      format: team.preferred_format,
+    });
+
+    return {
+      id: team.id,
+      name: team.name,
+      shieldUrl: team.shield_url ? getSupabaseStorageUrl('shields', team.shield_url) : null,
+      eloRating: ranking.eloRating,
+      // `null` cuando el equipo nunca jugó un partido de ranking: la tarjeta no
+      // rotula con un formato que todavía no disputó.
+      rankingFormat: ranking.isFallback ? null : ranking.format,
+      fairPlayScore: team.fair_play_score ?? 100,
+      seasonWins: team.season_wins ?? 0,
+      seasonDraws: team.season_draws ?? 0,
+      seasonLosses: team.season_losses ?? 0,
+      role: r.role,
+    };
+  });
 
   return { myTeams, upcomingMatches, pendingActions, pendingTransfers };
 }
