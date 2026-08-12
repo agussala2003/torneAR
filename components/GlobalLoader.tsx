@@ -8,7 +8,7 @@ type GlobalLoaderProps = {
 export function GlobalLoader({ label = 'Cargando...' }: GlobalLoaderProps) {
   return (
     <View className="absolute inset-0 z-50 items-center justify-center bg-surface-base/95 px-6">
-      <View className="h-28 w-28 items-center justify-center">
+      <View className="h-48 w-48 items-center justify-center">
         <LottieView
           autoPlay
           loop
