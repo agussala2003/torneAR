@@ -5,8 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Modal,
 } from 'react-native';
@@ -31,7 +29,6 @@ import {
 } from '@/lib/chat-api';
 import { fetchTeamInviteCode } from '@/lib/market-api';
 import { useKeyboardAwareBottomInset } from '@/hooks/useKeyboardAwareBottomInset';
-import { useIsKeyboardVisible } from '@/hooks/useKeyboardHeight';
 
 function formatRole(role: 'CAPITAN' | 'SUBCAPITAN' | 'JUGADOR' | null): string {
   if (!role) return '';
@@ -56,7 +53,6 @@ export default function MarketChatScreen() {
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const inputBottomInset = useKeyboardAwareBottomInset();
-  const isKeyboardVisible = useIsKeyboardVisible();
 
   const [messages, setMessages] = useState<MarketMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -73,8 +69,6 @@ export default function MarketChatScreen() {
   // A13: mensajes optimistas que no se pudieron entregar. Estado efímero y local
   // a la pantalla a propósito — no es dominio y no sobrevive a salir del chat.
   const [failedMessageIds, setFailedMessageIds] = useState<string[]>([]);
-  // Alto real de la cabecera: alimenta el `keyboardVerticalOffset` del KAV.
-  const [headerHeight, setHeaderHeight] = useState(0);
 
   useEffect(() => {
     if (!profile || !id) return;
@@ -415,7 +409,7 @@ export default function MarketChatScreen() {
           slot de acciones: es identidad del chat, no una accion, pero es el
           unico lugar donde no compite por ancho con un nombre largo. */}
       {/* La altura se mide, no se asume: alimenta el offset del KAV. */}
-      <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
+      <View>
       <SecondaryHeader
         title={chatTitle}
         subtitle={chatData ? chatSubtitle : undefined}
@@ -446,23 +440,12 @@ export default function MarketChatScreen() {
           <ActivityIndicator size="large" color="#00E65B" />
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          /* Sólo iOS. En Android el empuje lo hace el padding de la barra
-             (`useKeyboardAwareBottomInset`): con edge-to-edge el KAV mide su
-             frame por debajo de la barra de navegación y al replegarse el
-             teclado deja un residuo que nunca vuelve a cero. Con los dos
-             mecanismos activos ese residuo se sumaba al inset de reposo. */
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          /* Medido y no fijo: con SecondaryHeader la cabecera va de ~78 a ~115
-             segun el inset del equipo, y un offset corto deja el input debajo
-             del teclado en los dispositivos con notch.
-
-             0 con el teclado cerrado: el offset describe cuanto hay que
-             descontar del empuje del teclado, asi que en reposo no tiene nada
-             que compensar y lo unico que hace es correr el input hacia arriba. */
-          keyboardVerticalOffset={Platform.OS === 'ios' && isKeyboardVisible ? headerHeight : 0}
-        >
+        // Sin KeyboardAvoidingView: el empuje lo hace el padding de la barra de
+        // input (`useKeyboardAwareBottomInset`), calculado desde el alto real del
+        // teclado. El KAV medía su propio frame contra la coordenada absoluta del
+        // teclado, y esas dos coordenadas sólo coinciden si el contenedor llega
+        // justo al borde inferior de la pantalla.
+        <View className="flex-1">
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -562,7 +545,7 @@ export default function MarketChatScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
       <Modal
         visible={showInviteConfirmModal}

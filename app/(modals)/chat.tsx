@@ -5,8 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -17,7 +15,6 @@ import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
 import { useKeyboardAwareBottomInset } from '@/hooks/useKeyboardAwareBottomInset';
-import { useIsKeyboardVisible } from '@/hooks/useKeyboardHeight';
 import { fetchMessages, sendMessage, markConversationAsRead } from '@/lib/chat-api';
 import type { MarketMessage } from '@/lib/chat-api';
 
@@ -45,7 +42,6 @@ export default function MatchChatScreen() {
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const inputBottomInset = useKeyboardAwareBottomInset();
-  const isKeyboardVisible = useIsKeyboardVisible();
 
   const [header, setHeader] = useState<MatchChatHeader | null>(null);
   const [messages, setMessages] = useState<MarketMessage[]>([]);
@@ -60,8 +56,6 @@ export default function MatchChatScreen() {
   // a la pantalla a propósito — no es dominio y no sobrevive a salir del chat.
   const [failedMessageIds, setFailedMessageIds] = useState<string[]>([]);
   const [retryToken, setRetryToken] = useState(0);
-  // Alto real de la cabecera: alimenta el `keyboardVerticalOffset` del KAV.
-  const [headerHeight, setHeaderHeight] = useState(0);
 
   // Derive effective myTeamId (from param or from match membership)
   const [myTeamId, setMyTeamId] = useState<string>(paramTeamId ?? '');
@@ -306,9 +300,7 @@ export default function MatchChatScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* La altura se mide, no se asume: es lo que el KeyboardAvoidingView
-          necesita como offset y depende del inset del dispositivo. */}
-      <View onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
+      <View>
         <SecondaryHeader
           title={headerTitle}
           subtitle={header ? `Código: ${header.uniqueCode}` : undefined}
@@ -331,29 +323,13 @@ export default function MatchChatScreen() {
           />
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          /* Sólo iOS. En Android el empuje lo hace el padding de la barra
-             (`useKeyboardAwareBottomInset`): con edge-to-edge el KAV mide su
-             frame por debajo de la barra de navegación y al replegarse el
-             teclado deja un residuo que nunca vuelve a cero. Con los dos
-             mecanismos activos ese residuo se sumaba al inset de reposo. */
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          /* Antes era un 90 fijo. Ese número describía la cabecera vieja de
-             padding fijo; con SecondaryHeader la altura va de ~78 (Android sin
-             notch) a ~115 (Dynamic Island), y con el offset corto el input
-             quedaba tapado por el teclado justo en los equipos con notch — que
-             es lo que se reporto. Medido, el offset es correcto en cualquiera.
-
-             0 en Android: ahi el empuje lo hace el padding de la barra y el KAV
-             no participa.
-
-             Y 0 tambien con el teclado cerrado: el offset describe cuanto hay
-             que descontar del empuje del teclado, asi que en reposo no tiene
-             nada que compensar y lo unico que hace es correr el input hacia
-             arriba. */
-          keyboardVerticalOffset={Platform.OS === 'ios' && isKeyboardVisible ? headerHeight : 0}
-        >
+        // Sin KeyboardAvoidingView: el empuje lo hace el padding de la barra de
+        // input (`useKeyboardAwareBottomInset`), calculado desde el alto real del
+        // teclado. Esta pantalla se presenta como modal —una hoja desplazada
+        // hacia abajo— y el KAV empujaba de menos por exactamente ese
+        // desplazamiento, porque mide su propio frame contra la coordenada
+        // absoluta del teclado: de ahí el input tapado a medias.
+        <View className="flex-1">
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -408,7 +384,7 @@ export default function MatchChatScreen() {
               )}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
     </View>
   );

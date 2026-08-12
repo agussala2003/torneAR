@@ -139,10 +139,32 @@ export default function RankingScreen() {
 
     if (!hasFreshParams && !needsTeamBootstrap) return;
 
+    /*
+     * Los guards se marcan como consumidos ANTES de arrancar el trabajo async
+     * (si no, un segundo render dispararia una carga duplicada), pero eso deja
+     * una ventana peligrosa: si esta corrida se cancela a mitad de camino, los
+     * refs quedan marcados y la corrida siguiente sale por el `return` de
+     * arriba sin haber cargado nada. `bootstrapped` se queda en false para
+     * siempre, el efecto 2 nunca corre y `loading` nunca vuelve a false — la
+     * carga infinita al entrar desde el widget de la Home.
+     *
+     * Pasa justo por esa via y no desde la tab porque la navegacion con params
+     * suma cuatro dependencias mas (`ts`, `zone`, `category`, `format`) que la
+     * ruta va publicando en mas de un render: alcanza con que una llegue un
+     * tick despues para cancelar la corrida en vuelo. Entrando por la tab no
+     * hay params y el efecto corre una sola vez.
+     *
+     * Por eso se guarda el valor anterior y se restaura si la corrida no llego
+     * a publicar su resultado.
+     */
+    const previousTeamKey = bootstrappedTeamRef.current;
+    const previousNonce = consumedNonceRef.current;
     bootstrappedTeamRef.current = teamKey;
     if (hasFreshParams) consumedNonceRef.current = incomingNonce;
 
     let cancelled = false;
+    /** La corrida llego a publicar su resultado (exito o error manejado). */
+    let settled = false;
     setBootstrapped(false);
 
     void (async () => {
@@ -191,9 +213,11 @@ export default function RankingScreen() {
 
         setActiveTeamElo(elo);
         setFilters(defaults);
+        settled = true;
         setBootstrapped(true);
       } catch (error: any) {
         if (cancelled) return;
+        settled = true;
         Logger.error('Fallo el bootstrap del ranking', {
           scope: 'tabs.ranking.bootstrap',
           activeTeamId,
@@ -206,7 +230,15 @@ export default function RankingScreen() {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      // Corrida abortada: se devuelven los guards a su estado anterior para que
+      // la proxima pueda volver a entrar en vez de quedar bloqueada.
+      if (!settled) {
+        bootstrappedTeamRef.current = previousTeamKey;
+        consumedNonceRef.current = previousNonce;
+      }
+    };
   }, [profile, activeTeamId, refreshToken, showAlert, tsParam, zoneParam, categoryParam, formatParam]);
 
   // ── 2) Tabla de ranking: sigue a los filtros ─────────────────────────────────

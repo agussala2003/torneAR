@@ -34,17 +34,3 @@ export function useKeyboardHeight(): number {
 
   return height;
 }
-
-/**
- * `true` mientras el teclado está en pantalla.
- *
- * Derivado de `useKeyboardHeight` y no de un listener propio: dos suscripciones
- * al mismo evento se desincronizan en el frame en el que una ya actualizó y la
- * otra no.
- *
- * Existe para condicionar el `keyboardVerticalOffset` de los chats — con el
- * teclado cerrado el offset debe ser 0, o el input queda desplazado.
- */
-export function useIsKeyboardVisible(): boolean {
-  return useKeyboardHeight() > 0;
-}
