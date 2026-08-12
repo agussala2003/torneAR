@@ -1,6 +1,5 @@
 import { Text, TouchableOpacity, View } from 'react-native';
-import { Image } from 'expo-image';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { TeamShield } from '@/components/ui/TeamShield';
 import type { RivalTeamEntry } from './types';
 
 interface Props {
@@ -21,13 +20,15 @@ export function RivalTeamCard({ entry, onPress, canChallenge }: Props) {
     return (
         <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(entry.teamId)} className="mb-2.5 rounded-[18px] bg-surface-container p-3.5">
             <View className="mb-3 flex-row items-center gap-3">
-                {entry.shieldUrl ? (
-                    <Image source={{ uri: entry.shieldUrl }} style={{ width: 46, height: 46, borderRadius: 23 }} contentFit="cover" />
-                ) : (
-                    <View className="h-[46px] w-[46px] items-center justify-center rounded-full bg-surface-high">
-                        <AppIcon family="material-community" name="shield" size={22} color="#869585" />
-                    </View>
-                )}
+                {/* `name` activa el fallback a iniciales de TeamShield: en una
+                    busqueda, el escudo generico se repetia identico en cada
+                    tarjeta y no distinguia a ningun club. */}
+                <TeamShield
+                    shieldUrl={entry.shieldUrl}
+                    size={46}
+                    isMyTeam={entry.isMyTeam}
+                    name={entry.teamName}
+                />
 
                 <View className="flex-1">
                     <Text className="font-uiBold text-[14px] text-neutral-on-surface" numberOfLines={1}>{entry.teamName}</Text>

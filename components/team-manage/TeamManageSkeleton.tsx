@@ -1,37 +1,36 @@
-import { Text, TouchableOpacity, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 /**
- * Silueta de app/team-manage.tsx. Conserva titulo y boton atras reales: el
- * usuario puede volver mientras carga en vez de quedar atrapado en un loader.
+ * Silueta de app/team-manage.tsx.
+ *
+ * La cabecera es el `SecondaryHeader` real y no un placeholder: replicarla a
+ * mano fue justamente lo que produjo el salto visual del QA — el skeleton habia
+ * quedado con la cabecera vieja (boton de atras suelto arriba, titulo en `3xl`)
+ * y al terminar de cargar todo el bloque cambiaba de alto y de tipografia. Con
+ * el componente real, el unico cambio al cargar es el contenido de abajo.
+ *
+ * Titulo y subtitulo tienen que coincidir con los de la pantalla, si no el
+ * salto vuelve por el alto del subtitulo.
+ *
+ * Ademas el boton de retroceso queda funcional durante la carga: el usuario
+ * puede volver en vez de quedar atrapado en un loader.
  */
 export function TeamManageSkeleton() {
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="px-4 pb-2 pt-1">
-        <TouchableOpacity
-          className="w-10"
-          activeOpacity={0.8}
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-      </View>
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader
+        title="Gestion de equipo"
+        subtitle="Administracion y estado de tu plantel."
+      />
 
-      <View className="px-4">
-        <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">
-          Gestion de equipo
-        </Text>
-        <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">
-          Administracion y estado de tu plantel.
-        </Text>
-
+      {/* `paddingTop: 18` = el del ScrollView de la pantalla. */}
+      <View className="px-4" style={{ paddingTop: 18 }}>
         {/* TeamManageHeader: escudo + datos + codigo de invitacion */}
-        <Skeleton className="mt-4 rounded-2xl" style={{ height: 180 }} />
+        <Skeleton className="rounded-2xl" style={{ height: 180 }} />
 
         {/* Solicitudes pendientes */}
         <Skeleton className="mt-4 rounded-xl" style={{ height: 96 }} />

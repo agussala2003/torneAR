@@ -9,9 +9,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as Location from 'expo-location';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { distanceInMeters, formatDistance } from '@/lib/geo';
+import { useDistanceResolver } from '@/hooks/useDistanceResolver';
 import { SafeAreaBottomSheet } from '@/components/ui/SafeAreaBottomSheet';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getProposalErrorMessage } from '@/lib/match-actions';
@@ -72,7 +71,15 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
   const [loadingVenues, setLoadingVenues] = useState(false);
   const [zonesLoaded, setZonesLoaded] = useState(false);
   /** A14: `venueId` → metros. Vacío si no hay ubicación disponible. */
-  const [venueDistances, setVenueDistances] = useState<Record<string, number>>({});
+  /*
+   * A14 — distancia a cada complejo.
+   *
+   * El calculo vive en `useDistanceResolver` y no aca: esta pantalla media
+   * desde el GPS del dispositivo mientras el Mercado medía desde el centroide
+   * de la zona del perfil, y el mismo predio aparecia a "100 m" en una y a
+   * "600 m" en la otra. Ahora las dos comparten origen, destino y formato.
+   */
+  const { label: venueDistanceLabel } = useDistanceResolver();
 
   // Alert propio, renderizado DENTRO del <Modal> (ver abajo). Un <Modal> nativo se
   // presenta en una ventana del sistema por encima de todo el arbol React, asi que
@@ -96,53 +103,6 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
       .finally(() => setZonesLoaded(true));
   }, [visible, zonesLoaded]);
 
-  /*
-   * A14 — distancia a cada complejo.
-   *
-   * Se calcula en el cliente: `venues.lat/lng` ya viaja en la consulta que arma
-   * el selector, así que una RPC geoespacial sería un round-trip extra por un
-   * dato que ya está en memoria.
-   *
-   * `getLastKnownPositionAsync` y NO `getCurrentPositionAsync`: la última
-   * posición conocida es instantánea y no enciende el GPS. Y sólo se consulta si
-   * el permiso YA está concedido — elegir cancha no justifica pedir un permiso
-   * nuevo, así que sin permiso la lista se ve igual que antes, sin distancias.
-   */
-  useEffect(() => {
-    if (venues.length === 0) {
-      setVenueDistances({});
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const { granted } = await Location.getForegroundPermissionsAsync();
-        if (!granted) return;
-
-        const position = await Location.getLastKnownPositionAsync();
-        if (!position || cancelled) return;
-
-        const from = { lat: position.coords.latitude, lng: position.coords.longitude };
-        const distances: Record<string, number> = {};
-        for (const venue of venues) {
-          if (venue.lat === null || venue.lng === null) continue;
-          distances[venue.id] = distanceInMeters(from, { lat: venue.lat, lng: venue.lng });
-        }
-
-        if (!cancelled) setVenueDistances(distances);
-      } catch (err) {
-        // Sin distancias la pantalla funciona igual: es información de apoyo.
-        Logger.warn('No se pudo calcular la distancia a los complejos', {
-          scope: 'ProposalModal.venueDistances',
-          error: err,
-        });
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [venues]);
 
   // Load venues when zone changes
   useEffect(() => {
@@ -478,13 +438,18 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
                           <Text className="font-uiBold flex-1 text-sm text-neutral-on-surface">
                             {v.name}
                           </Text>
-                          {/* A14: sólo si ya teníamos la ubicación. Elegir cancha
-                              no justifica pedir un permiso nuevo. */}
-                          {venueDistances[v.id] !== undefined && (
-                            <Text className="font-ui text-[11px] text-brand-primary">
-                              {formatDistance(venueDistances[v.id])}
-                            </Text>
-                          )}
+                          {/* A14: `null` cuando no hay origen utilizable (sin
+                              permiso de ubicacion y sin zona en el perfil). */}
+                          {(() => {
+                            const distance = venueDistanceLabel({
+                              coords: v.lat != null && v.lng != null ? { lat: v.lat, lng: v.lng } : null,
+                            });
+                            return distance ? (
+                              <Text className="font-ui text-[11px] text-brand-primary">
+                                {distance}
+                              </Text>
+                            ) : null;
+                          })()}
                         </View>
                         {v.address && (
                           <Text className="font-ui text-xs text-neutral-on-surface-variant">

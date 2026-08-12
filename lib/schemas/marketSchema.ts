@@ -20,6 +20,12 @@ export const createTeamPostSchema = z.object({
   matchTime: z.string().optional(),
   zone: z.string().optional(),
   complex: z.string().optional(),
+  /**
+   * Complejo del catálogo. Opcional porque el alta admite escribir una cancha
+   * que no está cargada: en ese caso viaja sólo `complex` y el aviso pierde la
+   * precisión del badge de distancia, no la posibilidad de publicarse.
+   */
+  venueId: z.string().uuid('ID de complejo inválido').optional(),
 });
 
 export const createPlayerPostSchema = z.object({

@@ -41,9 +41,12 @@ export function getApplicationStatusHint(
     case 'VISTA':
       return 'Ya vieron tu postulación. Falta que la respondan.';
     case 'ACEPTADA':
+      // El aviso de EQUIPO conserva el paso del traspaso: entrar al plantel
+      // exige confirmarlo desde "Mis solicitudes", y sin esa frase el jugador
+      // queda aceptado pero afuera, esperando algo que nadie le pidió hacer.
       return postType === 'TEAM'
-        ? 'Te aceptaron. Confirmá el traspaso desde "Mis solicitudes" para entrar al plantel.'
-        : 'Aceptaron a tu equipo. Coordiná el resto por el chat del Mercado.';
+        ? 'Fuiste aceptado. Confirmá el traspaso desde "Mis solicitudes" y después coordiná día, hora y pago por el chat del Mercado.'
+        : 'Fuiste aceptado. Coordiná día, hora y pago por el chat del Mercado.';
     case 'RECHAZADA':
       return 'No quedaste esta vez. También pasa cuando el aviso se cierra porque eligieron a otro.';
   }

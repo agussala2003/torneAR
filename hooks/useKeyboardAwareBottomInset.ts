@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 
@@ -7,24 +6,35 @@ import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
  * Padding inferior de una barra fija anclada al fondo (el input de los chats).
  *
  * Devuelve **todo** el espacio que la barra necesita abajo, tanto en reposo como
- * con el teclado abierto. Es el único dueño de ese espacio: en Android el
- * `KeyboardAvoidingView` NO debe empujar además, o se suman dos empujes.
+ * con el teclado abierto, en las DOS plataformas. Es el único dueño de ese
+ * espacio: no debe haber un `KeyboardAvoidingView` empujando además, o se suman
+ * dos empujes.
  *
- * ## Por qué el cálculo no se delega en el KeyboardAvoidingView (Android)
+ * ## Por qué el cálculo no se delega en el KeyboardAvoidingView
  *
- * La app corre edge-to-edge (`app.json` → `android.edgeToEdgeEnabled`), así que
- * la ventana no se redimensiona con el teclado y el KAV tiene que empujar. Pero
- * el KAV deriva ese empuje de su propio frame contra `endCoordinates.screenY`,
- * y en edge-to-edge el frame se extiende por debajo de la barra de navegación
- * mientras el evento de cierre reporta la coordenada por encima de ella: al
- * replegarse el teclado queda un **residuo** del alto de la barra que nunca
- * vuelve a cero. Ese residuo se sumaba al inset de reposo y dejaba el input
- * flotando muy por encima de la barra — visiblemente distinto de cómo se veía
- * al entrar al chat (auditoría E2E, módulo 3.3).
+ * El KAV no mide el teclado: mide **su propio frame** contra la coordenada
+ * absoluta del teclado. De `KeyboardAvoidingView.js` (RN 0.81):
  *
- * Acá el empuje se calcula desde el alto real del teclado, que sí vuelve a 0 de
- * forma determinista, y el KAV queda sólo para iOS (donde `padding` sí se
- * comporta bien y el evento llega antes de la animación).
+ *     const keyboardY = keyboardFrame.screenY - keyboardVerticalOffset;
+ *     return Math.max(frame.y + frame.height - keyboardY, 0);
+ *
+ * `frame` viene del `onLayout` del propio KAV —relativo a su padre— mientras
+ * que `screenY` es absoluta. Las dos coordenadas sólo coinciden si el contenedor
+ * llega hasta el borde inferior de la PANTALLA y arranca en su origen, y en esta
+ * app eso no se cumple en ningún chat:
+ *
+ *   · `app/(modals)/chat.tsx` se presenta con `presentation: 'modal'`, o sea una
+ *     hoja desplazada hacia abajo. `frame.y + frame.height` termina valiendo el
+ *     alto de la hoja, no el de la pantalla, y el KAV empuja de menos por
+ *     exactamente ese desplazamiento: el input queda tapado a medias.
+ *   · En Android, con edge-to-edge el frame se extiende por debajo de la barra
+ *     de navegación mientras el evento de cierre reporta la coordenada por
+ *     encima de ella: al replegarse el teclado queda un **residuo** del alto de
+ *     la barra que nunca vuelve a cero (auditoría E2E, módulo 3.3).
+ *
+ * `endCoordinates.height` no tiene ese problema: es el alto real del teclado y
+ * no depende de dónde esté montada la vista. Por eso el empuje se calcula acá y
+ * el KAV no participa en ninguna plataforma.
  *
  * ## El inset de reposo se congela
  *
@@ -55,7 +65,8 @@ export function useKeyboardAwareBottomInset(gap = 8): number {
   }
 
   // Teclado abierto: el inset de reposo ya no corresponde — el teclado tapa la
-  // barra del sistema. En iOS el KAV hace el empuje y acá sólo va el aire; en
-  // Android el empuje es este padding.
-  return Platform.OS === 'ios' ? gap : keyboardHeight + gap;
+  // barra del sistema, y su alto es todo el espacio que hay que reservar. La
+  // barra queda apoyada justo sobre el teclado y la lista de mensajes se
+  // comprime, que es el layout que se busca.
+  return keyboardHeight + gap + insets.bottom;
 }

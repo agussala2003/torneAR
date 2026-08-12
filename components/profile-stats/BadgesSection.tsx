@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { GOLD, isGoldBadge } from '@/constants/podium';
 import type { EarnedBadge } from './types';
 
 type Props = {
@@ -39,8 +40,19 @@ export function BadgesSection({ badges }: Props) {
               className="items-center gap-2"
               onPress={() => setSelected(badge)}
             >
-              <View className="h-20 w-20 items-center justify-center rounded-full border-2 border-brand-primary bg-surface-high">
-                <AppIcon family="material-community" name={badge.iconUrl} size={28} color="#53E076" />
+              {/* "MVP de Oro" y "Fair Play Oro" van doradas: se llaman así en el
+                  catálogo y pintarlas del verde genérico contradecía su nombre. */}
+              <View
+                className={`h-20 w-20 items-center justify-center rounded-full border-2 bg-surface-high ${
+                  isGoldBadge(badge.slug) ? 'border-brand-gold' : 'border-brand-primary'
+                }`}
+              >
+                <AppIcon
+                  family="material-community"
+                  name={badge.iconUrl}
+                  size={28}
+                  color={isGoldBadge(badge.slug) ? GOLD : '#53E076'}
+                />
               </View>
               <Text
                 className="font-uiBold max-w-[72px] text-center text-[10px] text-neutral-on-surface"

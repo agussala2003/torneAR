@@ -1,55 +1,53 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
+import {
+  PRIVACY_INTRO,
+  PRIVACY_LAST_UPDATED,
+  PRIVACY_SECTIONS,
+} from '@/components/legal/privacyContent';
 
+/**
+ * Pantalla de Política de Privacidad.
+ *
+ * Sólo presenta: el texto vive en `components/legal/privacyContent.ts`, igual
+ * que Términos, así que actualizarlo es editar datos y no JSX.
+ */
 export default function PrivacyScreen() {
-  const router = useRouter();
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="flex-row items-center px-4 pb-2 pt-2">
-        <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-        <Text className="font-displayBlack text-xl text-neutral-on-surface flex-1 text-center pr-10">POLÍTICA DE PRIVACIDAD</Text>
-      </View>
-      
-      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
-        <Text className="font-displayBlack text-2xl text-neutral-on-surface mb-6">
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader title="Política de Privacidad" />
+
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 60 }}>
+        <Text className="font-displayBlack mb-1 text-2xl text-neutral-on-surface">
           Política de Privacidad
         </Text>
-        
-        <Text className="font-ui text-sm text-neutral-on-surface-variant mb-6 leading-6">
-          En torneAR valoramos y respetamos la privacidad de nuestros usuarios. Esta política describe cómo recopilamos, utilizamos y protegemos tu información.
+
+        <Text className="font-ui mb-5 text-xs uppercase tracking-wider text-neutral-outline">
+          Última actualización: {PRIVACY_LAST_UPDATED}
         </Text>
 
-        <View className="mb-6">
-          <Text className="font-display text-lg uppercase tracking-wider text-brand-primary mb-2">
-            1. RECOPILACIÓN DE DATOS
-          </Text>
-          <Text className="font-ui text-sm text-neutral-on-surface-variant leading-6">
-            Recopilamos información personal (como nombre y correo electrónico) para crear tu perfil de jugador. Además, recopilamos estadísticas de tu rendimiento en la plataforma para generar rankings asimétricos e influyentes en tu Rating.
-          </Text>
-        </View>
+        <Text className="font-ui mb-8 text-sm leading-6 text-neutral-on-surface-variant">
+          {PRIVACY_INTRO}
+        </Text>
 
-        <View className="mb-6">
-          <Text className="font-display text-lg uppercase tracking-wider text-brand-primary mb-2">
-            2. USO DE GEOLOCALIZACIÓN (CHECK-IN)
-          </Text>
-          <Text className="font-ui text-sm text-neutral-on-surface-variant leading-6">
-            Al utilizar la función de Check-In en los partidos, procesamos tu ubicación en tiempo real únicamente para validar tu presencia física en las coordenadas designadas de la cancha. Esta ubicación se recopila temporalmente y no se almacena permanentemente ni se rastrea tu ubicación de fondo.
-          </Text>
-        </View>
-
-        <View className="mb-6">
-          <Text className="font-display text-lg uppercase tracking-wider text-brand-primary mb-2">
-            3. PROTECCIÓN Y COMPARTICIÓN
-          </Text>
-          <Text className="font-ui text-sm text-neutral-on-surface-variant leading-6">
-            No vendemos tus datos personales a terceros. Parte de tu información como estadísticas, nombre de usuario y zona, será visible en los perfiles públicos dentro de la aplicación para fomentar el ecosistema de mercado y contratación de la red torneAR.
-          </Text>
-        </View>
+        {PRIVACY_SECTIONS.map((section, index) => (
+          <View key={section.title} className="mb-6">
+            <Text className="font-display mb-2 text-lg uppercase tracking-wider text-brand-primary">
+              {index + 1}. {section.title}
+            </Text>
+            {section.paragraphs.map((paragraph) => (
+              <Text
+                key={paragraph.slice(0, 40)}
+                className="font-ui mb-2 text-sm leading-6 text-neutral-on-surface-variant"
+              >
+                {paragraph}
+              </Text>
+            ))}
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );

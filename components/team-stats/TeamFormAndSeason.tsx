@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import type { FormResult, TeamSeasonRecord } from './types';
 
 function FormBadge({ result }: { result: FormResult }) {
@@ -29,8 +30,6 @@ type TeamFormAndSeasonProps = {
 };
 
 export function TeamFormAndSeason({ form, season }: TeamFormAndSeasonProps) {
-  const totalMatches = season.wins + season.draws + season.losses;
-
   return (
     <View className="mt-6">
       {/* Form strip */}
@@ -55,82 +54,36 @@ export function TeamFormAndSeason({ form, season }: TeamFormAndSeasonProps) {
       <Text className="font-display mb-3 mt-6 px-1 text-sm uppercase tracking-wider text-neutral-on-surface-variant">
         Temporada
       </Text>
-      <View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          <View style={{ width: '48.5%' }} className="rounded-xl bg-surface-high p-3">
-            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">
-              Victorias
-            </Text>
-            <Text
-              className="font-displayBlack mt-1 text-2xl text-brand-primary"
-              style={{ fontVariant: ['tabular-nums'] }}
-            >
-              {season.wins}
-            </Text>
-          </View>
-          <View style={{ width: '48.5%' }} className="rounded-xl bg-surface-high p-3">
-            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">
-              Empates
-            </Text>
-            <Text
-              className="font-displayBlack mt-1 text-2xl text-warning-tertiary"
-              style={{ fontVariant: ['tabular-nums'] }}
-            >
-              {season.draws}
-            </Text>
-          </View>
-          <View style={{ width: '48.5%' }} className="rounded-xl bg-surface-high p-3">
-            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">
-              Derrotas
-            </Text>
-            <Text
-              className="font-displayBlack mt-1 text-2xl text-danger-error"
-              style={{ fontVariant: ['tabular-nums'] }}
-            >
-              {season.losses}
-            </Text>
-          </View>
-          <View style={{ width: '48.5%' }} className="rounded-xl bg-surface-high p-3">
-            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">
-              % Victorias
-            </Text>
-            <Text
-              className="font-displayBlack mt-1 text-2xl text-info-secondary"
-              style={{ fontVariant: ['tabular-nums'] }}
-            >
-              {season.winPercent}
-            </Text>
-          </View>
-          <View style={{ width: '48.5%' }} className="rounded-xl bg-surface-high p-3">
-            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">
-              Goles a favor
-            </Text>
-            <Text
-              className="font-displayBlack mt-1 text-2xl text-neutral-on-surface"
-              style={{ fontVariant: ['tabular-nums'] }}
-            >
-              {season.goalsFor}
-            </Text>
-            <Text className="font-ui mt-0.5 text-[10px] text-neutral-on-surface-variant">
-              Prom. {season.avgGoals} / PJ
-            </Text>
-          </View>
-          <View style={{ width: '48.5%' }} className="rounded-xl bg-surface-high p-3">
-            <Text className="font-ui text-[11px] uppercase tracking-wide text-neutral-on-surface-variant">
-              Goles en contra
-            </Text>
-            <Text
-              className="font-displayBlack mt-1 text-2xl text-neutral-on-surface"
-              style={{ fontVariant: ['tabular-nums'] }}
-            >
-              {season.goalsAgainst}
-            </Text>
-            <Text className="font-ui mt-0.5 text-[10px] text-neutral-on-surface-variant">
-              {totalMatches} PJ en temporada
-            </Text>
-          </View>
-        </View>
-      </View>
+      {/* Una metrica por card, igual que la grilla del perfil del jugador. Los
+          promedios y los PJ eran renglones chicos dentro de las cards de goles:
+          ahi no se leian como datos propios y rompian la simetria con el resto
+          de la grilla. */}
+      <StatGrid>
+        <StatCard label="Partidos" value={String(season.played)} />
+        <StatCard label="Victorias" value={String(season.wins)} colorClass="text-brand-primary" />
+        <StatCard label="Empates" value={String(season.draws)} colorClass="text-warning-tertiary" />
+        <StatCard label="Derrotas" value={String(season.losses)} colorClass="text-danger-error" />
+        <StatCard label="% Victorias" value={season.winPercent} colorClass="text-info-secondary" />
+        <StatCard label="Goles a favor" value={String(season.goalsFor)} />
+        <StatCard label="Goles en contra" value={String(season.goalsAgainst)} />
+        <StatCard
+          label="Dif. de gol"
+          value={season.goalDiff > 0 ? `+${season.goalDiff}` : String(season.goalDiff)}
+          colorClass={
+            season.goalDiff > 0
+              ? 'text-brand-primary'
+              : season.goalDiff < 0
+                ? 'text-danger-error'
+                : 'text-neutral-on-surface'
+          }
+        />
+        <StatCard label="Prom. a favor" value={season.avgGoals} colorClass="text-brand-primary" />
+        <StatCard
+          label="Prom. en contra"
+          value={season.avgGoalsAgainst}
+          colorClass="text-danger-error"
+        />
+      </StatGrid>
     </View>
   );
 }

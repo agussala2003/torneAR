@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
+import { resolveBestFormatRanking, type FormatRankingRow } from '@/lib/team-ranking-format';
 import type { Database } from '@/types/supabase';
 import type {
     RankingFiltersState, RankingTeamEntry, RivalTeamEntry,
@@ -114,19 +116,62 @@ export async function fetchActiveSeason(): Promise<{ id: string; name: string } 
     return data;
 }
 
-// ELO + datos de filtro semilla del equipo activo (o null si no existe).
+/**
+ * ELO + datos de filtro semilla del equipo activo (o null si no existe).
+ *
+ * `format` es el **mejor formato** del equipo (el de mayor ELO), no su
+ * `preferred_format`. El preferido es lo que alguien tipeó al crear el equipo y
+ * casi nunca se actualiza: un equipo que se dio de alta como F11 pero juega
+ * todo en F5 abria el ranking filtrado en F11, se veia ultimo o directamente
+ * ausente, y concluia que la tabla estaba rota.
+ *
+ * El `elo_rating` devuelto acompaña a ese formato — son el mismo dato mirado
+ * desde dos lados, y devolver el ELO global junto al mejor formato daria un par
+ * incoherente.
+ *
+ * Si el equipo todavia no tiene filas en `team_rankings` (nunca jugo un partido
+ * de ranking) se cae al preferido y al ELO global, que es lo unico que hay.
+ */
 export async function fetchActiveTeamRankingInfo(teamId: string): Promise<ActiveTeamRankingInfo | null> {
-    const { data, error } = await supabase
-        .from('teams')
-        .select('elo_rating, zone, category, preferred_format')
-        .eq('id', teamId)
-        .single();
-    if (error || !data) return null;
-    return {
+    const [teamRes, rankingsRes] = await Promise.all([
+        supabase
+            .from('teams')
+            .select('elo_rating, zone, category, preferred_format')
+            .eq('id', teamId)
+            .single(),
+        supabase
+            .from('team_rankings')
+            .select('format, elo_score')
+            .eq('team_id', teamId),
+    ]);
+
+    if (teamRes.error || !teamRes.data) return null;
+    const data = teamRes.data;
+
+    if (rankingsRes.error) {
+        // No es fatal: se cae al formato preferido, que es el comportamiento
+        // anterior. Pero queda registrado, porque desde afuera el sintoma
+        // ("abre en el formato equivocado") es identico a un bug de logica.
+        Logger.warn('No se pudieron leer los ELO por formato; se usa el formato preferido', {
+            scope: 'ranking-data.fetchActiveTeamRankingInfo',
+            teamId,
+            error: rankingsRes.error,
+        });
+    }
+
+    // Mismo resolvedor que usa la Home para la tarjeta de Mis Equipos: es lo
+    // que garantiza que las dos pantallas muestren la misma cifra y el mismo
+    // formato para el mismo equipo.
+    const best = resolveBestFormatRanking((rankingsRes.data ?? []) as FormatRankingRow[], {
         eloRating: data.elo_rating,
+        format: data.preferred_format,
+    });
+
+    return {
+        eloRating: best.eloRating,
         zone: data.zone,
         category: data.category,
-        format: data.preferred_format,
+        format: best.format,
     };
 }
 

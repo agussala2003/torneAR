@@ -277,7 +277,7 @@ export default function HomeScreen() {
   };
 
   const handleSeeAllMatches = () => {
-    router.push('/(tabs)/matches');
+    router.navigate('/(tabs)/matches');
   };
 
   const handleTeamPress = (teamId: string) => {
@@ -294,16 +294,27 @@ export default function HomeScreen() {
    * re-aplicaría nada, porque los params serían idénticos a los de la vez
    * anterior.
    */
+  /*
+   * `router.navigate` y NO `router.push` para ir a una tab.
+   *
+   * `push` apila una instancia NUEVA de la pantalla sobre la Home en vez de
+   * cambiar de pestaña: la tab se monta de cero (skeleton incluido) por encima
+   * de la que ya estaba cargada, la barra inferior no marca la pestaña activa y
+   * el gesto repetido hace crecer la pila sin fin. Es el mismo problema que ya
+   * habíamos sacado del enlace "Ver ranking" de MyTeamsRankingSection.
+   *
+   * `navigate` reutiliza la instancia existente y le entrega los params.
+   */
   const handleSeeRanking = () => {
     // Sin contexto resuelto todavía (carga en vuelo, o usuario sin equipo) se
     // navega pelado: que la tab aplique SUS defaults es mejor que forzarle un
     // ranking global que no pidió nadie.
     if (!miniRankingContext) {
-      router.push('/(tabs)/ranking');
+      router.navigate('/(tabs)/ranking');
       return;
     }
 
-    router.push({
+    router.navigate({
       pathname: '/(tabs)/ranking',
       params: {
         zone: miniRankingContext.zone ?? '',
@@ -315,11 +326,11 @@ export default function HomeScreen() {
   };
 
   const handleGoToRanking = () => {
-    router.push('/(tabs)/ranking');
+    router.navigate('/(tabs)/ranking');
   };
 
   const handleGoToMarket = () => {
-    router.push('/(tabs)/market');
+    router.navigate('/(tabs)/market');
   };
 
   const handleGoToCensus = () => {
@@ -327,7 +338,7 @@ export default function HomeScreen() {
   };
 
   const handleManageTeam = () => {
-    router.push('/(tabs)/profile');
+    router.navigate('/(tabs)/profile');
   };
 
   // D12 — cada señal lleva al lugar donde SE RESUELVE. Las que apuntan a un
@@ -342,18 +353,18 @@ export default function HomeScreen() {
         if (action.matchId) {
           router.push({ pathname: '/match-detail', params: { matchId: action.matchId } });
         } else {
-          router.push('/(tabs)/matches');
+          router.navigate('/(tabs)/matches');
         }
         break;
       case 'CHALLENGE_RECEIVED':
         router.push('/challenge-inbox');
         break;
       case 'MARKET_APPLICATION':
-        router.push('/(tabs)/market');
+        router.navigate('/(tabs)/market');
         break;
       case 'TEAM_REQUEST':
         // El perfil es donde vive la gestión de equipos.
-        router.push('/(tabs)/profile');
+        router.navigate('/(tabs)/profile');
         break;
     }
   };
@@ -409,9 +420,8 @@ export default function HomeScreen() {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => handleMatchPress(nextMatch.id)}
-              className={`mb-5 overflow-hidden rounded-2xl bg-surface-container ${
-                isCountingDown ? 'border border-brand-primary/30' : ''
-              }`}
+              className={`mb-5 overflow-hidden rounded-2xl bg-surface-container ${isCountingDown ? 'border border-brand-primary/30' : ''
+                }`}
             >
               {/* Encabezado */}
               <View className="flex-row items-center justify-between px-4 pt-4">
@@ -420,16 +430,14 @@ export default function HomeScreen() {
                 </Text>
                 <View className="flex-row items-center gap-1.5">
                   <View
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      nextMatch.status === 'CONFIRMADO' ? 'bg-info-secondary' : 'bg-neutral-outline'
-                    }`}
+                    className={`h-1.5 w-1.5 rounded-full ${nextMatch.status === 'CONFIRMADO' ? 'bg-info-secondary' : 'bg-neutral-outline'
+                      }`}
                   />
                   <Text
-                    className={`font-ui text-[11px] ${
-                      nextMatch.status === 'CONFIRMADO'
+                    className={`font-ui text-[11px] ${nextMatch.status === 'CONFIRMADO'
                         ? 'text-info-secondary'
                         : 'text-neutral-outline'
-                    }`}
+                      }`}
                   >
                     {nextMatch.status === 'CONFIRMADO' ? 'Confirmado' : 'Pendiente'}
                   </Text>
@@ -473,26 +481,29 @@ export default function HomeScreen() {
               <View className="border-t border-neutral-outline/20 bg-surface-high/40 px-4 py-3">
                 {isCountingDown ? (
                   <>
-                    <Text className="font-ui mb-2 text-center text-[10px] uppercase tracking-widest text-brand-primary">
+                    <Text className="font-ui mb-2 text-center text-[10px] uppercase tracking-wider text-brand-primary">
                       Empieza en
                     </Text>
-                    <View className="flex-row items-center justify-center gap-1.5">
+
+                    <View className="flex-row items-center justify-center gap-1">
                       {[
                         { value: countdown.hours, label: 'Hs' },
                         { value: countdown.minutes, label: 'Min' },
                         { value: countdown.seconds, label: 'Seg' },
                       ].map((segment, index) => (
-                        <View key={segment.label} className="flex-row items-center gap-1.5">
+                        <View key={segment.label} className="flex-row items-center gap-1">
                           {index > 0 && (
-                            <Text className="font-displayBlack pb-3 text-xl text-neutral-outline">
+                            <Text className="font-displayBlack text-lg text-neutral-outline/60">
                               :
                             </Text>
                           )}
-                          <View className="min-w-[52px] items-center rounded-xl bg-surface-lowest px-2 py-1.5">
-                            <Text className="font-displayBlack text-2xl text-brand-primary">
-                              {segment.value}
+
+                          <View className="min-w-[50px] items-center rounded-lg bg-surface-lowest px-2 py-1.5">
+                            <Text className="font-displayBlack text-2xl leading-none text-brand-primary">
+                              {String(segment.value).padStart(2, '0')}
                             </Text>
-                            <Text className="font-ui text-[9px] uppercase tracking-wider text-neutral-on-surface-variant">
+
+                            <Text className="font-ui mt-1 text-[9px] uppercase tracking-wider text-neutral-on-surface-variant">
                               {segment.label}
                             </Text>
                           </View>
@@ -506,7 +517,9 @@ export default function HomeScreen() {
                   </Text>
                 ) : (
                   <Text className="font-uiBold text-center text-[13px] text-neutral-on-surface">
-                    {nextMatch.scheduledAt ? formatMatchDate(nextMatch.scheduledAt) : 'Sin fecha'}
+                    {nextMatch.scheduledAt
+                      ? formatMatchDate(nextMatch.scheduledAt)
+                      : 'Sin fecha'}
                   </Text>
                 )}
               </View>
@@ -530,7 +543,6 @@ export default function HomeScreen() {
           <MyTeamsRankingSection
             teams={viewData.myTeams}
             onTeamPress={handleTeamPress}
-            onSeeRanking={handleSeeRanking}
           />
 
           <QuickActionsSection

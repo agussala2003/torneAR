@@ -6,6 +6,11 @@ import { buildPendingActions } from './home-data';
 vi.mock('@/lib/supabase', () => ({
   supabase: { from: vi.fn() },
 }));
+// Mismo motivo: `Logger` arrastra `react-native`, que el runtime `node` de
+// estos tests no puede parsear.
+vi.mock('@/lib/logger', () => ({
+  Logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
 
 describe('buildPendingActions (D12)', () => {
   it('descarta las señales en cero: la bandeja no muestra "0 desafíos"', () => {

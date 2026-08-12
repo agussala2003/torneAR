@@ -3,6 +3,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
+import { TeamShield } from '@/components/ui/TeamShield';
 import { useAuth } from '@/context/AuthContext';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
 import { getTeamCategoryLabel, getTeamFormatLabel } from '@/lib/team-options';
@@ -109,18 +111,15 @@ export default function TeamJoinScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base">
-      <View className="px-4 pb-2 pt-1">
-        <TouchableOpacity className="w-10" activeOpacity={0.8} onPress={() => router.back()}>
-          <AppIcon family="material-icons" name="arrow-back-ios-new" size={22} color="#BCCBB9" />
-        </TouchableOpacity>
-      </View>
+    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
+      <SecondaryHeader
+        title="Unirse a equipo"
+        subtitle="Ingresa el codigo de invitacion para sumarte a un plantel."
+      />
 
-      <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 36 }}>
-        <Text className="font-displayBlack text-3xl uppercase tracking-tight text-neutral-on-surface">Unirse a equipo</Text>
-        <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">Ingresa el codigo de invitacion para sumarte a un plantel.</Text>
-
-        <View className="mt-8 gap-4">
+      <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: 36 }}>
+        <View className="gap-4">
           <View>
             <Text className="font-display mb-2 text-xs uppercase tracking-wider text-neutral-on-surface-variant">Codigo de invitacion</Text>
             <TextInput
@@ -153,8 +152,20 @@ export default function TeamJoinScreen() {
 
         {team ? (
           <View className="mt-7 rounded-xl border border-neutral-outline-variant/40 bg-surface-low p-4">
-            <Text className="font-display text-2xl text-neutral-on-surface">{team.name}</Text>
-            <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">{team.zone}</Text>
+            {/* Escudo a la izquierda: antes del "Enviar solicitud" el usuario
+                solo tenia el nombre para confirmar que el codigo lo llevo al
+                club correcto, y los nombres se repiten entre zonas. */}
+            <View className="flex-row items-center gap-3">
+              <TeamShield shieldUrl={team.shieldUrl} name={team.name} size={52} />
+              <View className="flex-1">
+                <Text className="font-display text-2xl text-neutral-on-surface" numberOfLines={1}>
+                  {team.name}
+                </Text>
+                <Text className="font-ui mt-1 text-sm text-neutral-on-surface-variant">
+                  {team.zone}
+                </Text>
+              </View>
+            </View>
 
             <View className="mt-3 flex-row items-center gap-2">
               <Text className="font-uiBold rounded bg-brand-primary/15 px-2 py-1 text-[10px] uppercase tracking-wide text-brand-primary">{getTeamCategoryLabel(team.category)}</Text>

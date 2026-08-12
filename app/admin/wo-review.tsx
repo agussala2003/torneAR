@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -119,12 +120,7 @@ export default function WoReviewScreen() {
   return (
     <View className="flex-1 bg-surface-base">
       {/* Header */}
-      <View className="flex-row items-center gap-3 px-4 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-          <AppIcon family="material-community" name="chevron-left" size={26} color="#E5E2E1" />
-        </TouchableOpacity>
-        <Text className="font-displayBlack text-xl text-neutral-on-surface">Reclamos de WO</Text>
-      </View>
+      <SecondaryHeader title="Reclamos de WO" />
 
       {loading ? (
         <GlobalLoader label="Cargando reclamos" />
@@ -137,7 +133,7 @@ export default function WoReviewScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 12, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {claims.map((c) => (
             <View key={c.claimId} className="mb-4 rounded-2xl bg-surface-container p-4">
               {/* Equipos + fecha */}

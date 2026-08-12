@@ -3,8 +3,8 @@ import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator } from 'rea
 import { router, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import { useTeamStore } from '@/stores/teamStore';
-import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { fetchChallengesInbox, acceptChallengeWithNotification, updateChallengeStatus, cancelChallenge } from '@/lib/challenge-actions';
 import type { ChallengeInboxEntry } from '@/components/ranking/types';
@@ -140,15 +140,10 @@ export default function ChallengesInboxScreen() {
 
     return (
         <View className="flex-1 bg-surface-base">
-            <GlobalHeader isRankingTab />
+            {/* Se va el GlobalHeader: mostraba el icono de desafios con su badge
+                estando ya adentro de la bandeja de desafios. */}
+            <SecondaryHeader title="Desafíos" />
             <ScrollView className="px-4 pt-4" contentContainerStyle={{ paddingBottom: 60 }}>
-
-                <View className="mb-4 flex-row items-center gap-3">
-                    <TouchableOpacity onPress={() => router.back()} className="rounded-xl bg-surface-high p-2">
-                        <AppIcon family="material-community" name="arrow-left" size={20} color="#BCCBB9" />
-                    </TouchableOpacity>
-                    <Text className="font-displayBlack text-2xl uppercase tracking-widest text-brand-primary">Desafíos</Text>
-                </View>
 
                 {/* Tabs */}
                 <View className="mb-5 flex-row rounded-xl bg-surface-low p-1">
@@ -175,9 +170,22 @@ export default function ChallengesInboxScreen() {
                 {loading ? (
                     <ActivityIndicator color="#53E076" className="mt-10" />
                 ) : filteredChallenges.length === 0 ? (
-                    <View className="mt-10 items-center">
-                        <Text className="text-4xl">📭</Text>
-                        <Text className="mt-4 font-ui text-sm text-neutral-on-surface-variant">No hay desafíos en esta sección.</Text>
+                    <View className="flex-1 items-center justify-center px-8 py-16">
+                        <AppIcon family="material-community" name="sword-cross" size={64} color="#869585" />
+                        <Text className="font-displayBlack mt-5 text-center text-lg uppercase tracking-wide text-neutral-on-surface">
+                            {tab === 'RECIBIDOS'
+                                ? 'Nadie te desafió todavía'
+                                : tab === 'ENVIADOS'
+                                    ? 'No enviaste desafíos'
+                                    : 'Sin desafíos cerrados'}
+                        </Text>
+                        <Text className="font-ui mt-2 text-center text-sm leading-5 text-neutral-outline">
+                            {tab === 'RECIBIDOS'
+                                ? 'Cuando otro equipo te desafíe, el partido aparece acá para que lo aceptes o lo rechaces.'
+                                : tab === 'ENVIADOS'
+                                    ? 'Buscá un rival en el Ranking y mandale un desafío: te va a quedar listado acá hasta que responda.'
+                                    : 'Acá van a quedar los desafíos que ya se aceptaron, se rechazaron o vencieron.'}
+                        </Text>
                     </View>
                 ) : (
                     filteredChallenges.map(c => (

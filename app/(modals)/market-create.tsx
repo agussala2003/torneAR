@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { PitchSelector } from '@/components/ui/PitchSelector';
 import { ZonePickerDialog } from '@/components/ui/ZonePickerDialog';
@@ -18,6 +19,7 @@ import { Logger } from '@/lib/logger';
 import { createTeamPost, createPlayerPost, fetchUserManagedTeams, ManagedTeam } from '@/lib/market-api';
 import { TEAM_FORMAT_OPTIONS, TeamFormat } from '@/lib/team-options';
 import { fetchVenuesByZoneName, VenueEntry } from '@/lib/venue-data';
+import { useDistanceResolver } from '@/hooks/useDistanceResolver';
 import {
   createTeamPostSchema,
   createPlayerPostSchema,
@@ -53,6 +55,7 @@ export default function MarketCreateModal() {
   const [venues, setVenues] = useState<VenueEntry[]>([]);
   const [selectedVenue, setSelectedVenue] = useState<VenueEntry | null>(null);
   const [loadingVenues, setLoadingVenues] = useState(false);
+  const { label: distanceLabel } = useDistanceResolver();
   const [pitchType, setPitchType] = useState<TeamFormat | null>(null);
 
   // Específicos de Jugador
@@ -184,6 +187,9 @@ export default function MarketCreateModal() {
           matchTime: matchTime ? matchTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
           zone,
           complex,
+          // Enlace al catálogo: es de donde salen las coordenadas del badge de
+          // distancia. `undefined` si la cancha se escribió a mano.
+          venueId: selectedVenue?.id,
           description,
         };
         const validation = createTeamPostSchema.safeParse(teamPostPayload);
@@ -242,24 +248,12 @@ export default function MarketCreateModal() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-surface-base" edges={['top']}>
-      {/* Header Dinámico */}
-      <View className="px-6 py-4 flex-row items-center border-b border-surface-high bg-surface-base">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-4"
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
-        </TouchableOpacity>
-        <View className="flex-1 flex-row items-center justify-between gap-2">
-          <Text className="text-neutral-on-surface font-displayBlack text-xl tracking-wider">
-            {creationType === 'TEAM' ? 'Buscar Jugador' : 'Buscar Equipo / Partido'}
-          </Text>
-          {creationType === 'TEAM' ? <ActiveTeamSelector /> : null}
-        </View>
-      </View>
+    // Sin `edges={['top']}`: el inset superior ya lo aplica SecondaryHeader.
+    <SafeAreaView className="flex-1 bg-surface-base" edges={['bottom']}>
+      <SecondaryHeader
+        title={creationType === 'TEAM' ? 'Buscar Jugador' : 'Buscar Equipo / Partido'}
+        rightSlot={creationType === 'TEAM' ? <ActiveTeamSelector /> : null}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -382,7 +376,23 @@ export default function MarketCreateModal() {
                               )}
                             </View>
                             <View className="flex-1">
-                              <Text className="font-uiBold text-sm text-neutral-on-surface">{v.name}</Text>
+                              <View className="flex-row items-center justify-between gap-2">
+                                <Text className="font-uiBold flex-1 text-sm text-neutral-on-surface">{v.name}</Text>
+                                {/* Misma resolución que el Mercado y la propuesta
+                                    de partido: sin esto el usuario elegía a ciegas
+                                    y recién veía la distancia con el aviso ya
+                                    publicado. */}
+                                {(() => {
+                                  const distance = distanceLabel({
+                                    coords: v.lat != null && v.lng != null ? { lat: v.lat, lng: v.lng } : null,
+                                    zone,
+                                    complex: v.name,
+                                  });
+                                  return distance ? (
+                                    <Text className="font-ui text-[11px] text-brand-primary">{distance}</Text>
+                                  ) : null;
+                                })()}
+                              </View>
                               {v.address && (
                                 <Text className="font-ui text-xs text-neutral-on-surface-variant">{v.address}</Text>
                               )}

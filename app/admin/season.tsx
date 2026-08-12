@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { getGenericSupabaseErrorMessage } from '@/lib/auth-error-messages';
@@ -140,17 +141,12 @@ export default function SeasonAdminScreen() {
   return (
     <View className="flex-1 bg-surface-base">
       {/* Header */}
-      <View className="flex-row items-center gap-3 px-4 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
-          <AppIcon family="material-community" name="chevron-left" size={26} color="#E5E2E1" />
-        </TouchableOpacity>
-        <Text className="font-displayBlack text-xl text-neutral-on-surface">Temporadas</Text>
-      </View>
+      <SecondaryHeader title="Temporadas" />
 
       {loading ? (
         <GlobalLoader label="Cargando temporada" />
       ) : (
-        <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 12, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Temporada activa */}
           <View className="mb-4 rounded-2xl bg-surface-container p-4">
             <Text className="font-ui mb-2 text-[11px] uppercase tracking-widest text-neutral-outline">

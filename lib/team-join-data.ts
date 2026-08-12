@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
+import { resolveShieldUrl } from '@/lib/supabase-storage';
 import { TeamCategory, TeamFormat, TeamRole } from '@/lib/team-options';
 
 export type TeamPreview = {
@@ -9,19 +10,26 @@ export type TeamPreview = {
   category: TeamCategory;
   preferred_format: TeamFormat;
   elo_rating: number;
+  /** Escudo ya resuelto a URL absoluta. `null` si el club no cargo uno. */
+  shieldUrl: string | null;
 };
+
+type TeamPreviewRow = Omit<TeamPreview, 'shieldUrl'> & { shield_url: string | null };
 
 export async function findTeamByCode(code: string): Promise<TeamPreview | null> {
   const { data, error } = await supabase
     .from('teams')
-    .select('id, name, zone, category, preferred_format, elo_rating')
+    .select('id, name, zone, category, preferred_format, elo_rating, shield_url')
     .eq('invite_code', code)
     .maybeSingle();
 
   if (error) {
     throw error;
   }
-  return data as TeamPreview | null;
+  if (!data) return null;
+
+  const { shield_url, ...team } = data as TeamPreviewRow;
+  return { ...team, shieldUrl: resolveShieldUrl(shield_url) };
 }
 
 export async function sendJoinRequest(

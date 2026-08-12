@@ -5,15 +5,14 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { useAuth } from '@/context/AuthContext';
 import { getInitials } from '@/lib/market-utils';
 import { supabase } from '@/lib/supabase';
@@ -51,7 +50,6 @@ function formatTime(iso: string): string {
 
 export default function MarketChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const inputBottomInset = useKeyboardAwareBottomInset();
@@ -406,49 +404,35 @@ export default function MarketChatScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* Header */}
-      <View className="px-6 pb-4 pt-10 flex-row items-center border-b border-surface-high bg-surface-base">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="mr-4"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <AppIcon family="material-icons" name="arrow-back" size={24} color="#00E65B" />
-        </TouchableOpacity>
-
-        {chatData && (
-          <>
-            {chatAvatarUrl ? (
+      {/* El nombre del interlocutor pasa por el `uppercase` del SecondaryHeader
+          y hereda el inset real en lugar del `pt-10` fijo. El avatar va en el
+          slot de acciones: es identidad del chat, no una accion, pero es el
+          unico lugar donde no compite por ancho con un nombre largo. */}
+      {/* La altura se mide, no se asume: alimenta el offset del KAV. */}
+      <View>
+      <SecondaryHeader
+        title={chatTitle}
+        subtitle={chatData ? chatSubtitle : undefined}
+        rightSlot={
+          chatData ? (
+            chatAvatarUrl ? (
               <Image
                 source={{ uri: chatAvatarUrl }}
-                style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#53E076', marginRight: 10 }}
+                style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#53E076' }}
                 contentFit="cover"
               />
             ) : (
               <View
-                style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#53E076', backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}
+                style={{ width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: '#53E076', backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' }}
               >
                 <Text className="text-brand-primary font-uiBold text-sm">
                   {getInitials(chatTitle)}
                 </Text>
               </View>
-            )}
-          </>
-        )}
-
-        <View className="flex-1">
-          <Text
-            className="text-neutral-on-surface font-displayBlack text-xl tracking-wider"
-            numberOfLines={1}
-          >
-            {chatTitle}
-          </Text>
-          {chatData && (
-            <Text className="text-neutral-on-surface-variant font-ui text-xs">
-              {chatSubtitle}
-            </Text>
-          )}
-        </View>
+            )
+          ) : null
+        }
+      />
       </View>
 
       {isLoading ? (
@@ -456,16 +440,12 @@ export default function MarketChatScreen() {
           <ActivityIndicator size="large" color="#00E65B" />
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          /* Sólo iOS. En Android el empuje lo hace el padding de la barra
-             (`useKeyboardAwareBottomInset`): con edge-to-edge el KAV mide su
-             frame por debajo de la barra de navegación y al replegarse el
-             teclado deja un residuo que nunca vuelve a cero. Con los dos
-             mecanismos activos ese residuo se sumaba al inset de reposo. */
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
+        // Sin KeyboardAvoidingView: el empuje lo hace el padding de la barra de
+        // input (`useKeyboardAwareBottomInset`), calculado desde el alto real del
+        // teclado. El KAV medía su propio frame contra la coordenada absoluta del
+        // teclado, y esas dos coordenadas sólo coinciden si el contenedor llega
+        // justo al borde inferior de la pantalla.
+        <View className="flex-1">
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -565,7 +545,7 @@ export default function MarketChatScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
       <Modal
         visible={showInviteConfirmModal}

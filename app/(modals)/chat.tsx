@@ -5,12 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -40,7 +39,6 @@ export default function MatchChatScreen() {
     conversationId: string;
     myTeamId?: string;
   }>();
-  const router = useRouter();
   const { profile } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const inputBottomInset = useKeyboardAwareBottomInset();
@@ -302,22 +300,12 @@ export default function MatchChatScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* Header */}
-      <View className="flex-row items-center gap-3 border-b border-surface-high px-4 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} className="p-1">
-          <AppIcon family="material-community" name="arrow-left" size={24} color="#E5E2E1" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="font-uiBold text-base text-neutral-on-surface" numberOfLines={1}>
-            {headerTitle}
-          </Text>
-          {header && (
-            <Text className="font-ui text-[10px] uppercase tracking-widest text-neutral-outline">
-              Código: {header.uniqueCode}
-            </Text>
-          )}
-        </View>
-        <AppIcon family="material-community" name="soccer" size={20} color="#53E076" />
+      <View>
+        <SecondaryHeader
+          title={headerTitle}
+          subtitle={header ? `Código: ${header.uniqueCode}` : undefined}
+          rightSlot={<AppIcon family="material-community" name="soccer" size={20} color="#53E076" />}
+        />
       </View>
 
       {loadingInit ? (
@@ -335,19 +323,13 @@ export default function MatchChatScreen() {
           />
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          /* Sólo iOS. En Android el empuje lo hace el padding de la barra
-             (`useKeyboardAwareBottomInset`): con edge-to-edge el KAV mide su
-             frame por debajo de la barra de navegación y al replegarse el
-             teclado deja un residuo que nunca vuelve a cero. Con los dos
-             mecanismos activos ese residuo se sumaba al inset de reposo. */
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          /* 0 en Android: el header es una View de esta misma pantalla y el KAV
-             arranca por debajo, así que mide su propia posición y no necesita
-             compensación extra. */
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
+        // Sin KeyboardAvoidingView: el empuje lo hace el padding de la barra de
+        // input (`useKeyboardAwareBottomInset`), calculado desde el alto real del
+        // teclado. Esta pantalla se presenta como modal —una hoja desplazada
+        // hacia abajo— y el KAV empujaba de menos por exactamente ese
+        // desplazamiento, porque mide su propio frame contra la coordenada
+        // absoluta del teclado: de ahí el input tapado a medias.
+        <View className="flex-1">
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -402,7 +384,7 @@ export default function MatchChatScreen() {
               )}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       )}
     </View>
   );

@@ -13,6 +13,8 @@ import { useTeamStore } from '@/stores/teamStore';
 import { fetchMarketViewData } from '@/lib/market-data';
 import { togglePostStatus } from '@/lib/market-api';
 import { filterPostsByDay, resolveApplicantTeam } from '@/lib/market-utils';
+import { useDistanceResolver } from '@/hooks/useDistanceResolver';
+import { useTabBarInset } from '@/hooks/useTabBarInset';
 import { MarketViewData, TabType } from '@/components/market/types';
 import { getOrCreateMarketChat } from '@/lib/chat-api';
 import { Logger } from '@/lib/logger';
@@ -46,6 +48,10 @@ export default function MarketScreen() {
   const [activeCaptainTeamId, setActiveCaptainTeamId] = useState<string | null>(null);
   const [postPendingDelete, setPostPendingDelete] = useState<{ id: string; isTeamPost: boolean } | null>(null);
   const [applicationCounts, setApplicationCounts] = useState<Record<string, number>>({});
+  // Badge de distancia. El hook resuelve origen y destino con la misma
+  // prioridad que el selector de complejo y el de la propuesta de partido.
+  const { label: distanceLabel } = useDistanceResolver();
+  const fabBottom = useTabBarInset({ gap: 16 });
 
   const loadMarketData = useCallback(async (showFullLoader = true) => {
     if (!profile) {
@@ -388,6 +394,7 @@ export default function MarketScreen() {
           onViewApplications={handleViewApplications}
           memberStatusMap={memberStatusMap}
           applicationCounts={applicationCounts}
+          resolveDistanceLabel={distanceLabel}
         />
       </View>
 
@@ -396,8 +403,12 @@ export default function MarketScreen() {
           onPress={handleCreatePost}
           activeOpacity={0.9}
           className="items-center justify-center z-50 bg-brand-primary"
+          /* `bottom: 110` fijo pisaba la Tab Bar en los equipos con inset
+             grande: la barra mide 62 + insets.bottom, o sea hasta 110 en un
+             iPhone con Home Indicator. Se calcula con el mismo helper que usan
+             las pantallas para su paddingBottom. */
           style={{
-            position: 'absolute', bottom: 110, right: 20, height: 56, width: 56,
+            position: 'absolute', bottom: fabBottom, right: 20, height: 56, width: 56,
             borderRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.3, shadowRadius: 5, elevation: 5,
           }}

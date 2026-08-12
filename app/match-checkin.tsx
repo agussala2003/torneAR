@@ -7,6 +7,7 @@ import { fetchCheckinViewData, submitTeamCheckin, getCheckinErrorMessage } from 
 import { getCheckinLocation } from '@/lib/checkin-location';
 import { GlobalLoader } from '@/components/GlobalLoader';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { SecondaryHeader } from '@/components/ui/SecondaryHeader';
 import { CheckinSquadCounters } from '@/components/matches/CheckinSquadCounters';
 import { CheckinRosterItem } from '@/components/matches/CheckinRosterItem';
 import type { CheckinViewData, CheckinLineupState } from '@/components/matches/types';
@@ -183,18 +184,10 @@ export default function MatchCheckinScreen() {
 
   return (
     <View className="flex-1 bg-surface-base">
-      {/* Header */}
-      <View className="flex-row items-center gap-3 px-4 pb-3 pt-14">
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} className="p-1">
-          <AppIcon family="material-community" name="arrow-left" size={24} color="#E5E2E1" />
-        </TouchableOpacity>
-        <View className="flex-1">
-          <Text className="font-uiBold text-lg text-neutral-on-surface">Armar convocatoria</Text>
-          <Text className="font-ui text-xs text-neutral-on-surface-variant">
-            Tocá a cada jugador para ciclar: Afuera → Titular → Suplente
-          </Text>
-        </View>
-      </View>
+      <SecondaryHeader
+        title="Armar convocatoria"
+        subtitle="Tocá a cada jugador para ciclar: Afuera → Titular → Suplente"
+      />
 
       <ScrollView
         className="px-4"

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   Controller,
   useWatch,
@@ -8,7 +9,8 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { applyDateMask } from '@/lib/date-mask';
+import { applyDateMask, fromDateToDisplay, fromDisplayToDate } from '@/lib/date-mask';
+import { maxSignupBirthDate, MINIMUM_SIGNUP_AGE } from '@/lib/age';
 import type { UserProfileFormData } from '@/lib/schemas/userSchema';
 
 const GENDER_OPTIONS: { value: UserProfileFormData['gender']; label: string }[] = [
@@ -67,6 +69,26 @@ export function ProfileFormFields({
   const selectedGender = useWatch({ control, name: 'gender' });
   const selectedFoot = useWatch({ control, name: 'strongFoot' });
   const selectedFavoriteTeam = useWatch({ control, name: 'favoriteTeam' });
+  const selectedBirthDate = useWatch({ control, name: 'dateOfBirth' });
+
+  const [showBirthPicker, setShowBirthPicker] = React.useState(false);
+
+  /*
+   * Tope del calendario: la fecha más reciente que sigue dando 18 años.
+   *
+   * Se calcula una vez por montaje. Recalcularlo en cada render no aporta —
+   * nadie cruza la medianoche con el formulario abierto— y devolvería un `Date`
+   * nuevo cada vez, que es una prop inestable para el picker.
+   */
+  const maxBirthDate = React.useMemo(() => maxSignupBirthDate(), []);
+
+  /*
+   * Valor de apertura del calendario. Si el campo ya tiene una fecha válida
+   * abre ahí; si no, abre en el tope (18 años exactos) y no en "hoy": abriendo
+   * en hoy el usuario tiene que retroceder 18 años a mano cada vez, y encima
+   * arranca parado sobre una fecha que el propio picker no le deja elegir.
+   */
+  const birthPickerValue = fromDisplayToDate(selectedBirthDate ?? '') ?? maxBirthDate;
 
   return (
     <View className="gap-6">
@@ -79,22 +101,61 @@ export function ProfileFormFields({
           control={control}
           name="dateOfBirth"
           render={({ field: { onChange, onBlur, value } }) => (
-            <TextInput
-              className={`w-full rounded-xl border px-4 py-4 text-neutral-on-surface ${
-                errors.dateOfBirth ? 'border-red-500' : 'border-neutral-outline-variant/15'
-              } bg-surface-low`}
-              placeholder="DD/MM/AAAA"
-              placeholderTextColor="#3A3939"
-              keyboardType="numeric"
-              maxLength={10}
-              onBlur={onBlur}
-              onChangeText={(text) => onChange(applyDateMask(text))}
-              value={value ?? ''}
-            />
+            <>
+              {/* Se conserva el tipeo además del calendario: para una fecha de
+                  hace 30 años, escribir 8 dígitos es más rápido que scrollear.
+                  El calendario es el que comunica el límite de edad; el schema
+                  lo vuelve a validar por si la fecha entró tipeada. */}
+              <View className="flex-row items-center gap-2">
+                <TextInput
+                  className={`flex-1 rounded-xl border px-4 py-4 text-neutral-on-surface ${
+                    errors.dateOfBirth ? 'border-red-500' : 'border-neutral-outline-variant/15'
+                  } bg-surface-low`}
+                  placeholder="DD/MM/AAAA"
+                  placeholderTextColor="#3A3939"
+                  keyboardType="numeric"
+                  maxLength={10}
+                  onBlur={onBlur}
+                  onChangeText={(text) => onChange(applyDateMask(text))}
+                  value={value ?? ''}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowBirthPicker(true)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Elegir fecha de nacimiento en el calendario"
+                  className={`h-[54px] w-[54px] items-center justify-center rounded-xl border bg-surface-low ${
+                    errors.dateOfBirth ? 'border-red-500' : 'border-neutral-outline-variant/15'
+                  }`}
+                >
+                  <AppIcon family="material-community" name="calendar" size={22} color="#BCCBB9" />
+                </TouchableOpacity>
+              </View>
+
+              {showBirthPicker && (
+                <DateTimePicker
+                  value={birthPickerValue}
+                  mode="date"
+                  display="spinner"
+                  locale="es-AR"
+                  /* El bloqueo visual del backlog: el calendario no ofrece
+                     ninguna fecha que deje al usuario con menos de 18. */
+                  maximumDate={maxBirthDate}
+                  onChange={(event, date) => {
+                    setShowBirthPicker(false);
+                    if (event.type !== 'dismissed' && date) onChange(fromDateToDisplay(date));
+                  }}
+                />
+              )}
+            </>
           )}
         />
-        {errors.dateOfBirth && (
+        {errors.dateOfBirth ? (
           <Text className="text-red-500 text-xs mt-1">{errors.dateOfBirth.message}</Text>
+        ) : (
+          <Text className="font-ui mt-1 text-xs text-neutral-outline">
+            Tenés que ser mayor de {MINIMUM_SIGNUP_AGE} años para usar torneAR.
+          </Text>
         )}
       </View>
 

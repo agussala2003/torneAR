@@ -27,6 +27,15 @@ export function getTeamFormatLabel(format: TeamFormat): string {
   return TEAM_FORMAT_OPTIONS.find((option) => option.value === format)?.label ?? format;
 }
 
+/**
+ * "F5", "F11". Para acompañar cifras donde "Futbol 5" no entra —el ranking de
+ * la tarjeta de Mis Equipos— sin que el número pierda protagonismo.
+ */
+export function getTeamFormatShortLabel(format: TeamFormat): string {
+  const digits = /\d+/.exec(format);
+  return digits ? `F${digits[0]}` : getTeamFormatLabel(format);
+}
+
 export function getTeamRoleLabel(role: TeamRole): string {
   switch (role) {
     case 'CAPITAN':

@@ -37,6 +37,20 @@ export function getShieldUrl(teamId: string): string {
 }
 
 /**
+ * Escudo de un equipo tal como viene de `teams.shield_url`.
+ *
+ * La columna guarda el path del bucket, salvo los registros que quedaron con
+ * URL absoluta de una migracion vieja — `getSupabaseStorageUrl` ya distingue
+ * los dos casos. Resolverlo en el DAL y no en cada pantalla evita repetir el
+ * mismo ternario en todos los componentes que pintan un escudo, y devolver
+ * `null` (y no `''`) deja que la UI elija su fallback con un chequeo directo.
+ */
+export function resolveShieldUrl(shieldUrl: string | null | undefined): string | null {
+  if (!shieldUrl) return null;
+  return getSupabaseStorageUrl('shields', shieldUrl) || null;
+}
+
+/**
  * Get badge icon URL from storage
  */
 export function getBadgeIconUrl(badgeSlug: string): string {

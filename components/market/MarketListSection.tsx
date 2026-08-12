@@ -4,6 +4,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { MarketTeamCard, MarketPlayerCard } from '@/components/market/MarketCards';
 import { MarketCardSkeleton } from '@/components/market/MarketCardSkeleton';
 import { MarketTeamPost, MarketPlayerPost } from '@/lib/market-api';
+import type { PostLocation } from '@/lib/market-distance';
 import { TabType } from './types';
 
 interface MarketListSectionProps {
@@ -21,6 +22,12 @@ interface MarketListSectionProps {
   onViewApplications: (postId: string, postType: 'TEAM' | 'PLAYER') => void;
   memberStatusMap?: Record<string, 'own_team' | 'own_player'>;
   applicationCounts?: Record<string, number>;
+  /**
+   * Etiqueta de distancia de una publicación. Viene resuelta de
+   * `useDistanceResolver` para que el origen sea el mismo que en los selectores
+   * de complejo. Ver `lib/market-distance`.
+   */
+  resolveDistanceLabel?: (post: PostLocation) => string | null;
 }
 
 export function MarketListSection({
@@ -38,6 +45,7 @@ export function MarketListSection({
   onViewApplications,
   memberStatusMap,
   applicationCounts,
+  resolveDistanceLabel,
 }: MarketListSectionProps) {
   if (isLoading) {
     return (
@@ -76,6 +84,19 @@ export function MarketListSection({
           onDelete={() => onDeletePost(post.id, true)}
           applicationCount={applicationCounts?.[post.id]}
           onViewApplications={() => onViewApplications(post.id, 'TEAM')}
+          distanceLabel={
+            resolveDistanceLabel?.({
+              // Coordenadas exactas cuando el aviso está enlazado al catálogo
+              // por `venue_id`; si no, el helper cae al match por nombre y
+              // después al centroide de la zona.
+              coords:
+                post.venues?.lat != null && post.venues?.lng != null
+                  ? { lat: post.venues.lat, lng: post.venues.lng }
+                  : null,
+              zone: post.zone,
+              complex: post.complex,
+            }) ?? null
+          }
         />
       );
     } else {
@@ -110,7 +131,6 @@ export function MarketListSection({
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingTop: 0, paddingBottom: 100 }}
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -119,11 +139,20 @@ export function MarketListSection({
           colors={['#00E65B']}
         />
       }
+      /* `flex-1` en el contenedor sólo centra si el contenedor tiene alto que
+         repartir: sin esto el vacío quedaba pegado arriba con todo el espacio
+         libre debajo. */
+      contentContainerStyle={{ paddingTop: 0, paddingBottom: 100, flexGrow: 1 }}
       ListEmptyComponent={
-        <View className="flex-1 items-center justify-center py-20">
-          <AppIcon family="material-community" name="soccer-field" size={48} color="#3F4943" />
-          <Text className="mt-4 text-center font-ui text-neutral-on-surface-variant">
-            No se encontraron publicaciones.
+        <View className="flex-1 items-center justify-center px-8 py-20">
+          <AppIcon family="material-community" name="soccer-field" size={64} color="#869585" />
+          <Text className="font-displayBlack mt-5 text-center text-lg uppercase tracking-wide text-neutral-on-surface">
+            {activeTab === 'TEAMS_LOOKING' ? 'Ningún equipo busca jugadores' : 'Ningún jugador busca equipo'}
+          </Text>
+          <Text className="font-ui mt-2 text-center text-sm leading-5 text-neutral-outline">
+            {activeTab === 'TEAMS_LOOKING'
+              ? 'Probá quitando filtros o volvé más tarde: las publicaciones aparecen apenas un capitán arma partido.'
+              : 'Probá quitando filtros o volvé más tarde. También podés publicar que buscás equipo con el botón +.'}
           </Text>
         </View>
       }
