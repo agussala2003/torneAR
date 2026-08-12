@@ -7,6 +7,7 @@ import { AppState, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useTeamStore } from '@/stores/teamStore';
+import { TAB_BAR_CONTENT_HEIGHT } from '@/hooks/useTabBarInset';
 
 /**
  * Alto del CONTENIDO de la barra, sin el área segura.
@@ -21,8 +22,12 @@ import { useTeamStore } from '@/stores/teamStore';
  * O sea que un `height: 62` a secas dejaría los íconos pisados por la gesture
  * bar de Android y por el Home Indicator de iOS — exactamente el bug que este
  * cambio viene a evitar.
+ *
+ * Se define en `hooks/useTabBarInset` y no acá para que las pantallas que
+ * scrollean por debajo de la barra lean el MISMO número en vez de replicarlo a
+ * ojo, que es de donde salían los `paddingBottom: 114` / `120`. Este archivo es
+ * una ruta de expo-router: no debe exportar nada más que el componente.
  */
-const TAB_BAR_CONTENT_HEIGHT = 62;
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();

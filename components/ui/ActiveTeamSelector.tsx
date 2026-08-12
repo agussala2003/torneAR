@@ -82,6 +82,11 @@ export function ActiveTeamSelector() {
             keyExtractor={item => item.id}
             ItemSeparatorComponent={() => <View className="h-3" />}
             showsVerticalScrollIndicator={false}
+            /* El sheet aporta el inset del dispositivo, pero eso solo separa la
+               superficie de la barra del sistema: con la lista scrolleada al
+               fondo, la ultima tarjeta seguia quedando pegada al borde del
+               sheet. Estos 16 son el aire DENTRO de la lista. */
+            contentContainerStyle={{ paddingBottom: 16 }}
             renderItem={({ item }) => {
               const isActive = item.id === activeTeamId;
               return (

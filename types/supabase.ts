@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.4"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -633,6 +638,7 @@ export type Database = {
           position_wanted: Database["public"]["Enums"]["player_position"]
           team_id: string
           updated_at: string
+          venue_id: string | null
           zone: string | null
         }
         Insert: {
@@ -648,6 +654,7 @@ export type Database = {
           position_wanted?: Database["public"]["Enums"]["player_position"]
           team_id: string
           updated_at?: string
+          venue_id?: string | null
           zone?: string | null
         }
         Update: {
@@ -663,6 +670,7 @@ export type Database = {
           position_wanted?: Database["public"]["Enums"]["player_position"]
           team_id?: string
           updated_at?: string
+          venue_id?: string | null
           zone?: string | null
         }
         Relationships: [
@@ -692,6 +700,20 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "v_team_ranking"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_team_posts_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "v_venues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_team_posts_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
             referencedColumns: ["id"]
           },
         ]
@@ -2117,9 +2139,9 @@ export type Database = {
       get_favorite_team_census: {
         Args: never
         Returns: {
-          team_name: string
           fans: number
           percentage: number
+          team_name: string
         }[]
       }
       get_market_inbox: {
@@ -2321,6 +2343,18 @@ export type Database = {
         Returns: Json
       }
       leave_team_as_member: { Args: { p_team_id: string }; Returns: Json }
+      log_checkin_distance: {
+        Args: {
+          p_distance_m: number
+          p_match_id: string
+          p_profile_id: string
+          p_radius_m: number
+          p_source: string
+          p_team_id: string
+          p_venue_id: string
+        }
+        Returns: undefined
+      }
       match_guest_code_expires_at: {
         Args: { p_created_at: string; p_scheduled_at: string }
         Returns: string
@@ -2690,4 +2724,3 @@ export const Constants = {
     },
   },
 } as const
-

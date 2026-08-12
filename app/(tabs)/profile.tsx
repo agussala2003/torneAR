@@ -21,10 +21,12 @@ import { ProfileFeedbackCard } from '@/components/profile/ProfileFeedbackCard';
 import { ProfileSocialSection } from '@/components/profile/ProfileSocialSection';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { useTabBarInset } from '@/hooks/useTabBarInset';
 import { Logger } from '@/lib/logger';
 
 export default function ProfileScreen() {
   const { signOut, profile, user } = useAuth();
+  const tabBarInset = useTabBarInset();
   const { fetchMyTeams } = useTeamStore();
   const [loading, setLoading] = useState(true);
   const [viewData, setViewData] = useState<ProfileViewData | null>(null);
@@ -137,7 +139,9 @@ export default function ProfileScreen() {
   return (
     <View className="flex-1 bg-surface-base">
       <GlobalHeader />
-      <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: 114 }}>
+      {/* `paddingBottom: 114` fijo dejaba el boton de Cerrar Sesion debajo de
+          la Tab Bar en los equipos con inset grande. */}
+      <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: tabBarInset }}>
         <ProfileHeader profile={viewData.profile} />
         <ProfileStatsGrid stats={viewData.stats} />
         <TouchableOpacity

@@ -42,6 +42,15 @@ export default function MatchesScreen() {
   const [guestData, setGuestData] = useState<GuestMatchesData>({ entries: [], teamIdByMatchId: {} });
   const [showGuestModal, setShowGuestModal] = useState(false);
 
+  // Plegado de las secciones secundarias. Estado local a proposito: es una
+  // preferencia de la sesion, no del usuario — no vale una escritura a la base.
+  //
+  // "Como invitado" arranca abierto (son partidos que todavia se juegan) e
+  // "Historial" cerrado: es un archivo que crece sin techo y era lo que empujaba
+  // el resto de la pantalla fuera de la vista.
+  const [guestExpanded, setGuestExpanded] = useState(true);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+
   // Los partidos donde entré con código no dependen del equipo activo: un
   // invitado puede no tener equipo ninguno. Se cargan aparte y en paralelo, así
   // un fallo acá no se lleva puesta la lista del equipo.
@@ -302,8 +311,13 @@ export default function MatchesScreen() {
               en su propia sección y sin acciones de gestión. */}
           {hasGuestMatches && (
             <>
-              <MatchSectionHeader title="Como invitado" count={guestData.entries.length} />
-              {guestData.entries.map((entry, index) => (
+              <MatchSectionHeader
+                title="Como invitado"
+                count={guestData.entries.length}
+                expanded={guestExpanded}
+                onToggle={() => setGuestExpanded((open) => !open)}
+              />
+              {guestExpanded && guestData.entries.map((entry, index) => (
                 <MatchCard
                   key={entry.id}
                   entry={entry}
@@ -323,8 +337,10 @@ export default function MatchesScreen() {
               <MatchSectionHeader
                 title="Historial"
                 count={viewData.historyMatches.length}
+                expanded={historyExpanded}
+                onToggle={() => setHistoryExpanded((open) => !open)}
               />
-              {viewData.historyMatches.map((entry, index) => (
+              {historyExpanded && viewData.historyMatches.map((entry, index) => (
                 <MatchCard
                   key={entry.id}
                   entry={entry}

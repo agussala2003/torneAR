@@ -101,12 +101,20 @@ interface MarketTeamCardProps {
   applicationCount?: number;
   /** Called when the owner taps "Postulaciones". Not called for non-owners. */
   onViewApplications?: () => void;
+  /**
+   * Etiqueta de distancia ya resuelta (`📍 a 2.5 km`), o `null` si no hay dato.
+   *
+   * Llega calculada desde la pantalla y no se resuelve acá: la tarjeta es un
+   * componente de presentación y el índice de complejos es una consulta única
+   * para toda la lista — resolverlo por tarjeta sería un N+1.
+   */
+  distanceLabel?: string | null;
 }
 
 export function MarketTeamCard({
   postId, teamName, teamZone, matchZone, logoUrl, positionWanted, pitchType, description,
   matchDate, matchTime, complex, isOwner, memberStatus, index = 0, onPressAction, onPressStats, onDelete,
-  applicationCount, onViewApplications,
+  applicationCount, onViewApplications, distanceLabel,
 }: MarketTeamCardProps) {
   const isUrgent = isUrgentPost(matchDate);
   const cleanDescription = sanitizeMarketDescription(description);
@@ -191,6 +199,14 @@ export function MarketTeamCard({
             <Text className="text-neutral-on-surface-variant text-[11px] font-ui flex-1" numberOfLines={1}>
               Zona del partido: {matchZone}
             </Text>
+            {/* Ausente cuando el usuario no cargó zona o cuando ni su zona ni la
+                del aviso tienen complejos con coordenadas: sin dato preferimos
+                no dibujar nada antes que un número inventado. */}
+            {distanceLabel ? (
+              <Text className="font-uiBold shrink-0 rounded bg-brand-primary/15 px-1.5 py-0.5 text-[10px] text-brand-primary">
+                {distanceLabel}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 

@@ -688,15 +688,10 @@ export default function TeamManageScreen() {
           </View>
         )}
 
-        {canModerateRequests && (
-          <TeamManagePendingRequests
-            requests={pendingRequests}
-            processingRequestId={processingRequestId}
-            onApprove={handleApproveRequest}
-            onReject={handleRejectRequest}
-          />
-        )}
-
+        {/* El Plantel va PRIMERO y las solicitudes debajo. Al reves, un capitan
+            con solicitudes pendientes tenia que scrollear por encima de ellas
+            cada vez que entraba a ver a su propio equipo — y las solicitudes
+            son la excepcion, no lo que se viene a mirar todos los dias. */}
         <View className="mt-4 rounded-xl bg-surface-low p-4">
           <View className="mb-3 flex-row items-center justify-between">
             <Text className="font-display text-xs uppercase tracking-wider text-neutral-on-surface-variant">Plantel</Text>
@@ -757,6 +752,15 @@ export default function TeamManageScreen() {
             </View>
           )}
         </View>
+
+        {canModerateRequests && (
+          <TeamManagePendingRequests
+            requests={pendingRequests}
+            processingRequestId={processingRequestId}
+            onApprove={handleApproveRequest}
+            onReject={handleRejectRequest}
+          />
+        )}
 
         {canModerateRequests && (
           <TeamManageHistoryRequests requests={historyRequests} memberProfileIds={memberProfileIds} />

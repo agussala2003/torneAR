@@ -6,6 +6,7 @@ import { useTeamStore } from '@/stores/teamStore';
 import { GlobalHeader } from '@/components/GlobalHeader';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
+import { useTabBarInset } from '@/hooks/useTabBarInset';
 import {
   fetchRankingWithFilters, searchRivalTeams, fetchPlayerLeaderboard,
   fetchActiveSeason, fetchActiveTeamRankingInfo,
@@ -82,6 +83,7 @@ export default function RankingScreen() {
 
   const [rankingEntries, setRankingEntries] = useState<RankingTeamEntry[]>([]);
   const [activeTeamElo, setActiveTeamElo] = useState<number | null>(null);
+  const tabBarInset = useTabBarInset();
   const [activeSeason, setActiveSeason] = useState<{ id: string; name: string } | null>(null);
 
   // NUEVO: Estado para guardar las zonas de la BD
@@ -376,7 +378,9 @@ export default function RankingScreen() {
     <View className="flex-1 bg-surface-base">
       <GlobalHeader isRankingTab={true} />
 
-      <ScrollView className="px-4 pt-4" contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+      {/* La ultima fila de la tabla quedaba tapada por la Tab Bar: el 120 fijo
+          no contemplaba el inset del dispositivo. */}
+      <ScrollView className="px-4 pt-4" contentContainerStyle={{ paddingBottom: tabBarInset }} keyboardShouldPersistTaps="handled">
 
         {/* Nueva cabecera: Tabs + Botón Filtro + Texto */}
         <View className="mb-3">
