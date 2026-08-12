@@ -185,6 +185,9 @@ export default function MarketCreateModal() {
           matchTime: matchTime ? matchTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
           zone,
           complex,
+          // Enlace al catálogo: es de donde salen las coordenadas del badge de
+          // distancia. `undefined` si la cancha se escribió a mano.
+          venueId: selectedVenue?.id,
           description,
         };
         const validation = createTeamPostSchema.safeParse(teamPostPayload);
