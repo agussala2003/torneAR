@@ -420,9 +420,8 @@ export default function HomeScreen() {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => handleMatchPress(nextMatch.id)}
-              className={`mb-5 overflow-hidden rounded-2xl bg-surface-container ${
-                isCountingDown ? 'border border-brand-primary/30' : ''
-              }`}
+              className={`mb-5 overflow-hidden rounded-2xl bg-surface-container ${isCountingDown ? 'border border-brand-primary/30' : ''
+                }`}
             >
               {/* Encabezado */}
               <View className="flex-row items-center justify-between px-4 pt-4">
@@ -431,16 +430,14 @@ export default function HomeScreen() {
                 </Text>
                 <View className="flex-row items-center gap-1.5">
                   <View
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      nextMatch.status === 'CONFIRMADO' ? 'bg-info-secondary' : 'bg-neutral-outline'
-                    }`}
+                    className={`h-1.5 w-1.5 rounded-full ${nextMatch.status === 'CONFIRMADO' ? 'bg-info-secondary' : 'bg-neutral-outline'
+                      }`}
                   />
                   <Text
-                    className={`font-ui text-[11px] ${
-                      nextMatch.status === 'CONFIRMADO'
+                    className={`font-ui text-[11px] ${nextMatch.status === 'CONFIRMADO'
                         ? 'text-info-secondary'
                         : 'text-neutral-outline'
-                    }`}
+                      }`}
                   >
                     {nextMatch.status === 'CONFIRMADO' ? 'Confirmado' : 'Pendiente'}
                   </Text>
@@ -484,26 +481,29 @@ export default function HomeScreen() {
               <View className="border-t border-neutral-outline/20 bg-surface-high/40 px-4 py-3">
                 {isCountingDown ? (
                   <>
-                    <Text className="font-ui mb-2 text-center text-[10px] uppercase tracking-widest text-brand-primary">
+                    <Text className="font-ui mb-2 text-center text-[10px] uppercase tracking-wider text-brand-primary">
                       Empieza en
                     </Text>
-                    <View className="flex-row items-center justify-center gap-1.5">
+
+                    <View className="flex-row items-center justify-center gap-1">
                       {[
                         { value: countdown.hours, label: 'Hs' },
                         { value: countdown.minutes, label: 'Min' },
                         { value: countdown.seconds, label: 'Seg' },
                       ].map((segment, index) => (
-                        <View key={segment.label} className="flex-row items-center gap-1.5">
+                        <View key={segment.label} className="flex-row items-center gap-1">
                           {index > 0 && (
-                            <Text className="font-displayBlack pb-3 text-xl text-neutral-outline">
+                            <Text className="font-displayBlack text-lg text-neutral-outline/60">
                               :
                             </Text>
                           )}
-                          <View className="min-w-[52px] items-center rounded-xl bg-surface-lowest px-2 py-1.5">
-                            <Text className="font-displayBlack text-2xl text-brand-primary">
-                              {segment.value}
+
+                          <View className="min-w-[50px] items-center rounded-lg bg-surface-lowest px-2 py-1.5">
+                            <Text className="font-displayBlack text-2xl leading-none text-brand-primary">
+                              {String(segment.value).padStart(2, '0')}
                             </Text>
-                            <Text className="font-ui text-[9px] uppercase tracking-wider text-neutral-on-surface-variant">
+
+                            <Text className="font-ui mt-1 text-[9px] uppercase tracking-wider text-neutral-on-surface-variant">
                               {segment.label}
                             </Text>
                           </View>
@@ -517,7 +517,9 @@ export default function HomeScreen() {
                   </Text>
                 ) : (
                   <Text className="font-uiBold text-center text-[13px] text-neutral-on-surface">
-                    {nextMatch.scheduledAt ? formatMatchDate(nextMatch.scheduledAt) : 'Sin fecha'}
+                    {nextMatch.scheduledAt
+                      ? formatMatchDate(nextMatch.scheduledAt)
+                      : 'Sin fecha'}
                   </Text>
                 )}
               </View>

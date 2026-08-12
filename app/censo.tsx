@@ -60,12 +60,9 @@ export default function CensoScreen() {
   if (loading) return <GlobalLoader label="Contando hinchas..." />;
 
   const entries = data?.entries ?? [];
-  // Escala de las barras. Las filas vienen ordenadas de la RPC, así que el
-  // primero es el máximo.
   const leaderPercentage = entries[0]?.percentage ?? 0;
 
   return (
-    // `edges={['bottom']}`: el inset superior ya lo aplica SecondaryHeader.
     <SafeAreaView edges={['bottom']} className="flex-1 bg-surface-base">
       <SecondaryHeader
         title="Censo del fútbol argentino"
@@ -73,10 +70,10 @@ export default function CensoScreen() {
       />
 
       <FlatList
-        className="px-4"
+        className="px-2"
         data={entries}
         keyExtractor={(entry) => entry.teamName}
-        contentContainerStyle={{ paddingBottom: 48 }}
+        contentContainerStyle={{ paddingBottom: 52 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -87,16 +84,40 @@ export default function CensoScreen() {
           />
         }
         ListHeaderComponent={
-          <View className="mb-4 mt-4">
+          <View className="pt-4 pb-3">
             {data && data.totalFans > 0 && (
-              <View className="mt-4 flex-row items-center gap-2 rounded-2xl bg-surface-container px-4 py-3">
-                <AppIcon family="material-community" name="account-group" size={18} color="#53E076" />
-                <Text className="font-ui text-[13px] text-neutral-on-surface-variant">
-                  <Text className="font-uiBold text-neutral-on-surface">{data.totalFans}</Text>
+              <View className="flex-row items-center rounded-2xl bg-surface-container px-4 py-3">
+                <View className="h-8 w-8 items-center justify-center rounded-xl bg-[#53E076]/10">
+                  <AppIcon
+                    family="material-community"
+                    name="account-group"
+                    size={18}
+                    color="#53E076"
+                  />
+                </View>
+
+                <Text className="font-ui ml-3 flex-1 text-[13px] leading-5 text-neutral-on-surface-variant">
+                  <Text className="font-uiBold text-neutral-on-surface">
+                    {data.totalFans}
+                  </Text>
                   {data.totalFans === 1 ? ' hincha censado' : ' hinchas censados'} en{' '}
-                  <Text className="font-uiBold text-neutral-on-surface">{entries.length}</Text>
+                  <Text className="font-uiBold text-neutral-on-surface">
+                    {entries.length}
+                  </Text>
                   {entries.length === 1 ? ' club' : ' clubes'}
                 </Text>
+              </View>
+            )}
+
+            {entries.length > 0 && (
+              <View className="mt-5 mb-1 flex-row items-center">
+                <View className="h-px flex-1 bg-neutral-outline/10" />
+
+                <Text className="font-uiBold mx-3 text-[10px] uppercase tracking-[1.2px] text-neutral-on-surface-variant">
+                  Ranking
+                </Text>
+
+                <View className="h-px flex-1 bg-neutral-outline/10" />
               </View>
             )}
           </View>
@@ -109,9 +130,21 @@ export default function CensoScreen() {
           />
         )}
         ListEmptyComponent={
-          <View className="items-center px-6 py-16">
-            <AppIcon family="material-community" name="account-question" size={40} color="#869585" />
-            <Text className="font-ui mt-3 text-center text-sm leading-5 text-neutral-on-surface-variant">
+          <View className="flex-1 items-center px-8 pt-16">
+            <View className="h-20 w-20 items-center justify-center rounded-3xl bg-surface-container">
+              <AppIcon
+                family="material-community"
+                name="account-question"
+                size={38}
+                color="#869585"
+              />
+            </View>
+
+            <Text className="font-displayBlack mt-5 text-center text-lg uppercase tracking-tight text-neutral-on-surface">
+              El censo está vacío
+            </Text>
+
+            <Text className="font-ui mt-2 max-w-[300px] text-center text-[13px] leading-5 text-neutral-on-surface-variant">
               Todavía nadie cargó su cuadro favorito. Completá el tuyo desde tu perfil y sé el
               primero del censo.
             </Text>

@@ -73,7 +73,7 @@ enabled = true
 # Mientras apunte a ./seed.sql, el job db-tests-pgtap del CI VA A FALLAR: las
 # suites de supabase/tests/ hardcodean los UUIDs del seed de testing. Volvelo a
 # ./seed_testing.sql apenas termines de reconstruir producción.
-sql_paths = ["./seed_testing.sql"]
+sql_paths = ["./seed_testing.sql", "./seed_showcase.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
