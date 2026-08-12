@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { TeamShield } from '@/components/ui/TeamShield';
+import { BRONZE, GOLD, SILVER } from '@/constants/podium';
 import type { MiniRankingContext, MiniRankingEntry } from './types';
 import type { Database } from '@/types/supabase';
 
@@ -40,25 +41,31 @@ function ContextChip({ label, icon }: { label: string; icon: string }) {
   );
 }
 
-/** Oro / plata / bronce. El resto cae en el gris de siempre. */
+/**
+ * Oro / plata / bronce. El resto cae en el gris de siempre.
+ *
+ * Los hexes salen de `constants/podium` y no van escritos acá: el mismo oro lo
+ * usan la tabla del ranking y los badges de MVP, y tenerlo repetido en cada
+ * pantalla es cómo terminan desincronizados.
+ */
 const PODIUM_STYLE: Record<
   number,
   { bg: string; text: string; border: string }
 > = {
   1: {
-    bg: '#FABD3222',
-    text: '#FABD32',
-    border: '#FABD3255',
+    bg: `${GOLD}22`,
+    text: GOLD,
+    border: `${GOLD}55`,
   },
   2: {
-    bg: '#BCCBB922',
-    text: '#BCCBB9',
-    border: '#BCCBB955',
+    bg: `${SILVER}22`,
+    text: SILVER,
+    border: `${SILVER}55`,
   },
   3: {
-    bg: '#CD7F3222',
+    bg: `${BRONZE}22`,
     text: '#E0A46A',
-    border: '#CD7F3255',
+    border: `${BRONZE}55`,
   },
 };
 

@@ -2,6 +2,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInRight } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { AppIcon } from '@/components/ui/AppIcon';
+import { GOLD, podiumColor } from '@/constants/podium';
 import { RANKING_COL, RANKING_ROW_PX } from './rankingGrid';
 import type { RankingTeamEntry } from './types';
 
@@ -12,9 +13,10 @@ interface Props {
 }
 
 export function RankingTeamRow({ entry, onPress, index = 0 }: Props) {
-    const isTop3 = entry.rankPosition <= 3;
-    const posColors = ['#FABD32', '#C0C0C0', '#CD7F32'] as const; // Oro, Plata, Bronce
-    const posColor = isTop3 ? posColors[entry.rankPosition - 1] : '#869585';
+    const podium = podiumColor(entry.rankPosition);
+    const isTop3 = podium !== null;
+    const posColor = podium ?? '#869585';
+    const isChampion = entry.rankPosition === 1;
 
     // % Efectividad on-the-fly (seguro si no jugó partidos).
     const winRate = entry.matchesPlayed > 0
@@ -27,7 +29,14 @@ export function RankingTeamRow({ entry, onPress, index = 0 }: Props) {
             activeOpacity={0.85}
             onPress={() => onPress(entry.teamId)}
             style={{ paddingHorizontal: RANKING_ROW_PX }}
-            className={`flex-row items-center overflow-hidden rounded-xl py-3 ${entry.isMyTeam ? 'border border-brand-primary/20 bg-[#1e2a1e]' : 'bg-surface-container'
+            /* El campeón gana sobre "mi equipo": si mi equipo ES el 1°, la fila
+               va dorada. Es la distinción más alta de la tabla y taparla con el
+               verde de pertenencia sería perder justo el dato que se celebra. */
+            className={`flex-row items-center overflow-hidden rounded-xl py-3 ${isChampion
+                ? 'border border-brand-gold/35 bg-[#241f12]'
+                : entry.isMyTeam
+                    ? 'border border-brand-primary/20 bg-[#1e2a1e]'
+                    : 'bg-surface-container'
                 }`}
         >
             {/* Barra lateral de color (solo top 3 o mi equipo) */}
@@ -42,12 +51,19 @@ export function RankingTeamRow({ entry, onPress, index = 0 }: Props) {
                 barra lateral es `absolute`, asi que no empujaba nada y ese
                 margen solo corria las filas del top 3 y la propia respecto del
                 resto de la columna. */}
-            <Text
-                style={{ color: entry.isMyTeam && !isTop3 ? '#53E076' : posColor, width: RANKING_COL.position }}
-                className="font-displayBlack text-base"
-            >
-                {entry.rankPosition}
-            </Text>
+            <View style={{ width: RANKING_COL.position }} className="flex-row items-center gap-0.5">
+                <Text
+                    style={{ color: entry.isMyTeam && !isTop3 ? '#53E076' : posColor }}
+                    className="font-displayBlack text-base"
+                >
+                    {entry.rankPosition}
+                </Text>
+                {/* Trofeo sólo en el 1°: el color por sí solo no distingue al
+                    campeón de quien mira la tabla en escala de grises. */}
+                {isChampion && (
+                    <AppIcon family="material-community" name="trophy" size={11} color={GOLD} />
+                )}
+            </View>
 
             {/* Escudo — el ancho de la celda es fijo y el escudo se centra
                 dentro, para que un equipo con escudo y otro sin el no corran la

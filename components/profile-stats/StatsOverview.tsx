@@ -15,7 +15,7 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
       <StatGrid>
         <StatCard label="Partidos" value={String(stats.matchesPlayed)} />
         <StatCard label="Goles" value={String(stats.goals)} colorClass="text-brand-primary" />
-        <StatCard label="MVPs" value={String(stats.mvps)} colorClass="text-warning-tertiary" />
+        <StatCard label="MVPs" value={String(stats.mvps)} colorClass="text-brand-gold" />
         <StatCard label="Victorias" value={String(stats.wins)} colorClass="text-info-secondary" />
         <StatCard label="Prom. Goles" value={stats.avgGoals} colorClass="text-brand-primary" />
         <StatCard label="% Victorias" value={stats.winPercent} colorClass="text-info-secondary" />

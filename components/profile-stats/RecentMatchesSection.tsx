@@ -141,8 +141,11 @@ export function RecentMatchesSection({ matches, isOwnProfile }: RecentMatchesSec
                         ⚽ {isOwnProfile ? 'Anotaste' : 'Anotó'} {match.playerGoals}
                       </Text>
                     )}
+                    {/* Dorado y no `warning-tertiary`: ser MVP es un logro, no
+                        una advertencia. Comparten valor, pero el token dice de
+                        qué se trata. */}
                     {match.isMvp && (
-                      <Text className="font-uiBold rounded bg-warning-tertiary/15 px-1.5 py-0.5 text-[9px] text-warning-tertiary">
+                      <Text className="font-uiBold rounded bg-brand-gold/15 px-1.5 py-0.5 text-[9px] text-brand-gold">
                         ⭐ MVP
                       </Text>
                     )}

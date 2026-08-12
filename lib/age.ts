@@ -39,6 +39,21 @@ function parseBirthDate(dateOfBirth: string): { year: number; month: number; day
 export const MINIMUM_SIGNUP_AGE = 18;
 
 /**
+ * Fecha de nacimiento MÁS RECIENTE que sigue cumpliendo la edad mínima.
+ *
+ * Es el `maximumDate` del calendario: todo lo posterior deja al usuario con
+ * menos de 18 y el selector directamente no lo ofrece, así el límite se ve
+ * antes de equivocarse en vez de aparecer como un error al enviar.
+ *
+ * El borde es inclusivo y coincide con el del schema: quien cumple 18 HOY tiene
+ * exactamente esta fecha y es válido. Se construye con los componentes de fecha
+ * en local, no restando milisegundos, por el mismo motivo que `calculateAge`.
+ */
+export function maxSignupBirthDate(now: Date = new Date()): Date {
+  return new Date(now.getFullYear() - MINIMUM_SIGNUP_AGE, now.getMonth(), now.getDate());
+}
+
+/**
  * Años cumplidos a partir de un `Date` ya parseado.
  *
  * Existe como función aparte porque hay dos formatos de entrada en la app: la

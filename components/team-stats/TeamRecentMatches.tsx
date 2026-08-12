@@ -98,6 +98,21 @@ export function TeamRecentMatches({ matches }: TeamRecentMatchesProps) {
                     </Text>
                   )}
                 </View>
+
+                {/* MVP del partido, con el mismo dorado que en el historial del
+                    jugador. Solo aparece cuando se cargó: es opcional al subir
+                    el resultado, y una fila de "sin MVP" en cada partido sería
+                    ruido. */}
+                {!!match.mvpName && (
+                  <View className="mt-1 flex-row items-center">
+                    <Text
+                      className="font-uiBold rounded bg-brand-gold/15 px-1.5 py-0.5 text-[9px] text-brand-gold"
+                      numberOfLines={1}
+                    >
+                      ⭐ MVP · {match.mvpName}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View className="items-end gap-1">

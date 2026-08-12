@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { averageAge, calculateAge, formatAge } from '@/lib/age';
+import {
+  averageAge,
+  calculateAge,
+  calculateAgeFromDate,
+  formatAge,
+  maxSignupBirthDate,
+  MINIMUM_SIGNUP_AGE,
+} from '@/lib/age';
 
 // Fecha fija: sin esto los tests de "todavía no cumplió" cambian de resultado
 // según el día en que corra CI.
@@ -74,5 +81,32 @@ describe('averageAge', () => {
   it('redondea a un decimal', () => {
     // 31 y 26 → 28.5
     expect(averageAge(['1995-01-01', '2000-01-01'], NOW)?.average).toBe(28.5);
+  });
+});
+
+describe('maxSignupBirthDate', () => {
+  it('devuelve la fecha de quien cumple la edad mínima justo hoy', () => {
+    // Es el tope del calendario: nacido este día, hoy cumple 18.
+    expect(maxSignupBirthDate(NOW)).toEqual(new Date(2008, 7, 4));
+  });
+
+  it('el tope es válido: quien nació ese día ya tiene la edad mínima', () => {
+    // Borde inclusivo. Si el picker ofrece esta fecha, el schema tiene que
+    // aceptarla — si no, el usuario elige del calendario y le rebota al enviar.
+    expect(calculateAgeFromDate(maxSignupBirthDate(NOW), NOW)).toBe(MINIMUM_SIGNUP_AGE);
+  });
+
+  it('un día después del tope ya no alcanza la edad mínima', () => {
+    const tope = maxSignupBirthDate(NOW);
+    const unDiaDespues = new Date(tope.getFullYear(), tope.getMonth(), tope.getDate() + 1);
+    expect(calculateAgeFromDate(unDiaDespues, NOW)).toBe(MINIMUM_SIGNUP_AGE - 1);
+  });
+
+  it('respeta el 29 de febrero sin desbordar a marzo', () => {
+    // 2044 no es bisiesto: `new Date(2044, 1, 29)` rodaría al 1 de marzo si el
+    // cálculo se hiciera restando milisegundos.
+    const bisiesto = new Date(2062, 1, 29); // 2062-02-29 no existe → 2062-03-01
+    const tope = maxSignupBirthDate(bisiesto);
+    expect(calculateAgeFromDate(tope, bisiesto)).toBe(MINIMUM_SIGNUP_AGE);
   });
 });

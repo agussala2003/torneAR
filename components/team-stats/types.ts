@@ -54,6 +54,11 @@ export type TeamRecentMatch = {
   rivalName: string;
   /** Escudo del rival, ya resuelto a URL absoluta. `null` si el club no cargo uno. */
   rivalShieldUrl: string | null;
+  /**
+   * MVP que eligio ESTE equipo en el partido. `null` cuando no se cargo (es
+   * opcional al subir el resultado) o cuando el partido no termino.
+   */
+  mvpName: string | null;
   goalsFor: number | null;
   goalsAgainst: number | null;
   result: FormResult | null;

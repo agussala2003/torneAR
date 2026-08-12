@@ -18,6 +18,21 @@ module.exports = {
           "primary-container": "#1DB954",
           "primary-fixed": "#72FE8F",
           "inverse-primary": "#006E2D",
+          /*
+           * Dorado del podio y de los logros.
+           *
+           * Comparte el valor con `warning-tertiary`, que es de donde venía: el
+           * oro del ranking, el MVP y las insignias se pintaban con el token de
+           * ADVERTENCIA porque casualmente es ámbar. Semánticamente son cosas
+           * distintas —un MVP no es una advertencia— y con un token propio, el
+           * día que se retoque el amarillo de los avisos el prestigio no se
+           * mueve con él.
+           *
+           * `gold` para la cifra y el ícono; `gold-dim` para bordes y fondos
+           * que lo acompañan sin competirle.
+           */
+          gold: "#FABD32",
+          "gold-dim": "#C9962A",
         },
         surface: {
           lowest: "#0E0E0E",

@@ -42,7 +42,12 @@ type MatchRaw = {
   team_b_id: string;
   team_a: { name: string; shield_url: string | null } | null;
   team_b: { name: string; shield_url: string | null } | null;
-  match_results: { team_id: string; goals_scored: number; goals_against: number }[];
+  match_results: {
+    team_id: string;
+    goals_scored: number;
+    goals_against: number;
+    mvp: { full_name: string } | null;
+  }[];
 };
 
 type MemberRaw = {
@@ -119,7 +124,10 @@ export async function fetchTeamStatsViewData(
         team_a_id, team_b_id,
         team_a:teams!team_a_id(name, shield_url),
         team_b:teams!team_b_id(name, shield_url),
-        match_results(team_id, goals_scored, goals_against)
+        match_results(
+          team_id, goals_scored, goals_against,
+          mvp:profiles!match_results_mvp_id_fkey(full_name)
+        )
       `)
       .or(`team_a_id.eq.${teamId},team_b_id.eq.${teamId}`)
       .order('scheduled_at', { ascending: false })
@@ -211,6 +219,9 @@ export async function fetchTeamStatsViewData(
       matchType: match.match_type,
       rivalName,
       rivalShieldUrl: resolveShieldUrl(rival?.shield_url),
+      // MVP que cargó ESTE equipo, no el del rival: cada `match_results` trae
+      // el suyo y mostrar el del otro lado sería premiar al contrario.
+      mvpName: match.match_results.find((r) => r.team_id === teamId)?.mvp?.full_name ?? null,
       goalsFor,
       goalsAgainst,
       result,

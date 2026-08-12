@@ -43,7 +43,7 @@ describe('userProfileSchema.dateOfBirth', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues.map((issue) => issue.message)).toEqual([
-        'Debes ser mayor de 18 años para registrarte',
+        'Debes ser mayor de 18 años para usar torneAR.',
       ]);
     }
   });
@@ -79,7 +79,7 @@ describe('userProfileSchema.dateOfBirth — edad mínima', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toBe(
-        'Debes ser mayor de 18 años para registrarte',
+        'Debes ser mayor de 18 años para usar torneAR.',
       );
     }
   });

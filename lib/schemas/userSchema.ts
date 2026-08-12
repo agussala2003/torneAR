@@ -75,7 +75,7 @@ export const userProfileSchema = z.object({
 
       const age = calculateAgeFromDate(date);
       return age !== null && age >= MINIMUM_SIGNUP_AGE;
-    }, `Debes ser mayor de ${MINIMUM_SIGNUP_AGE} años para registrarte`),
+    }, `Debes ser mayor de ${MINIMUM_SIGNUP_AGE} años para usar torneAR.`),
   gender: z.enum(['M', 'F', 'X'], { error: 'Selecciona un género' }),
   strongFoot: z.enum(['RIGHT', 'LEFT', 'BOTH'], {
     error: 'Selecciona tu pierna hábil',
