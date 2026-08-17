@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from './ui/AppIcon';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -180,12 +181,12 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
       style={{ paddingTop: insets.top + HEADER_BREATHING_ROOM }}
     >
       {/* Logo TorneAR */}
-      <View className="flex-row items-center gap-2">
-        <View className="h-10 w-10 items-center justify-center rounded-full">
-          <AppIcon family="material-community" name="soccer" size={26} color='#53E076' />
-        </View>
-        <Text className="font-displayBlack text-2xl tracking-wider text-brand-primary">TORNEAR</Text>
-      </View>
+      <Image
+        source={require('@/assets/new-images/logo+nombre_a_la_derecha.png')}
+        contentFit="contain"
+        className="h-10"
+        style={{ aspectRatio: 2169 / 725 }}
+      />
 
       {/* `min-w-0` + pr-3 (antes pr-4): con el logo y los íconos más grandes, el
           presupuesto horizontal del selector se achicó ~40px. */}

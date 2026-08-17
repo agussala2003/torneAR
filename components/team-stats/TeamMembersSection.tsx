@@ -53,11 +53,11 @@ export function TeamMembersSection({ members }: TeamMembersSectionProps) {
                 className="flex-row items-center gap-3 rounded-xl bg-surface-low px-3 py-3"
               >
                 {/* Avatar */}
-                <View className="h-10 w-10 items-center justify-center rounded-lg bg-surface-variant">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-surface-variant">
                   {avatarUrl ? (
                     <Image
                       source={{ uri: avatarUrl }}
-                      className="h-10 w-10 rounded-lg"
+                      className="h-10 w-10 rounded-full"
                       resizeMode="cover"
                     />
                   ) : (

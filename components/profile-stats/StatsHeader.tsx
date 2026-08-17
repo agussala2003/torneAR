@@ -24,23 +24,24 @@ export function StatsHeader({ profile }: StatsHeaderProps) {
   return (
     <View className="items-center pb-2 pt-4">
       <View
-        className="border-4 border-brand-primary-container bg-surface-lowest p-1"
-        style={{ height: 128, width: 128, borderRadius: 6 }}
+        className="rounded-full border-4 border-brand-primary-container bg-surface-lowest p-1"
+        style={{ height: 128, width: 128 }}
       >
         {avatarUrl ? (
           <Image
             source={{ uri: avatarUrl }}
-            style={{ height: '100%', width: '100%', borderRadius: 6 }}
+            className="rounded-full"
+            style={{ height: '100%', width: '100%' }}
             resizeMode="cover"
           />
         ) : (
-          <View className="h-full w-full items-center justify-center rounded-lg bg-surface-high">
+          <View className="h-full w-full items-center justify-center rounded-full bg-surface-high">
             <AppIcon family="material-community" name="account" size={42} color="#BCCBB9" />
           </View>
         )}
       </View>
 
-      <Text className="font-displayBlack mt-4 text-3xl tracking-tight text-neutral-on-surface">
+      <Text className="font-uiBold mt-4 text-3xl text-neutral-on-surface">
         {profile.full_name}
       </Text>
       <Text className="font-ui mt-1 text-base text-neutral-on-surface-variant">

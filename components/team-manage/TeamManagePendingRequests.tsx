@@ -90,7 +90,7 @@ function RequestCard({
   return (
     <View className={`${isWide ? 'w-[280px]' : ''} rounded-lg bg-surface-high px-3 py-3`}>
       <View className="flex-row items-start gap-3">
-        <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-surface-variant">
+        <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-surface-variant">
           {request.profiles?.avatar_url ? (
             <Image
               source={{
