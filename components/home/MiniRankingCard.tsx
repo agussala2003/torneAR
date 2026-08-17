@@ -187,22 +187,10 @@ export function MiniRankingCard({
   return (
     <View className="mb-5">
       {/* Section header */}
-      <View className="mb-2.5 flex-row items-center justify-between px-0.5">
-        <View className="flex-row items-center gap-2">
-          <Text className="font-displayBlack text-xs uppercase tracking-widest text-neutral-on-surface-variant">
-            Ranking
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={onPress}
-          className="px-1 py-1"
-        >
-          <Text className="font-uiBold text-[11px] text-info-secondary">
-            Ver ranking
-          </Text>
-        </TouchableOpacity>
+      <View className="mb-3 px-0.5">
+        <Text className="font-displayBlack text-sm uppercase tracking-wider text-neutral-on-surface-variant">
+          Ranking
+        </Text>
       </View>
 
       <TouchableOpacity

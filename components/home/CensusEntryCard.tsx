@@ -22,8 +22,8 @@ export function CensusEntryCard({ onPress }: Props) {
       accessibilityLabel="Abrir el censo del fútbol argentino"
       className="mb-5 flex-row items-center gap-3 rounded-2xl border border-info-secondary/20 bg-surface-container p-4"
     >
-      <View className="h-12 w-12 items-center justify-center rounded-full bg-info-secondary/15">
-        <AppIcon family="material-community" name="chart-donut" size={24} color="#8CCDFF" />
+      <View className="h-12 w-12 items-center justify-center rounded-full bg-brand-primary/15">
+        <AppIcon family="material-community" name="chart-donut" size={24} color="#53E076" />
       </View>
 
       <View className="flex-1">
