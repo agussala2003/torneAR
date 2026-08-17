@@ -29,6 +29,18 @@ type GlobalHeaderProps = {
  */
 const HEADER_BREATHING_ROOM = 12;
 
+/**
+ * Ancho/alto fijos para el logo y no `aspectRatio` con un solo lado: en un
+ * `flex-row` sin stretch, Yoga (el layout nativo de iOS/Android) no siempre
+ * deriva el ancho a partir de la altura + aspectRatio de forma confiable con
+ * `expo-image` — anda bien en react-native-web (que usa CSS real) pero en el
+ * celular el logo terminaba en 0 de ancho. Mismo criterio que el resto de las
+ * imágenes locales de la app (`TeamShield`, `MarketCards`): las dos
+ * dimensiones, explícitas.
+ */
+const LOGO_HEIGHT = 40;
+const LOGO_WIDTH = Math.round(LOGO_HEIGHT * (2169 / 725));
+
 export function GlobalHeader({ onNotificationPress, notificationCount, isMarketTab, isRankingTab }: GlobalHeaderProps) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
@@ -184,8 +196,7 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
       <Image
         source={require('@/assets/new-images/logo_nombre_derecha.png')}
         contentFit="contain"
-        className="h-10"
-        style={{ aspectRatio: 2169 / 725 }}
+        style={{ height: LOGO_HEIGHT, width: LOGO_WIDTH }}
       />
 
       {/* `min-w-0` + pr-3 (antes pr-4): con el logo y los íconos más grandes, el
