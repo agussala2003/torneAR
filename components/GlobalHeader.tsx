@@ -182,7 +182,7 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
     >
       {/* Logo TorneAR */}
       <Image
-        source={require('@/assets/new-images/logo+nombre_a_la_derecha.png')}
+        source={require('@/assets/new-images/logo_nombre_derecha.png')}
         contentFit="contain"
         className="h-10"
         style={{ aspectRatio: 2169 / 725 }}
