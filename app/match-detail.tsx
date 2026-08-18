@@ -49,6 +49,7 @@ import { CancellationModal } from '@/components/matches/CancellationModal';
 import { CancellationRequestSection } from '@/components/matches/CancellationRequestSection';
 import { WoModal } from '@/components/matches/WoModal';
 import { DisputeSection } from '@/components/matches/DisputeSection';
+import { ShareMatchButton } from '@/components/match-share/ShareMatchButton';
 import type { MatchDetailViewData, MatchProposalFormData } from '@/components/matches/types';
 
 export default function MatchDetailScreen() {
@@ -700,6 +701,7 @@ export default function MatchDetailScreen() {
                 ¡Buen partido! El Fair Play de ambos equipos ha sido actualizado.
               </Text>
             </View>
+            <ShareMatchButton matchId={match.id} myTeamId={myTeamId} />
           </>
         )}
 
@@ -735,6 +737,7 @@ export default function MatchDetailScreen() {
                 </Text>
               )}
             </View>
+            <ShareMatchButton matchId={match.id} myTeamId={myTeamId} />
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
             />

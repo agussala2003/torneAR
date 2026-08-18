@@ -8,10 +8,11 @@ import { GlobalLoader } from '@/components/GlobalLoader';
 import { getAuthErrorMessage } from '@/lib/auth-error-messages';
 import { HeroButton } from '@/components/ui/HeroButton';
 import { GoogleAuthButton } from '@/components/ui/GoogleAuthButton';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
 import { useSignupGateStore } from '@/stores/signupGateStore';
+import { useReferralStore } from '@/stores/referralStore';
 import { useMinimumVisible } from '@/hooks/useMinimumVisible';
 import {
   signInSchema,
@@ -26,6 +27,19 @@ export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
 
   const { showAlert, AlertComponent } = useCustomAlert();
+
+  // Captura del código de referido (`tornear://login?ref=<username>`).
+  // `deepLinkToHref` (lib/deep-linking.ts) ya preserva el query param sin
+  // ningún cambio ahí; acá sólo se lee y se guarda para el onboarding, porque
+  // `profiles` no tiene grant para `anon` — recién se puede resolver contra un
+  // username real una vez que haya sesión (ver stores/referralStore.ts).
+  const { ref: referralUsername } = useLocalSearchParams<{ ref?: string }>();
+
+  useEffect(() => {
+    if (referralUsername) {
+      useReferralStore.getState().setPendingReferralUsername(referralUsername);
+    }
+  }, [referralUsername]);
 
   // Flags de PRESENTACIÓN. Los guards de reentrada de abajo siguen mirando
   // `loading` / `googleLoading` reales: si usaran estos, el formulario quedaría

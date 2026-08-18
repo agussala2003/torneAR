@@ -24,6 +24,7 @@ import { FAVORITE_TEAM_OPTIONS } from '@/lib/favorite-teams';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
 import { saveOnboardingProfile } from '@/lib/onboarding-data';
 import { useUsernameAvailability } from '@/hooks/useUsernameAvailability';
+import { useReferralStore } from '@/stores/referralStore';
 import { Logger } from '@/lib/logger';
 
 const STEP_WIDTH = ['w-1/3', 'w-2/3', 'w-full'] as const;
@@ -121,7 +122,10 @@ export default function OnboardingScreen() {
     if (!user) return;
     setLoading(true);
     try {
-      await saveOnboardingProfile(user.id, data);
+      // Se consume (no se lee) recién acá, no antes: el perfil todavía no
+      // existe en los pasos 1 y 2, y `set_referral` necesita que ya exista.
+      const referredByUsername = useReferralStore.getState().consumePendingReferralUsername();
+      await saveOnboardingProfile(user.id, data, referredByUsername);
       await refreshProfile();
       Logger.info('Onboarding completado', {
         scope: 'onboarding.onSubmit',

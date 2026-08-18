@@ -14,13 +14,20 @@ import { Logger } from '@/lib/logger';
 type ProfileHeaderProps = {
   profile: ProfileRow;
   onAvatarUpdate?: (newAvatarUrl: string) => void;
+  /**
+   * Recompensa de estatus del sistema de referidos: `true` cuando la insignia
+   * "embajador" está ganada (`get_player_badges`, slug `embajador`). Se
+   * deriva del array de insignias que la pantalla ya carga — no dispara
+   * ninguna query nueva acá.
+   */
+  isEmbajador?: boolean;
 };
 
 function positionLabel(position: string): string {
   return position.replaceAll('_', ' ');
 }
 
-export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
+export function ProfileHeader({ profile, onAvatarUpdate, isEmbajador = false }: ProfileHeaderProps) {
   const { refreshProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [avatarPath, setAvatarPath] = useState(profile.avatar_url);
@@ -113,7 +120,9 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
         className="relative"
       >
         <View
-          className="rounded-full border-4 border-brand-primary-container bg-surface-lowest p-1"
+          className={`rounded-full border-4 bg-surface-lowest p-1 ${
+            isEmbajador ? 'border-brand-gold' : 'border-brand-primary-container'
+          }`}
           style={{ height: 128, width: 128 }}
         >
           {uploading ? (

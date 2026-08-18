@@ -72,7 +72,10 @@ export default function ProfileStatsScreen() {
     <View className="flex-1 bg-surface-base">
       <SecondaryHeader title="Stats" />
       <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 16, paddingBottom: 114 }}>
-        <StatsHeader profile={viewData.profile} />
+        <StatsHeader
+          profile={viewData.profile}
+          isEmbajador={viewData.badges.some((b) => b.slug === 'embajador' && b.isEarned)}
+        />
         <StatsOverview stats={viewData.stats} />
         <RecentMatchesSection matches={viewData.recentMatches} isOwnProfile={isOwnProfile} />
         <BadgesSection badges={viewData.badges} />

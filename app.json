@@ -13,7 +13,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.agussala2003.tornear",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "TorneAR necesita tu ubicación para verificar que estás en la cancha al hacer check-in."
+        "NSLocationWhenInUseUsageDescription": "TorneAR necesita tu ubicación para verificar que estás en la cancha al hacer check-in.",
+        "LSApplicationQueriesSchemes": ["instagram"]
       }
     },
     "android": {

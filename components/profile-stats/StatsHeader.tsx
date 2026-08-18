@@ -10,9 +10,11 @@ function positionLabel(pos: string): string {
 
 type StatsHeaderProps = {
   profile: ProfileRow;
+  /** Ver el mismo prop en `components/profile/ProfileHeader.tsx`. */
+  isEmbajador?: boolean;
 };
 
-export function StatsHeader({ profile }: StatsHeaderProps) {
+export function StatsHeader({ profile, isEmbajador = false }: StatsHeaderProps) {
   const avatarUrl = profile.avatar_url
     ? getSupabaseStorageUrl('avatars', profile.avatar_url)
     : null;
@@ -24,7 +26,9 @@ export function StatsHeader({ profile }: StatsHeaderProps) {
   return (
     <View className="items-center pb-2 pt-4">
       <View
-        className="rounded-full border-4 border-brand-primary-container bg-surface-lowest p-1"
+        className={`rounded-full border-4 bg-surface-lowest p-1 ${
+          isEmbajador ? 'border-brand-gold' : 'border-brand-primary-container'
+        }`}
         style={{ height: 128, width: 128 }}
       >
         {avatarUrl ? (
