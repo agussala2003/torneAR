@@ -14,6 +14,7 @@ import { ProfileViewData, TeamItem } from '@/components/profile/types';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileStatsGrid } from '@/components/profile/ProfileStatsGrid';
 import { ProfileBadgesSection } from '@/components/profile/ProfileBadgesSection';
+import { ProfileInviteCard } from '@/components/profile/ProfileInviteCard';
 import { ProfileTeamsSection } from '@/components/profile/ProfileTeamsSection';
 import { CareerTimeline } from '@/components/profile/CareerTimeline';
 import { ProfileSettingsSection } from '@/components/profile/ProfileSettingsSection';
@@ -136,16 +137,15 @@ export default function ProfileScreen() {
     );
   }
 
+  const isEmbajador = viewData.badges.some((b) => b.slug === 'embajador' && b.isEarned);
+
   return (
     <View className="flex-1 bg-surface-base">
       <GlobalHeader />
       {/* `paddingBottom: 114` fijo dejaba el boton de Cerrar Sesion debajo de
           la Tab Bar en los equipos con inset grande. */}
       <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: tabBarInset }}>
-        <ProfileHeader
-          profile={viewData.profile}
-          isEmbajador={viewData.badges.some((b) => b.slug === 'embajador' && b.isEarned)}
-        />
+        <ProfileHeader profile={viewData.profile} isEmbajador={isEmbajador} />
         <ProfileStatsGrid stats={viewData.stats} />
         <TouchableOpacity
           activeOpacity={0.9}
@@ -156,6 +156,11 @@ export default function ProfileScreen() {
           <Text className="font-display text-xs uppercase tracking-wider text-info-secondary">Ver stats detalladas</Text>
         </TouchableOpacity>
         <ProfileBadgesSection badges={viewData.badges} />
+        <ProfileInviteCard
+          username={viewData.profile.username}
+          isEmbajador={isEmbajador}
+          onError={(message) => showAlert('No se pudo compartir', message)}
+        />
         <ProfileTeamsSection
           teams={viewData.teams}
           onCreateTeam={() => router.push('/team-create')}
