@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Text, TouchableOpacity, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { fetchMatchShareViewData } from '@/lib/match-share-data';
-import { captureViewToUri, shareGeneric } from '@/lib/share-image';
+import { captureViewToUri, shareGeneric, NativeCaptureUnavailableError } from '@/lib/share-image';
 import { shareToInstagramStories } from '@/lib/instagram-stories';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
@@ -77,6 +77,23 @@ export function ShareMatchButton({ matchId, myTeamId }: Props) {
           await shareGeneric(uri);
         }
       } catch (error) {
+        // Binario sin el módulo nativo de captura: es esperable en un cliente
+        // viejo, no un fallo de la app. Se loguea como warn (para no ensuciar
+        // los errores reales) y el mensaje NO invita a reintentar, porque
+        // reintentar no puede funcionar hasta que se instale una build nueva.
+        if (error instanceof NativeCaptureUnavailableError) {
+          Logger.warn('Captura no disponible en este binario; no se puede compartir', {
+            scope: 'ShareMatchButton.handleShare',
+            target,
+            matchId,
+          });
+          showAlert(
+            'Función no disponible',
+            'Esta versión de la app todavía no puede generar la imagen. Actualizá a la última versión para compartir tus resultados.',
+          );
+          return;
+        }
+
         Logger.error('No se pudo compartir la tarjeta', {
           scope: 'ShareMatchButton.handleShare',
           target,
