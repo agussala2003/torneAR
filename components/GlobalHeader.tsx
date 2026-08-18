@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppIcon } from './ui/AppIcon';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -27,6 +28,18 @@ type GlobalHeaderProps = {
  * borde de la hora y la batería, que es lo que se reportó en el testing.
  */
 const HEADER_BREATHING_ROOM = 12;
+
+/**
+ * Ancho/alto fijos para el logo y no `aspectRatio` con un solo lado: en un
+ * `flex-row` sin stretch, Yoga (el layout nativo de iOS/Android) no siempre
+ * deriva el ancho a partir de la altura + aspectRatio de forma confiable con
+ * `expo-image` — anda bien en react-native-web (que usa CSS real) pero en el
+ * celular el logo terminaba en 0 de ancho. Mismo criterio que el resto de las
+ * imágenes locales de la app (`TeamShield`, `MarketCards`): las dos
+ * dimensiones, explícitas.
+ */
+const LOGO_HEIGHT = 40;
+const LOGO_WIDTH = Math.round(LOGO_HEIGHT * (2169 / 725));
 
 export function GlobalHeader({ onNotificationPress, notificationCount, isMarketTab, isRankingTab }: GlobalHeaderProps) {
   const insets = useSafeAreaInsets();
@@ -180,12 +193,11 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
       style={{ paddingTop: insets.top + HEADER_BREATHING_ROOM }}
     >
       {/* Logo TorneAR */}
-      <View className="flex-row items-center gap-2">
-        <View className="h-10 w-10 items-center justify-center rounded-full">
-          <AppIcon family="material-community" name="soccer" size={26} color='#53E076' />
-        </View>
-        <Text className="font-displayBlack text-2xl tracking-wider text-brand-primary">TORNEAR</Text>
-      </View>
+      <Image
+        source={require('@/assets/new-images/logo_nombre_derecha.png')}
+        contentFit="contain"
+        style={{ height: LOGO_HEIGHT, width: LOGO_WIDTH }}
+      />
 
       {/* `min-w-0` + pr-3 (antes pr-4): con el logo y los íconos más grandes, el
           presupuesto horizontal del selector se achicó ~40px. */}

@@ -45,12 +45,12 @@ export function NotificationsListSection({
             activeOpacity={0.9}
             className={`rounded-xl border p-3 ${item.is_read
                 ? 'border-neutral-outline-variant/20 bg-surface-low'
-                : 'border-info-secondary/35 bg-info-secondary/10'
+                : 'border-brand-primary/35 bg-brand-primary/10'
               }`}
           >
             <View className="flex-row items-start gap-3">
               <View
-                className={`mt-1 h-2.5 w-2.5 rounded-full ${item.is_read ? 'bg-surface-bright/60' : 'bg-info-secondary'
+                className={`mt-1 h-2.5 w-2.5 rounded-full ${item.is_read ? 'bg-surface-bright/60' : 'bg-brand-primary'
                   }`}
               />
               <View className="flex-1">

@@ -1369,6 +1369,7 @@ export type Database = {
           id: string
           is_admin: boolean
           preferred_position: Database["public"]["Enums"]["player_position"]
+          referred_by: string | null
           strong_foot: string | null
           updated_at: string
           username: string
@@ -1386,6 +1387,7 @@ export type Database = {
           id?: string
           is_admin?: boolean
           preferred_position?: Database["public"]["Enums"]["player_position"]
+          referred_by?: string | null
           strong_foot?: string | null
           updated_at?: string
           username: string
@@ -1403,12 +1405,21 @@ export type Database = {
           id?: string
           is_admin?: boolean
           preferred_position?: Database["public"]["Enums"]["player_position"]
+          referred_by?: string | null
           strong_foot?: string | null
           updated_at?: string
           username?: string
           zone?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       result_dispute_votes: {
         Row: {
@@ -2423,6 +2434,10 @@ export type Database = {
           p_to_team_id: string
         }
         Returns: Json
+      }
+      set_referral: {
+        Args: { p_referred_by_username: string }
+        Returns: undefined
       }
       submit_dispute_vote: {
         Args: { p_match_id: string; p_voted_team_id: string }

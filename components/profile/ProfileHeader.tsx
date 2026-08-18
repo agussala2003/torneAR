@@ -14,13 +14,20 @@ import { Logger } from '@/lib/logger';
 type ProfileHeaderProps = {
   profile: ProfileRow;
   onAvatarUpdate?: (newAvatarUrl: string) => void;
+  /**
+   * Recompensa de estatus del sistema de referidos: `true` cuando la insignia
+   * "embajador" está ganada (`get_player_badges`, slug `embajador`). Se
+   * deriva del array de insignias que la pantalla ya carga — no dispara
+   * ninguna query nueva acá.
+   */
+  isEmbajador?: boolean;
 };
 
 function positionLabel(position: string): string {
   return position.replaceAll('_', ' ');
 }
 
-export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
+export function ProfileHeader({ profile, onAvatarUpdate, isEmbajador = false }: ProfileHeaderProps) {
   const { refreshProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [avatarPath, setAvatarPath] = useState(profile.avatar_url);
@@ -112,34 +119,40 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
         activeOpacity={0.8}
         className="relative"
       >
-        <View 
-          className="border-4 border-brand-primary-container bg-surface-lowest p-1"
-          style={{ height: 128, width: 128, borderRadius: 6 }}
+        <View
+          className={`rounded-full border-4 bg-surface-lowest p-1 ${
+            isEmbajador ? 'border-brand-gold' : 'border-brand-primary-container'
+          }`}
+          style={{ height: 128, width: 128 }}
         >
           {uploading ? (
-            <View 
-              className="items-center justify-center bg-surface-high"
-              style={{ height: '100%', width: '100%', borderRadius: 6 }}
+            <View
+              className="items-center justify-center rounded-full bg-surface-high"
+              style={{ height: '100%', width: '100%' }}
             >
               <ActivityIndicator size="large" color="#53E076" />
             </View>
           ) : avatarUrl ? (
-            <Image 
-              source={{ uri: avatarUrl }} 
-              style={{ height: '100%', width: '100%', borderRadius: 6 }}
-              resizeMode="cover" 
+            <Image
+              source={{ uri: avatarUrl }}
+              className="rounded-full"
+              style={{ height: '100%', width: '100%' }}
+              resizeMode="cover"
             />
           ) : (
-            <View 
-              className="items-center justify-center bg-surface-high"
-              style={{ height: '100%', width: '100%', borderRadius: 6 }}
+            <View
+              className="items-center justify-center rounded-full bg-surface-high"
+              style={{ height: '100%', width: '100%' }}
             >
               <AppIcon family="material-community" name="account" size={42} color="#BCCBB9" />
             </View>
           )}
         </View>
-        {/* Badge: + si no hay foto, ✓ si hay foto */}
-        <View className="absolute bottom-3 right-3 rounded-lg border-2 border-surface-base bg-brand-primary p-1">
+        {/* Badge: + si no hay foto, ✓ si hay foto.
+            bottom/right en 1: con el aro ahora circular, el punto de tangencia
+            del círculo queda ~19px adentro de la esquina — un inset de 3 (12px)
+            dejaba la insignia flotando lejos del borde visible. */}
+        <View className="absolute bottom-1 right-1 rounded-lg border-2 border-surface-base bg-brand-primary p-1">
           <AppIcon 
             family="material-icons" 
             name={avatarUrl ? "verified" : "add"} 
@@ -155,7 +168,7 @@ export function ProfileHeader({ profile, onAvatarUpdate }: ProfileHeaderProps) {
           primera linea del perfil es demasiado agresivo. */}
       <View className="mt-4 w-full items-center px-6">
         <Text
-          className="font-displayBlack text-center text-3xl tracking-tight text-neutral-on-surface"
+          className="font-uiBold text-center text-3xl text-neutral-on-surface"
           numberOfLines={2}
           ellipsizeMode="tail"
         >

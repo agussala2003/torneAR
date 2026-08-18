@@ -142,7 +142,10 @@ export default function ProfileScreen() {
       {/* `paddingBottom: 114` fijo dejaba el boton de Cerrar Sesion debajo de
           la Tab Bar en los equipos con inset grande. */}
       <ScrollView className="px-4" contentContainerStyle={{ paddingTop: 18, paddingBottom: tabBarInset }}>
-        <ProfileHeader profile={viewData.profile} />
+        <ProfileHeader
+          profile={viewData.profile}
+          isEmbajador={viewData.badges.some((b) => b.slug === 'embajador' && b.isEarned)}
+        />
         <ProfileStatsGrid stats={viewData.stats} />
         <TouchableOpacity
           activeOpacity={0.9}

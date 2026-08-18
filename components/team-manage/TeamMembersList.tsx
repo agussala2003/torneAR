@@ -63,7 +63,7 @@ export function TeamMembersList({
               {/* flex-1 + minWidth 0: un nombre largo (o con emojis) empujaba el
                   badge de rol fuera de la card. */}
               <View className="flex-1 flex-row items-center gap-3" style={{ minWidth: 0 }}>
-                <View className="h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-variant">
+                <View className="h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-variant">
                   {avatarUrl ? (
                     <Image source={{ uri: avatarUrl }} className="h-full w-full" />
                   ) : (
