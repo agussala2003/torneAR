@@ -7,7 +7,7 @@ import { Epilogue_700Bold } from '@expo-google-fonts/epilogue';
 import { DarkTheme, ThemeProvider, Theme } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { LogBox } from 'react-native';
+import { LogBox, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
@@ -61,7 +61,7 @@ const navigationTheme: Theme = {
   },
 };
 
-function RootNavigation() {
+function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { session, profile, loading, hydrated } = useAuth();
   // Suscripción reactiva (y no `getState()` como el deep link, que se consume de
   // forma atómica): soltar la retención tiene que volver a correr el guard.
@@ -103,11 +103,24 @@ function RootNavigation() {
   // y el guard lo consume al quedar autenticado. Los links públicos navegan ya.
   useEffect(() => {
     void Linking.getInitialURL().then((url) => {
+      // TODO(debug): temporal, sacar antes de mergear a main. Confirma que el
+      // intent se lee ANTES de que el guard de auth toque la navegación.
+      // `__DEV__` lo deja fuera de cualquier build de release.
+      if (__DEV__) {
+        console.log('[deep-link][cold-start] url cruda:', url);
+      }
+
       if (!url) return;
 
       // En cold-start la sesión todavía no se hidrató: tratamos como no-auth,
       // así una ruta protegida se difiere y el guard la consume tras el login.
       const action = resolveDeepLink(url, false);
+
+      // TODO(debug): temporal, sacar junto con el log de arriba.
+      if (__DEV__) {
+        console.log('[deep-link][cold-start] accion resuelta:', JSON.stringify(action));
+      }
+
       if (action.kind === 'defer') {
         useDeepLinkStore.getState().setPendingDeepLink(action.url);
       } else if (action.kind === 'navigate') {
@@ -176,35 +189,57 @@ function RootNavigation() {
     }
   }, [session, profile, loading, segments, router, showIntro, hydrated, isHoldingOnboardingRedirect]);
 
-  if (showIntro) {
-    return <AppIntroSplash />;
-  }
+  // El overlay tapa la pantalla mientras corre el intro o mientras faltan las
+  // fuentes. Lo que YA no hace es sustituir al navegador (ver comentario abajo).
+  const showOverlay = showIntro || !fontsLoaded;
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.dark.background } }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="forgot-password" />
-      <Stack.Screen name="auth/callback" />
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="profile-stats" />
-      <Stack.Screen name="faq" />
-      <Stack.Screen name="censo" />
-      <Stack.Screen name="team-create" />
-      <Stack.Screen name="team-join" />
-      <Stack.Screen name="team-requests" />
-      <Stack.Screen name="team-manage" />
-      <Stack.Screen name="notifications" />
-      <Stack.Screen name="market-chats" />
-      <Stack.Screen name="market-my-applications" />
-      <Stack.Screen name="team-stats" />
-      <Stack.Screen name="challenge-inbox" />
-      <Stack.Screen name="match-detail" />
-      <Stack.Screen name="match-checkin" />
-      <Stack.Screen name="admin/wo-review" />
-      <Stack.Screen name="(modals)" />
-      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.dark.background } }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="auth/callback" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="profile-stats" />
+        <Stack.Screen name="faq" />
+        <Stack.Screen name="censo" />
+        <Stack.Screen name="team-create" />
+        <Stack.Screen name="team-join" />
+        <Stack.Screen name="team-requests" />
+        <Stack.Screen name="team-manage" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="market-chats" />
+        <Stack.Screen name="market-my-applications" />
+        <Stack.Screen name="team-stats" />
+        <Stack.Screen name="challenge-inbox" />
+        <Stack.Screen name="match-detail" />
+        <Stack.Screen name="match-checkin" />
+        <Stack.Screen name="admin/wo-review" />
+        <Stack.Screen name="(modals)" />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      </Stack>
+      {/* El intro va SUPERPUESTO, no en lugar del navegador.
+
+          Antes esto era un `return <AppIntroSplash />` antes del <Stack>: durante
+          esos ~2,3 s el árbol de navegación directamente no existía, así que la
+          URL inicial no tenía contra qué resolverse y cualquier `router.replace()`
+          de los efectos de deep link corría sin navegador montado.
+
+          Como hermano absoluto, el <Stack> existe desde el primer frame y el
+          intro sólo lo tapa. La View a pantalla completa además captura los
+          toques (pointerEvents por defecto), así que nadie interactúa con las
+          pantallas de abajo mientras el intro se ve.
+
+          Se mantiene también mientras faltan las fuentes: eso permite montar el
+          navegador ya (ver RootLayout) sin que se llegue a ver texto con la
+          tipografía de fallback. */}
+      {showOverlay && (
+        <View style={StyleSheet.absoluteFill}>
+          <AppIntroSplash />
+        </View>
+      )}
+    </>
   );
 }
 
@@ -219,8 +254,8 @@ export default function RootLayout() {
   });
 
   // Telemetria: engancha excepciones globales y unhandled rejections a app_logs.
-  // Va acá —antes del early return por fuentes— para cubrir también los errores
-  // que ocurren mientras la app todavía no pintó nada.
+  // Va lo más arriba posible del árbol para cubrir también los errores que
+  // ocurren mientras la app todavía no pintó nada.
   useEffect(() => initLogger(), []);
 
   // Force update. Va acá y no dentro de RootNavigation por dos motivos:
@@ -233,10 +268,11 @@ export default function RootLayout() {
   // devuelve `required: false` y la app abre normal.
   const forceUpdate = useForceUpdate();
 
-  if (!fontsLoaded) {
-    return null;
-  }
-
+  // Acá había un `if (!fontsLoaded) return null`. Era el MISMO problema que el
+  // intro: mientras las fuentes cargaban, el layout raíz no rendereaba ningún
+  // navegador, y expo-router exige que el root layout monte uno para poder
+  // resolver rutas. Ahora el árbol se monta siempre y `fontsLoaded` viaja a
+  // RootNavigation, que se limita a dejar el overlay puesto hasta que estén.
   return (
     /**
      * `SafeAreaProvider` es el que habilita `useSafeAreaInsets()` en toda la app
@@ -255,7 +291,7 @@ export default function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         <AuthProvider>
           <UIProvider>
-            <RootNavigation />
+            <RootNavigation fontsLoaded={fontsLoaded} />
             <AppUpdateModal
               visible={forceUpdate.required}
               currentVersion={forceUpdate.currentVersion}
