@@ -92,18 +92,18 @@ export async function fetchTeamManageViewData(teamId: string, profileId: string 
       .maybeSingle(),
     supabase
       .from('team_members')
-      .select('profile_id, role, joined_at, profiles(id, full_name, username, avatar_url, preferred_position, date_of_birth, expo_push_token)')
+      .select('profile_id, role, joined_at, profiles(id, full_name, username, avatar_url, preferred_position)')
       .eq('team_id', teamId)
       .order('joined_at', { ascending: true }),
     supabase
       .from('team_join_requests')
-      .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position, date_of_birth, expo_push_token)')
+      .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position)')
       .eq('team_id', teamId)
       .eq('status', 'PENDIENTE')
       .order('created_at', { ascending: true }),
     supabase
       .from('team_join_requests')
-      .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position, date_of_birth, expo_push_token)')
+      .select('id, profile_id, status, created_at, profiles(id, full_name, username, avatar_url, preferred_position)')
       .eq('team_id', teamId)
       .in('status', ['ACEPTADA', 'RECHAZADA'])
       .order('created_at', { ascending: false })
@@ -116,14 +116,48 @@ export async function fetchTeamManageViewData(teamId: string, profileId: string 
   if (historyRes.error) throw historyRes.error;
 
   const membersData = (membersRes.data as TeamMemberRow[] | null) ?? [];
+  const pendingData = (pendingRes.data as TeamJoinRequestRow[] | null) ?? [];
+  const historyData = (historyRes.data as TeamJoinRequestRow[] | null) ?? [];
   const selfRole = profileId ? membersData.find((member) => member.profile_id === profileId)?.role : null;
   const selfCanModerate = selfRole === 'CAPITAN' || selfRole === 'SUBCAPITAN';
 
+  // Edad de cada perfil involucrado: consulta aparte a `profiles_public`, no
+  // un embed a `profiles` — `date_of_birth` de un perfil ajeno ya no es
+  // legible desde el cliente (20260819100000_privacy_and_age_compliance).
+  const allProfileIds = Array.from(
+    new Set(
+      [...membersData, ...pendingData, ...historyData]
+        .map((row) => row.profiles?.id)
+        .filter((id): id is string => !!id),
+    ),
+  );
+  const agesById = new Map<string, number | null>();
+  if (allProfileIds.length > 0) {
+    const { data: agesData, error: agesError } = await supabase
+      .from('profiles_public')
+      .select('id, age')
+      .in('id', allProfileIds);
+
+    if (agesError) {
+      Logger.warn('No se pudo leer la edad de los perfiles del equipo', {
+        scope: 'teamManage.fetchTeamManageViewData',
+        teamId,
+        error: agesError,
+      });
+    } else {
+      for (const row of agesData ?? []) {
+        if (row.id) agesById.set(row.id, row.age);
+      }
+    }
+  }
+  const withAge = <T extends { profiles: { id: string } | null }>(row: T): T =>
+    row.profiles ? { ...row, profiles: { ...row.profiles, age: agesById.get(row.profiles.id) ?? null } } : row;
+
   return {
     team: (teamRes.data as TeamDetailRow | null) ?? null,
-    members: membersData,
-    pendingRequests: selfCanModerate ? ((pendingRes.data as TeamJoinRequestRow[] | null) ?? []) : [],
-    historyRequests: selfCanModerate ? ((historyRes.data as TeamJoinRequestRow[] | null) ?? []) : [],
+    members: membersData.map(withAge),
+    pendingRequests: selfCanModerate ? pendingData.map(withAge) : [],
+    historyRequests: selfCanModerate ? historyData.map(withAge) : [],
   };
 }
 
@@ -184,9 +218,17 @@ export async function acceptJoinRequest(request: TeamJoinRequestRow, team: { id:
 
   if (updateRequestError) throw updateRequestError;
 
-  if (request.profiles?.expo_push_token) {
+  // `expo_push_token` de OTRO perfil ya no es legible por un SELECT directo
+  // (20260819100000_privacy_and_age_compliance): esta RPC SECURITY DEFINER
+  // es el único camino, y valida de nuevo que el caller sea captain/
+  // subcapitán del equipo de la solicitud antes de devolverlo.
+  const { data: applicantToken } = await supabase.rpc('get_join_request_applicant_push_token', {
+    p_request_id: request.id,
+  });
+
+  if (applicantToken) {
     void sendPushNotification(
-      request.profiles.expo_push_token,
+      applicantToken,
       '¡Solicitud aceptada!',
       `${team.name} aceptó tu solicitud. Entrá a "Mis solicitudes" y confirmá tu traspaso para unirte.`,
     );
@@ -212,11 +254,10 @@ export async function rejectJoinRequest(requestId: string): Promise<void> {
 }
 
 export async function updateMemberRole(
-  teamId: string, 
-  profileId: string, 
-  role: TeamRole, 
+  teamId: string,
+  profileId: string,
+  role: TeamRole,
   team: { id: string; name: string },
-  pushToken?: string | null
 ): Promise<void> {
   const { error } = await supabase
     .from('team_members')
@@ -225,7 +266,16 @@ export async function updateMemberRole(
     .eq('profile_id', profileId);
 
   if (error) throw error;
-  
+
+  // `expo_push_token` de otro perfil ya no es legible por un SELECT directo
+  // (20260819100000_privacy_and_age_compliance): esta RPC SECURITY DEFINER
+  // valida de nuevo que el caller sea captain/subcapitán del equipo antes
+  // de devolverlo.
+  const { data: pushToken } = await supabase.rpc('get_team_member_push_token', {
+    p_team_id: teamId,
+    p_profile_id: profileId,
+  });
+
   if (pushToken) {
     void sendPushNotification(
       pushToken,
@@ -249,8 +299,16 @@ export async function removeMember(
   teamId: string,
   profileId: string,
   team: { id: string; name: string },
-  pushToken?: string | null
 ): Promise<void> {
+  // Se busca el token ANTES de remover: `get_team_member_push_token`
+  // valida que `profileId` siga siendo team_members del equipo, y
+  // `remove_team_member` lo saca de esa tabla — pedirlo después siempre
+  // devolvería NULL y el push de "te removieron" nunca saldría.
+  const { data: pushToken } = await supabase.rpc('get_team_member_push_token', {
+    p_team_id: teamId,
+    p_profile_id: profileId,
+  });
+
   const { error } = await supabase.rpc('remove_team_member', {
     p_team_id: teamId,
     p_profile_id: profileId,

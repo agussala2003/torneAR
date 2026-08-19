@@ -41,6 +41,15 @@ const ENTRIES: AdminEntry[] = [
     title: 'Logs de la app',
     subtitle: 'Telemetría de errores silenciosos reportados por los clientes',
   },
+  {
+    // Vive en `(modals)` y no en `admin/` porque es la misma pantalla que
+    // `router.push` en `__DEV__` — un solo componente, dos puertas de entrada.
+    route: '/(modals)/share-card-preview',
+    icon: 'image-outline',
+    color: '#8CCDFF',
+    title: 'Preview de tarjeta de resultado',
+    subtitle: 'Herramienta de QA visual — casos límite de MatchShareCard',
+  },
 ];
 
 export default function AdminIndexScreen() {

@@ -8,15 +8,20 @@
  *
  * Para actualizar: cambiar `PRIVACY_LAST_UPDATED` y el contenido de
  * `PRIVACY_SECTIONS`. La pantalla no se toca.
+ *
+ * ⚠️ "Responsables del tratamiento de datos" tiene placeholders
+ * `[COMPLETAR_DNI]`, `[COMPLETAR_CUIT]` y `[COMPLETAR_DOMICILIO]` a
+ * propósito — no se inventan datos de identidad de terceros. Completar
+ * antes de publicar esta versión.
  */
 
 import type { LegalSection } from './termsContent';
 
 /** Se muestra bajo el título. Cambiarlo al publicar una versión nueva. */
-export const PRIVACY_LAST_UPDATED = '12 de Agosto, 2026';
+export const PRIVACY_LAST_UPDATED = '18 de Agosto, 2026';
 
 export const PRIVACY_INTRO =
-  'En torneAR valoramos y respetamos la privacidad de nuestros usuarios. Esta política describe qué datos recopilamos, para qué los usamos y con quién se comparten.';
+  'En torneAR valoramos y respetamos la privacidad de nuestros usuarios. Esta política describe qué datos recopilamos, para qué los usamos, con quién se comparten y durante cuánto tiempo los conservamos.';
 
 export const PRIVACY_SECTIONS: LegalSection[] = [
   {
@@ -24,6 +29,13 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
     paragraphs: [
       'Al registrarte guardamos los datos de tu perfil: nombre, nombre de usuario, correo electrónico, fecha de nacimiento, zona, posición preferida y, si la cargás, tu foto de perfil.',
       'A medida que jugás, registramos la actividad deportiva: partidos en los que participaste, goles, MVPs, presencias, insignias, equipos por los que pasaste y los puntajes que se derivan de todo eso.',
+    ],
+  },
+  {
+    title: 'Responsables del tratamiento de datos',
+    paragraphs: [
+      'El tratamiento de tus datos personales está a cargo, en carácter de cotitulares, de Juan Ignacio Sacco Moriconi (DNI [COMPLETAR_DNI], CUIT [COMPLETAR_CUIT], domicilio [COMPLETAR_DOMICILIO]) y Agustín Saladino (DNI [COMPLETAR_DNI], CUIT [COMPLETAR_CUIT], domicilio [COMPLETAR_DOMICILIO]).',
+      'El dominio oficial de la plataforma es https://tornear.app. Para consultas, reclamos o el ejercicio de tus derechos sobre tus datos personales, escribinos a tornearcc@gmail.com.',
     ],
   },
   {
@@ -45,6 +57,13 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
     paragraphs: [
       'Los mensajes de los chats de Mercado y de partido se almacenan para que la conversación siga disponible para sus participantes.',
       'Podemos acceder a ellos cuando sea necesario para resolver una denuncia, una disputa de resultado o un incumplimiento de las reglas de conducta.',
+    ],
+  },
+  {
+    title: 'Evidencias de Walkover',
+    paragraphs: [
+      'Si tu equipo reclama un Walkover (W.O.), la foto que subís como evidencia queda con acceso público temporal: cualquiera con el enlace puede verla mientras dure el proceso de resolución de la disputa, porque el equipo rival y, si hace falta, la administración de torneAR necesitan poder revisarla para decidir el reclamo.',
+      'Esa evidencia se conserva hasta 30 días después de finalizada la temporada correspondiente (ver "Conservación y eliminación" más abajo). No subas una foto que no quieras que quede accesible por ese medio y por ese plazo.',
     ],
   },
   {
@@ -71,8 +90,12 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
   {
     title: 'Conservación y eliminación',
     paragraphs: [
-      'Conservamos tus datos mientras tu cuenta esté activa. Si solicitás la baja, eliminamos tu perfil y tus datos personales.',
-      'Los resultados de partidos ya jugados y las estadísticas de los equipos en los que participaste pueden conservarse de forma disociada, porque forman parte del historial competitivo de otros usuarios.',
+      'Conservamos cada categoría de dato sólo durante el plazo necesario para la finalidad que la originó. Los plazos formales de conservación, definidos conforme a los criterios de la Agencia de Acceso a la Información Pública (AAIP), son los siguientes:',
+      'Logs técnicos y telemetría: 90 días desde su generación.',
+      'Evidencias de Walkover (fotos): hasta 30 días después de finalizada la temporada correspondiente al partido.',
+      'Cuentas eliminadas: la baja es inmediata, con anonimización del perfil en el mismo momento — no hay período de gracia durante el cual tus datos personales queden identificables.',
+      'Backups de la base de datos: retención rotativa de 30 días; una copia de respaldo que contenga tus datos deja de existir, como máximo, 30 días después de haberse generado.',
+      'Más allá de estos plazos, los resultados de partidos ya jugados y las estadísticas de los equipos en los que participaste pueden conservarse de forma disociada, porque forman parte del historial competitivo compartido con otros usuarios.',
     ],
   },
   {
@@ -86,6 +109,7 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
     title: 'Cambios en esta política',
     paragraphs: [
       'Podemos actualizar esta política para reflejar cambios en la plataforma. La fecha de la última actualización figura al comienzo de esta pantalla.',
+      'La versión vigente de este documento siempre está disponible en https://tornear.app/legal/privacidad.',
     ],
   },
 ];

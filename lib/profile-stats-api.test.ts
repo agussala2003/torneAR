@@ -60,6 +60,8 @@ function mockTables({ participants = [buildParticipantRow()], elo = [], eloError
     switch (table) {
       case 'profiles':
         return createQueryBuilder({ data: { id: PROFILE_ID, full_name: 'Tester' }, error: null });
+      case 'profiles_public':
+        return createQueryBuilder({ data: { age: null }, error: null });
       case 'v_player_stats':
         return createQueryBuilder({
           data: { matches_played: 1, total_goals: 2, total_mvps: 1, total_wins: 1 },

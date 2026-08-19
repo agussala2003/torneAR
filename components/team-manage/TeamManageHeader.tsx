@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { TeamDetailRow, TeamMemberRow } from './types';
 import { getTeamCategoryLabel, getTeamFormatLabel, getTeamRoleLabel, TeamRole } from '@/lib/team-options';
-import { averageAge } from '@/lib/age';
+import { averageOfAges } from '@/lib/age';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 
 interface TeamManageHeaderProps {
@@ -38,7 +38,7 @@ export function TeamManageHeader({
   // muestra cuando no es todo el plantel, en vez de dar un promedio que parece
   // del equipo entero y no lo es.
   const squadAge = useMemo(
-    () => averageAge(members.map((member) => member.profiles?.date_of_birth)),
+    () => averageOfAges(members.map((member) => member.profiles?.age)),
     [members],
   );
 

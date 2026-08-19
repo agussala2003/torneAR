@@ -4,7 +4,7 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { getTeamRoleLabel, TeamRole } from '@/lib/team-options';
 import { roleAppearance, firstLetterUpper, positionLabel, canManageMember } from '@/lib/team-helpers';
-import { calculateAge, formatAge } from '@/lib/age';
+import { formatAge } from '@/lib/age';
 
 interface TeamMemberRow {
   profile_id: string;
@@ -16,7 +16,8 @@ interface TeamMemberRow {
     username: string | null;
     avatar_url: string | null;
     preferred_position: string | null;
-    date_of_birth: string | null;
+    /** Ya calculada server-side — ver components/team-manage/types.ts. */
+    age: number | null;
   } | null;
 }
 
@@ -47,7 +48,7 @@ export function TeamMembersList({
           : '';
         const roleVisual = roleAppearance(member.role);
 
-        const memberAge = formatAge(calculateAge(member.profiles?.date_of_birth));
+        const memberAge = formatAge(member.profiles?.age ?? null);
 
         const isSelf = profileId === member.profile_id;
         const canManageThisMember = canManageMember(myRole, member.role, isSelf);

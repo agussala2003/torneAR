@@ -39,6 +39,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_feedback: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_feedback_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_logs: {
         Row: {
           created_at: string
@@ -268,6 +297,44 @@ export type Database = {
             columns: ["to_team_id"]
             isOneToOne: false
             referencedRelation: "v_team_ranking"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_reports: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string
+          reported_entity_id: string
+          reported_entity_type: Database["public"]["Enums"]["report_entity_type"]
+          reporter_id: string
+          status: Database["public"]["Enums"]["report_status"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason: string
+          reported_entity_id: string
+          reported_entity_type: Database["public"]["Enums"]["report_entity_type"]
+          reporter_id: string
+          status?: Database["public"]["Enums"]["report_status"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string
+          reported_entity_id?: string
+          reported_entity_type?: Database["public"]["Enums"]["report_entity_type"]
+          reporter_id?: string
+          status?: Database["public"]["Enums"]["report_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -780,10 +847,7 @@ export type Database = {
       }
       match_participants: {
         Row: {
-          checkin_at: string | null
-          checkin_lat: number | null
-          checkin_lng: number | null
-          did_checkin: boolean
+          checkin_at: string | null          did_checkin: boolean
           id: string
           is_guest: boolean
           is_result_loader: boolean
@@ -793,10 +857,7 @@ export type Database = {
           team_id: string
         }
         Insert: {
-          checkin_at?: string | null
-          checkin_lat?: number | null
-          checkin_lng?: number | null
-          did_checkin?: boolean
+          checkin_at?: string | null          did_checkin?: boolean
           id?: string
           is_guest?: boolean
           is_result_loader?: boolean
@@ -806,10 +867,7 @@ export type Database = {
           team_id: string
         }
         Update: {
-          checkin_at?: string | null
-          checkin_lat?: number | null
-          checkin_lng?: number | null
-          did_checkin?: boolean
+          checkin_at?: string | null          did_checkin?: boolean
           id?: string
           is_guest?: boolean
           is_result_loader?: boolean
@@ -1999,6 +2057,22 @@ export type Database = {
       }
     }
     Views: {
+      profiles_public: {
+        Row: {
+          age: number | null
+          avatar_url: string | null
+          created_at: string | null
+          favorite_team: string | null
+          full_name: string | null
+          gender: string | null
+          id: string | null
+          preferred_position: Database["public"]["Enums"]["player_position"] | null
+          strong_foot: string | null
+          username: string | null
+          zone: string | null
+        }
+        Relationships: []
+      }
       v_player_stats: {
         Row: {
           avatar_url: string | null
@@ -2112,6 +2186,7 @@ export type Database = {
       }
       current_profile_id: { Args: never; Returns: string }
       deactivate_expired_market_posts: { Args: never; Returns: undefined }
+      delete_own_account: { Args: never; Returns: undefined }
       elo_delta: {
         Args: { p_elo_rival: number; p_elo_self: number; p_score: number }
         Returns: number
@@ -2154,6 +2229,10 @@ export type Database = {
           percentage: number
           team_name: string
         }[]
+      }
+      get_join_request_applicant_push_token: {
+        Args: { p_request_id: string }
+        Returns: string
       }
       get_market_inbox: {
         Args: { p_profile_id: string }
@@ -2227,6 +2306,27 @@ export type Database = {
           phone: string
           zone_id: string
         }[]
+      }
+      get_own_profile: {
+        Args: never
+        Returns: {
+          auth_user_id: string
+          avatar_url: string | null
+          created_at: string
+          date_of_birth: string | null
+          expo_push_token: string | null
+          favorite_team: string | null
+          full_name: string
+          gender: string | null
+          id: string
+          is_admin: boolean
+          preferred_position: Database["public"]["Enums"]["player_position"]
+          referred_by: string | null
+          strong_foot: string | null
+          updated_at: string
+          username: string
+          zone: string | null
+        }
       }
       get_pending_wo_claims: {
         Args: never
@@ -2314,6 +2414,10 @@ export type Database = {
           team_b_id: string
           team_b_name: string
         }[]
+      }
+      get_team_member_push_token: {
+        Args: { p_profile_id: string; p_team_id: string }
+        Returns: string
       }
       get_team_ranking: {
         Args: {
@@ -2521,6 +2625,8 @@ export type Database = {
         | "MEDIOCAMPISTA"
         | "DELANTERO"
       proposal_status: "PENDIENTE" | "ACEPTADA" | "RECHAZADA"
+      report_entity_type: "USER" | "MATCH"
+      report_status: "PENDING" | "REVIEWED" | "DISMISSED" | "ACTIONED"
       result_status: "PENDIENTE" | "CARGADO" | "CONFIRMADO" | "EN_DISPUTA"
       stint_leave_reason:
         | "ABANDONO"
@@ -2718,6 +2824,8 @@ export const Constants = {
         "DELANTERO",
       ],
       proposal_status: ["PENDIENTE", "ACEPTADA", "RECHAZADA"],
+      report_entity_type: ["USER", "MATCH"],
+      report_status: ["PENDING", "REVIEWED", "DISMISSED", "ACTIONED"],
       result_status: ["PENDIENTE", "CARGADO", "CONFIRMADO", "EN_DISPUTA"],
       stint_leave_reason: [
         "ABANDONO",

@@ -73,12 +73,13 @@ export type TeamMemberStat = {
   position: string;
   role: TeamRole;
   /**
-   * `profiles.date_of_birth` crudo ('YYYY-MM-DD'). Se pasa la fecha y no la
-   * edad ya calculada porque el numero cambia solo con el paso del tiempo: si
-   * el DAL la congelara en el fetch, un plantel en pantalla al cruzar la
-   * medianoche del cumpleanos quedaria con la edad vieja.
+   * Edad ya calculada server-side (vista `profiles_public`), no
+   * `date_of_birth` crudo: desde 20260819100000_privacy_and_age_compliance
+   * la fecha exacta de un perfil ajeno no es legible desde el cliente.
+   * Costo aceptado: queda fija al momento del fetch, no recalculada en vivo
+   * si la pantalla sigue abierta al cruzar la medianoche del cumpleaños.
    */
-  dateOfBirth: string | null;
+  age: number | null;
   matchesPlayed: number;
   goals: number;
   presencePercent: string;

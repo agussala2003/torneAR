@@ -82,5 +82,11 @@ export async function fetchMatchShareViewData(
     finishedAt: match.finishedAt,
     eloDelta,
     mvp: resolveMvpAvatar(match.myResult?.mvp ?? null),
+    // No hay todavía una fuente de goles individuales por partido para leer
+    // acá (ver el comentario de `scorers` en `components/match-share/types.ts`).
+    // Explícito en `null` y no un campo optativo que se omite: mismo criterio
+    // que `eloDelta`, que también documenta sus tres razones de ser `null` en
+    // vez de dejar el campo ausente.
+    scorers: null,
   };
 }

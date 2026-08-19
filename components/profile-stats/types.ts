@@ -57,6 +57,12 @@ export type TeamEntry = {
 
 export type ProfileStatsViewData = {
   profile: ProfileRow;
+  /**
+   * Calculada server-side (vista `profiles_public`), no `profile.date_of_birth`:
+   * desde 20260819100000_privacy_and_age_compliance esa columna ya no viaja
+   * en `profile` cuando se está viendo el perfil de otro jugador.
+   */
+  age: number | null;
   stats: ProfileStatsSummary;
   recentMatches: RecentMatchResult[];
   badges: EarnedBadge[];

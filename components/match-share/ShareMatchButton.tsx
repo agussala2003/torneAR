@@ -6,6 +6,7 @@ import { captureViewToUri, shareGeneric, NativeCaptureUnavailableError } from '@
 import { shareToInstagramStories } from '@/lib/instagram-stories';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
+import { deriveMatchOutcome } from '@/lib/match-share-outcome';
 import { MatchShareCard, SHARE_CARD_HEIGHT, SHARE_CARD_WIDTH } from './MatchShareCard';
 import type { MatchShareCardData } from './types';
 
@@ -145,7 +146,11 @@ export function ShareMatchButton({ matchId, myTeamId }: Props) {
                   }}
                   collapsable={false}
                 >
-                  <MatchShareCard data={data} />
+                  {/* `outcome` se deriva acá y no en `MatchShareCard`: es el
+                      único punto que conoce `myTeamId`, el dato que hace
+                      falta para saber cuál de los dos equipos es "el mío"
+                      (ver `deriveMatchOutcome` en `types.ts`). */}
+                  <MatchShareCard data={data} outcome={deriveMatchOutcome(data, myTeamId)} />
                 </View>
               </View>
 

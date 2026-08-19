@@ -38,6 +38,6 @@ export async function saveOnboardingProfile(
   // por `auth.uid()` -> profiles.id, así que no puede llamarse antes. Sin
   // código de referido pendiente, no pega la RPC.
   if (referredByUsername) {
-    await resolveAndSetReferral(referredByUsername);
+    await resolveAndSetReferral(referredByUsername, userId);
   }
 }

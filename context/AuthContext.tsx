@@ -46,18 +46,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
-      // `maybeSingle` y no `single`: con `single`, cero filas es un ERROR
-      // (PGRST116). Todo usuario recién registrado pasa por ese estado —
-      // hay sesión pero todavía no hay fila en `profiles`— así que el camino
-      // más normal de la app entraba por la rama de error y ensuciaba la
-      // telemetría con un `Logger.error` por cada alta. Con `maybeSingle`,
-      // "no hay perfil" es `data: null, error: null`, y el error queda
-      // reservado para lo que de verdad falló.
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('auth_user_id', userId)
-        .maybeSingle();
+      // `get_own_profile()`, no `.from('profiles').select('*')`: desde
+      // 20260819100000_privacy_and_age_compliance, `date_of_birth` y
+      // `expo_push_token` están bloqueadas por columna en la tabla base
+      // (nadie puede leer el date_of_birth/token ajeno vía SELECT directo).
+      // La RPC es SECURITY DEFINER y sólo devuelve la fila de
+      // `auth.uid()` — mismo shape que el `SELECT *` que reemplaza, así
+      // que el resto de la app (profile.date_of_birth, profile.expo_push_token,
+      // etc.) no cambia.
+      //
+      // Sin fila para este usuario, la función devuelve NULL (no un error;
+      // es el mismo caso "recién registrado, sin perfil todavía" que antes
+      // cubría `maybeSingle`).
+      const { data, error } = await supabase.rpc('get_own_profile');
 
       // Devolver null acá manda al usuario a /onboarding (ver app/_layout.tsx).
       // Un fallo de red y "este usuario todavía no completó su perfil" producen

@@ -25,9 +25,13 @@ export type TeamMemberRow = {
     username: string | null;
     avatar_url: string | null;
     preferred_position: string | null;
-    /** 'YYYY-MM-DD'. Alimenta el promedio de edad del plantel (lib/age.ts). */
-    date_of_birth: string | null;
-    expo_push_token?: string | null;
+    /**
+     * Ya calculada server-side (vista `profiles_public`), no
+     * `date_of_birth` crudo: desde 20260819100000_privacy_and_age_compliance
+     * la fecha exacta de un perfil ajeno no es legible desde el cliente.
+     * Alimenta el promedio de edad del plantel (lib/age.ts::averageOfAges).
+     */
+    age: number | null;
   } | null;
 };
 
@@ -42,8 +46,7 @@ export type TeamJoinRequestRow = {
     username: string | null;
     avatar_url: string | null;
     preferred_position: string;
-    date_of_birth: string | null;
-    expo_push_token?: string | null;
+    age: number | null;
   } | null;
 };
 

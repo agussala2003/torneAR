@@ -92,6 +92,25 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
 
   if (profileRes.error) throw profileRes.error;
 
+  // Edad: consulta aparte a `profiles_public` (vista con `age` derivada), no
+  // `profile.date_of_birth` — desde 20260819100000_privacy_and_age_compliance
+  // esa columna no viaja en el `SELECT *` de arriba cuando el perfil visto es
+  // el de otro jugador (y tampoco cuando es el propio: ver get_own_profile()
+  // en AuthContext para ese caso).
+  const { data: ageRow, error: ageError } = await supabase
+    .from('profiles_public')
+    .select('age')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (ageError) {
+    Logger.warn('No se pudo leer la edad del perfil', {
+      scope: 'profileStats.fetchProfileStatsViewData',
+      profileId,
+      error: ageError,
+    });
+  }
+
   const s = statsRes.data as {
     matches_played: number;
     total_goals: number;
@@ -214,6 +233,7 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
 
   return {
     profile: profileRes.data as ProfileRow,
+    age: ageRow?.age ?? null,
     stats: {
       matchesPlayed,
       goals,

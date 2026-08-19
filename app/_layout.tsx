@@ -14,9 +14,11 @@ import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { AppIntroSplash } from '@/components/AppIntroSplash';
 import { AppUpdateModal } from '@/components/AppUpdateModal';
+import { LegalVersionGate } from '@/components/LegalVersionGate';
 import { Colors } from '@/constants/theme';
 import { useForceUpdate } from '@/hooks/useForceUpdate';
 import { isProfileComplete } from '@/lib/auth-utils';
+import { needsLegalAcceptance } from '@/lib/auth-data';
 import { deepLinkToHref, resolveDeepLink } from '@/lib/deep-linking';
 import { initLogger } from '@/lib/logger';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
@@ -41,6 +43,22 @@ export const unstable_settings = {
 const INTRO_DURATION_MS = 2300;
 
 /**
+ * Pantallas de `(modals)` legibles en cualquier estado de sesión.
+ *
+ * Los Términos y la Política se aceptan ANTES de tener cuenta: el checkbox de
+ * registro (`LegalConsentCheckbox`) y el del onboarding enlazan acá. Como el
+ * guard de abajo sólo miraba `segments[0]`, tocar «Términos y Condiciones»
+ * llevaba a `(modals)` —que no figuraba entre las rutas públicas— y el usuario
+ * terminaba pateado de vuelta al login sin haber leído nada. El consentimiento
+ * versionado que guardamos en el alta quedaba registrado contra un texto que
+ * era imposible de abrir.
+ *
+ * Es el grupo `(modals)` completo lo que NO se abre: ahí también viven `chat` y
+ * `market-create`, que son privadas. Sólo estas dos rutas quedan exentas.
+ */
+const PUBLIC_MODAL_ROUTES = new Set(['terms', 'privacy']);
+
+/**
  * torneAR es dark-only.
  *
  * No existe un solo estilo con variantes `dark:` / `light:` en la app: todos los
@@ -62,7 +80,7 @@ const navigationTheme: Theme = {
 };
 
 function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
-  const { session, profile, loading, hydrated } = useAuth();
+  const { session, user, profile, loading, hydrated } = useAuth();
   // Suscripción reactiva (y no `getState()` como el deep link, que se consume de
   // forma atómica): soltar la retención tiene que volver a correr el guard.
   const isHoldingOnboardingRedirect = useSignupGateStore((s) => s.isHoldingOnboardingRedirect);
@@ -149,6 +167,16 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
     // para no redirigir a /login mientras todavía leemos la sesión guardada.
     if (!hydrated || loading || showIntro) return;
 
+    // Los documentos legales se leen en cualquier estado de sesión, así que se
+    // resuelven antes que nada y con un `return`: no alcanza con sumarlos al
+    // conjunto público de abajo, porque el usuario de Google los abre DESDE el
+    // onboarding —donde `!isProfileComplete(profile)` es verdadero— y la rama
+    // de esa condición lo devolvería a `/onboarding` igual que la de `!session`
+    // lo devuelve a `/login`. Salir temprano los exime de las tres ramas.
+    if (segments[0] === '(modals)' && PUBLIC_MODAL_ROUTES.has(segments[1] ?? '')) {
+      return;
+    }
+
     // `auth` (app/auth/callback.tsx) cuenta como grupo público a propósito: al
     // volver de Google la sesión tarda unos ms en escribirse, y sin esto el
     // guard vería `session === null` y patearía a /login en el medio del canje.
@@ -193,6 +221,15 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
   // fuentes. Lo que YA no hace es sustituir al navegador (ver comentario abajo).
   const showOverlay = showIntro || !fontsLoaded;
 
+  // Sólo para sesión completa (autenticado + perfil completo): un usuario
+  // recién registrado ya pasa por su propia aceptación en el onboarding, y
+  // uno sin sesión no tiene nada que re-aceptar. `!showIntro` evita que el
+  // modal aparezca detrás/encima de la animación de arranque — un `Modal`
+  // de RN se monta en su propia capa nativa por encima de todo, sin
+  // importar dónde esté en el árbol de JS.
+  const mustReacceptLegal =
+    hydrated && !showIntro && !!session && isProfileComplete(profile) && needsLegalAcceptance(user);
+
   return (
     <>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.dark.background } }}>
@@ -219,6 +256,7 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="(modals)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
+      <LegalVersionGate visible={mustReacceptLegal} />
       {/* El intro va SUPERPUESTO, no en lugar del navegador.
 
           Antes esto era un `return <AppIntroSplash />` antes del <Stack>: durante

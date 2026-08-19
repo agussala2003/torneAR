@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { AuthError } from '@supabase/supabase-js';
-import { signIn, signInWithGoogle, signUp } from '@/lib/auth-data';
+import { buildLegalAcceptance, signIn, signInWithGoogle, signUp } from '@/lib/auth-data';
 import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { GlobalLoader } from '@/components/GlobalLoader';
@@ -20,11 +20,15 @@ import {
   PASSWORD_MIN_LENGTH,
   type AuthFormData,
 } from '@/lib/schemas/authSchema';
+import { LegalConsentCheckbox } from '@/components/ui/LegalConsentCheckbox';
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  // Consentimiento legal. Sólo aplica al registro: una cuenta que ya existe
+  // aceptó al crearse y volver a pedírselo en cada login no aporta nada.
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
 
   const { showAlert, AlertComponent } = useCustomAlert();
 
@@ -69,7 +73,10 @@ export default function LoginScreen() {
   // tocar «Crear cuenta» indefinidamente con la contraseña corta y no pasaba
   // nada (auditoría E2E, módulo 1.1).
   const values = useWatch({ control });
-  const canSubmit = (isLogin ? signInSchema : signUpSchema).safeParse(values).success;
+  const schemaValid = (isLogin ? signInSchema : signUpSchema).safeParse(values).success;
+  // En registro el consentimiento es parte de la validez del formulario: sin él
+  // no hay alta posible, así que gatea el botón igual que un campo incompleto.
+  const canSubmit = schemaValid && (isLogin || acceptedLegal);
 
   // Red de seguridad: la retención del guard se suelta al cerrar el modal, pero
   // si la pantalla se desmonta antes por cualquier vía, dejarla puesta bloquearía
@@ -86,6 +93,10 @@ export default function LoginScreen() {
   // 3. La función onSubmit recibe directamente los datos validados
   const onSubmit = async (data: AuthFormData) => {
     if (loading) return;
+    // Segunda barrera, además del botón deshabilitado: `handleSubmit` puede
+    // dispararse por otras vías (submit del teclado, un test) y crear una cuenta
+    // sin consentimiento sería un incumplimiento legal, no un bug de UI.
+    if (!isLogin && !acceptedLegal) return;
 
     setLoading(true);
     let error: AuthError | null = null;
@@ -98,7 +109,11 @@ export default function LoginScreen() {
         }
         error = signInError;
       } else {
-        const { error: signUpError } = await signUp(data.email, data.password);
+        const { error: signUpError } = await signUp(
+          data.email,
+          data.password,
+          buildLegalAcceptance(),
+        );
 
         if (!signUpError) {
           Logger.info('Cuenta creada con email', { scope: 'login.onSubmit' });
@@ -261,19 +276,11 @@ export default function LoginScreen() {
         </View>
 
         {!isLogin && (
-          <View className="mb-6 flex-row flex-wrap items-center justify-center px-4">
-            <Text className="font-ui text-xs text-neutral-on-surface-variant text-center">
-              Al crear la cuenta aceptas los{' '}
-            </Text>
-            <TouchableOpacity onPress={() => router.push('/(modals)/terms')}>
-              <Text className="font-uiBold text-xs text-brand-primary">Términos</Text>
-            </TouchableOpacity>
-            <Text className="font-ui text-xs text-neutral-on-surface-variant"> y la{' '}</Text>
-            <TouchableOpacity onPress={() => router.push('/(modals)/privacy')}>
-              <Text className="font-uiBold text-xs text-brand-primary">Privacidad</Text>
-            </TouchableOpacity>
-            <Text className="font-ui text-xs text-neutral-on-surface-variant">.</Text>
-          </View>
+          <LegalConsentCheckbox
+            checked={acceptedLegal}
+            onToggle={setAcceptedLegal}
+            disabled={showAuthLoader || showGoogleLoader}
+          />
         )}
 
         <HeroButton
@@ -290,10 +297,13 @@ export default function LoginScreen() {
           <View className="h-px flex-1 bg-neutral-outline/30" />
         </View>
 
+        {/* Google da de alta la cuenta en el primer consentimiento, así que en
+            modo registro queda sujeto al mismo checkbox: si sólo gateáramos el
+            botón de email, registrarse con Google saltearía la aceptación. */}
         <GoogleAuthButton
           onPress={onGooglePress}
           isLoading={showGoogleLoader}
-          disabled={showAuthLoader}
+          disabled={showAuthLoader || (!isLogin && !acceptedLegal)}
           label={isLogin ? 'Continuar con Google' : 'Registrarme con Google'}
         />
 

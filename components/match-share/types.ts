@@ -1,7 +1,22 @@
 import type { TeamSnippet, ProfileSnippet } from '@/components/matches/types';
 import type { Database } from '@/types/supabase';
+import type { MatchOutcome } from '@/lib/match-share-outcome';
+
+// Re-exportado para que los componentes de esta carpeta puedan seguir
+// importando todo lo de este dominio ("los datos y cómo se pintan") desde un
+// solo lugar: `import type { MatchOutcome } from './types'` en vez de
+// acordarse de que ESTE tipo puntual vive en `lib/` por motivos de testing
+// (ver el comentario largo en `lib/match-share-outcome.ts`).
+export type { MatchOutcome };
 
 type MatchType = Database['public']['Enums']['match_type'];
+
+/** Un goleador para `ScorersBlock`. `goals` es la cuenta EN ESTE partido, no
+ *  acumulada de temporada. */
+export interface MatchScorer {
+  name: string;
+  goals: number;
+}
 
 /**
  * Datos ya recortados para `MatchShareCard`: nada de estado de formularios,
@@ -29,4 +44,38 @@ export interface MatchShareCardData {
    * al cargar su resultado). Es el relevante para quien comparte la tarjeta.
    */
   mvp: ProfileSnippet | null;
+
+  /**
+   * Goleadores de MI equipo en este partido, para `ScorersBlock`.
+   *
+   * PENDIENTE: `lib/match-share-data.ts` todavía no lo puebla — hoy siempre
+   * llega `null` desde el fetch real hasta que exista una fuente de datos de
+   * goleadores por partido (goles individuales no se registran hoy con el
+   * mismo detalle que el MVP). El componente ya sabe tratar la ausencia
+   * (`ScorersBlock` colapsa a `null`), así que sumar esa fuente más adelante
+   * no requiere tocar la UI.
+   */
+  scorers: MatchScorer[] | null;
 }
+
+/**
+ * Paleta de acento por resultado. Un solo lugar para los dos consumidores
+ * (`CardBackground.tsx` pinta `glow`, `MatchShareCard.tsx` pinta `line`) —
+ * tenerla duplicada en los dos archivos es exactamente el bug que dejó
+ * desactualizado el ratio del wordmark en la iteración anterior.
+ *
+ *  · WIN reusa el verde de marca (`brand-primary`): ya es el color
+ *    "positivo" en toda la app, no hacía falta inventar uno nuevo.
+ *  · DRAW reusa `neutral.outline`: el gris neutro que ya usa el resto de la
+ *    tarjeta para separadores y texto secundario.
+ *  · LOSS es el único tono genuinamente nuevo. A propósito NO es
+ *    `danger.error` (el rojo/salmón de la app): ese color significa "algo
+ *    salió mal" en el resto de la UI (errores de validación, fallos de red),
+ *    y perder un partido no es un error — es un resultado válido. Un azul
+ *    acero/plomo lo comunica sin pedir perdón por el marcador.
+ */
+export const OUTCOME_ACCENT: Record<MatchOutcome, { glow: string; line: string }> = {
+  WIN: { glow: '#123822', line: '#53E076' },
+  LOSS: { glow: '#16222E', line: '#7C97AD' },
+  DRAW: { glow: '#212220', line: '#869585' },
+};
