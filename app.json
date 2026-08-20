@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "tornear-org",
     "name": "TorneAR",
     "slug": "tornear",
     "version": "1.0.0",

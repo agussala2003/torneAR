@@ -20,7 +20,8 @@
 --   A-1      Existen las filas de las dos plataformas.
 --   A-2      Nacen inertes: el mínimo no bloquea a la versión actual.
 --   A-3      `anon` puede leer — es el requisito del chequeo pre-login.
---   A-4      `authenticated` no puede escribir.
+--   A-4      `authenticated` sin is_admin escribe sin error pero no mueve la fila.
+--   A-4b     …y un admin sí — control positivo de la policy.
 --   A-5      `anon` no puede escribir.
 --   A-6      El CHECK rechaza una versión mal formada.
 --   A-7      El CHECK rechaza una update_url que no sea https.
@@ -30,7 +31,7 @@
 -- ============================================================
 
 begin;
-select plan(9);
+select plan(10);
 
 -- ── A-1/A-2. Datos por defecto ──────────────────────────────────────────────
 select results_eq(
@@ -68,16 +69,59 @@ select throws_ok(
 reset role;
 
 
--- ── A-4. authenticated tampoco escribe ──────────────────────────────────────
+-- ── A-4. authenticated sin is_admin no cambia nada ──────────────────────────
+-- ⚠️ Ya NO usa throws_ok, y el motivo importa más que el cambio.
+--
+-- Desde 20260818180000_dashboard_settings_versions_write el rol
+-- `authenticated` SÍ tiene GRANT UPDATE (de columna) sobre los 3 campos
+-- operativos: lo necesita el gestor de versiones del dashboard, que escribe
+-- con la sesión del admin en el navegador, no con service_role. Quien filtra
+-- es la policy `app_versions_update_admin` — y RLS NO lanza excepción:
+-- descarta las filas en silencio.
+--
+-- O sea que el throws_ok que había acá no afirmaba "este usuario no puede
+-- escribir" sino "a este usuario le falta el GRANT". Son dos cosas distintas
+-- y la segunda dejó de ser cierta el 18-ago; el test venía pasando por el
+-- motivo equivocado desde antes. Es la misma clase de falso negativo que
+-- documenta 012-rls-returning-contract.
+--
+-- La aserción correcta es sobre el EFECTO: la sentencia corre sin error y la
+-- fila no se mueve.
 select tests.authenticate_as_profile('aaaaaaaa-0000-0000-0000-000000000001');
 
-select throws_ok(
-  $$ update public.app_versions set min_required_version = '99.0.0' where platform = 'android' $$,
-  null,
-  null,
-  'A-4: un usuario autenticado no puede bloquear la app para todos');
+update public.app_versions
+   set min_required_version = '99.0.0'
+ where platform = 'android';
 
 select tests.clear_auth();
+
+select is(
+  (select min_required_version from public.app_versions where platform = 'android'),
+  '1.0.0',
+  'A-4: un usuario autenticado sin is_admin no puede bloquear la app para todos');
+
+
+-- ── A-4b. …y un admin sí puede ──────────────────────────────────────────────
+-- Control positivo, sin el cual A-4 pasaría igual si la policy bloqueara a
+-- TODO el mundo — que es justo el bug que dejaría muerto el gestor de
+-- versiones del dashboard sin que ningún test se enterara. Es también la
+-- razón por la que la respuesta correcta a A-4 NO era revocarle el UPDATE a
+-- `authenticated`: eso apaga la palanca de emergencia junto con el ataque.
+select tests.authenticate_as_profile('0a000000-0000-0000-0000-000000000001');
+
+update public.app_versions
+   set min_required_version = '2.0.0'
+ where platform = 'android';
+
+select tests.clear_auth();
+
+select is(
+  (select min_required_version from public.app_versions where platform = 'android'),
+  '2.0.0',
+  'A-4b: un admin SÍ acciona la palanca (control positivo de la policy)');
+
+-- Vuelta al estado por defecto para que A-6..A-9 partan de donde esperan.
+update public.app_versions set min_required_version = '1.0.0' where platform = 'android';
 
 
 -- ── A-6/A-7/A-8. Las guardas de formato ─────────────────────────────────────

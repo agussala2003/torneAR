@@ -15,6 +15,7 @@ import 'react-native-reanimated';
 import { AppIntroSplash } from '@/components/AppIntroSplash';
 import { AppUpdateModal } from '@/components/AppUpdateModal';
 import { LegalVersionGate } from '@/components/LegalVersionGate';
+import { ColdStartPushLinkGate } from '@/components/push/ColdStartPushLinkGate';
 import { Colors } from '@/constants/theme';
 import { useForceUpdate } from '@/hooks/useForceUpdate';
 import { isProfileComplete } from '@/lib/auth-utils';
@@ -84,7 +85,37 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
   // Suscripción reactiva (y no `getState()` como el deep link, que se consume de
   // forma atómica): soltar la retención tiene que volver a correr el guard.
   const isHoldingOnboardingRedirect = useSignupGateStore((s) => s.isHoldingOnboardingRedirect);
-  const segments = useSegments();
+  /**
+   * Suscripción REACTIVA al deep link pendiente (y no sólo el `getState()`
+   * atómico de más abajo, que es el que lo consume).
+   *
+   * El pendiente puede aparecer DESPUÉS de que el guard ya corrió su pasada de
+   * usuario autenticado: `<ColdStartPushLinkGate />` lo publica cuando el
+   * módulo nativo resuelve la notificación que abrió la app, que en Android
+   * puede ser bastante después de que la sesión terminó de hidratar. Sin
+   * tenerlo en las dependencias del efecto, ese link se quedaba en el store
+   * para siempre — el guard no tenía ningún motivo para volver a correr.
+   *
+   * Sólo el valor se usa como disparador; el consumo sigue siendo el
+   * `consumePendingDeepLink()` atómico, para que dos pasadas del efecto no
+   * naveguen dos veces al mismo lugar.
+   */
+  const pendingDeepLink = useDeepLinkStore((s) => s.pendingDeepLink);
+
+  // Anotado como `string[]` a mano y no inferido: `useSegments()` devuelve una
+  // UNIÓN de TUPLAS que expo-router genera a partir del árbol de rutas
+  // (`.expo/types/router.d.ts`). Cuando esa generación produce una tupla de
+  // largo 1, `segments[1]` deja de ser `string | undefined` y pasa a ser un
+  // error de tipos —"Tuple type '[string]' of length '1' has no element at
+  // index '1'"— que ningún `?? ''` puede tapar: lo que TS rechaza es el
+  // índice, no el valor.
+  //
+  // Por qué sólo se ve en CI: `.expo/` está en .gitignore, así que en local
+  // `tsc` compila contra los tipos ya generados de una corrida previa y el
+  // runner los regenera desde cero en cada build. Fijar el tipo acá lo vuelve
+  // independiente de esa generación, que es lo único que hace falta —el guard
+  // compara segmentos contra strings literales, no necesita la tupla.
+  const segments: string[] = useSegments();
   const router = useRouter();
   const [showIntro, setShowIntro] = useState(true);
 
@@ -200,11 +231,12 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
     } else if (session && isProfileComplete(profile)) {
       // Autenticado y con perfil completo: es el único punto donde sabemos que
       // el usuario puede acceder a rutas protegidas, así que acá consumimos el
-      // deep link pendiente (post-login o cold-start ya logueado). El consumo
-      // es atómico, por lo que solo dispara en la primera pasada.
-      const pendingDeepLink = useDeepLinkStore.getState().consumePendingDeepLink();
-      if (pendingDeepLink) {
-        const href = deepLinkToHref(pendingDeepLink);
+      // deep link pendiente (post-login, cold-start ya logueado, o el que
+      // publica `<ColdStartPushLinkGate />` al abrirse la app desde una push).
+      // El consumo es atómico, por lo que solo dispara en la primera pasada.
+      const consumedDeepLink = useDeepLinkStore.getState().consumePendingDeepLink();
+      if (consumedDeepLink) {
+        const href = deepLinkToHref(consumedDeepLink);
         if (href) {
           router.replace(href);
           return;
@@ -215,7 +247,17 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
         router.replace('/(tabs)');
       }
     }
-  }, [session, profile, loading, segments, router, showIntro, hydrated, isHoldingOnboardingRedirect]);
+  }, [
+    session,
+    profile,
+    loading,
+    segments,
+    router,
+    showIntro,
+    hydrated,
+    isHoldingOnboardingRedirect,
+    pendingDeepLink,
+  ]);
 
   // El overlay tapa la pantalla mientras corre el intro o mientras faltan las
   // fuentes. Lo que YA no hace es sustituir al navegador (ver comentario abajo).
@@ -232,6 +274,14 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
 
   return (
     <>
+      {/* Arranque en frío por push. Renderiza `null`: es un efecto con forma de
+          componente (ver `components/push/ColdStartPushLink.tsx`). Va como
+          hermano del <Stack> y no adentro de ninguna pantalla porque tiene que
+          estar vivo desde el primer frame — la respuesta de la notificación
+          puede resolverse antes de que se monte cualquier ruta. No navega:
+          publica el deep link en `deepLinkStore` y lo consume el guard de
+          arriba, que es el único que sabe si ya se puede navegar y a dónde. */}
+      <ColdStartPushLinkGate />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.dark.background } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />

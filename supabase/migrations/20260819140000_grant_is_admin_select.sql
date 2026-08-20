@@ -1,0 +1,15 @@
+-- ============================================================
+-- Refuerzo defensivo: GRANT explícito de (id, is_admin) — 2026-08-19
+-- ------------------------------------------------------------
+-- 20260819100000_privacy_and_age_compliance.sql ya incluye `id` y
+-- `is_admin` en su GRANT SELECT de columna para `authenticated` (junto con
+-- username, full_name, etc.), así que esto no cambia el ACL resultante.
+-- Se deja como migración separada e idempotente para que el guard de admin
+-- del dashboard (lib/admin-guard.ts) no dependa implícitamente de que esas
+-- dos columnas sigan garantizadas "de arrastre" por una migración de
+-- privacidad que, a futuro, podría reordenar o recortar esa lista por
+-- motivos ajenos a autenticación.
+--
+-- `GRANT SELECT (col) ON tabla TO rol` es aditivo e idempotente: repetirlo
+-- sobre columnas ya otorgadas no falla y no revoca nada que no se liste acá.
+GRANT SELECT (id, is_admin) ON public.profiles TO authenticated;

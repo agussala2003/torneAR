@@ -138,6 +138,47 @@ describe('resolveDeepLink · Universal Links de referido (https://tornear.app/i/
       href: { pathname: '/login', params: { ref: 'agussala' } },
     });
   });
+
+  // Fase 3 de Marketing & Growth: el Content Factory etiqueta los links de
+  // las tarjetas con UTM. Tienen que sobrevivir la misma traducción que el
+  // username, no perderse en el camino a `tornear://login`.
+  it('reenvía los 3 UTM cuando vienen en el Universal Link', () => {
+    expect(
+      resolveDeepLink(
+        'https://tornear.app/i/agussala?utm_source=instagram&utm_medium=social&utm_campaign=mvp-card-w34',
+        false,
+      ),
+    ).toEqual({
+      kind: 'navigate',
+      href: {
+        pathname: '/login',
+        params: {
+          ref: 'agussala',
+          utm_source: 'instagram',
+          utm_medium: 'social',
+          utm_campaign: 'mvp-card-w34',
+        },
+      },
+    });
+  });
+
+  it('reenvía sólo los UTM presentes, sin inventar los que faltan', () => {
+    expect(
+      resolveDeepLink('https://tornear.app/i/agussala?utm_source=whatsapp', false),
+    ).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/login', params: { ref: 'agussala', utm_source: 'whatsapp' } },
+    });
+  });
+
+  it('ignora query params que no son ni ref ni UTM (allowlist, no passthrough genérico)', () => {
+    expect(
+      resolveDeepLink('https://tornear.app/i/agussala?utm_source=instagram&debug=1', false),
+    ).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/login', params: { ref: 'agussala', utm_source: 'instagram' } },
+    });
+  });
 });
 
 describe('resolveDeepLink · Defer (ruta protegida sin sesión)', () => {
@@ -239,6 +280,22 @@ describe('deepLinkToHref (helpers de bajo nivel)', () => {
     // Solo /i/<username> tiene traducción — el resto del dominio (la
     // landing, /legal/*, etc.) no tiene pantalla equivalente en la app.
     expect(deepLinkToHref('https://tornear.app/legal/tyc')).toBeNull();
+  });
+
+  it('reenvía los UTM del Universal Link junto con ref', () => {
+    expect(
+      deepLinkToHref('https://tornear.app/i/agussala?utm_source=tiktok&utm_campaign=elo-jump'),
+    ).toEqual({
+      pathname: '/login',
+      params: { ref: 'agussala', utm_source: 'tiktok', utm_campaign: 'elo-jump' },
+    });
+  });
+
+  it('no agrega claves de UTM cuando el Universal Link no trae ninguno', () => {
+    expect(deepLinkToHref('https://tornear.app/i/agussala')).toEqual({
+      pathname: '/login',
+      params: { ref: 'agussala' },
+    });
   });
 });
 

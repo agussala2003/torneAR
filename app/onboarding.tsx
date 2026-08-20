@@ -192,8 +192,13 @@ export default function OnboardingScreen() {
       // (otro logout/login en el mismo dispositivo) con un código que ya no
       // corresponde.
       useReferralStore.getState().consumePendingReferralUsername();
+      // Los UTM se consumen aparte del campo de código de invitación —
+      // adrede independientes, ver el comentario de `PendingUtm` en
+      // stores/referralStore.ts: que el usuario edite o borre "quién me
+      // invitó" no tiene por qué borrar también "qué campaña me trajo".
+      const pendingUtm = useReferralStore.getState().consumePendingUtm();
       const referredByUsername = referralCode.trim() || null;
-      await saveOnboardingProfile(user.id, data, referredByUsername);
+      await saveOnboardingProfile(user.id, data, referredByUsername, pendingUtm);
       await refreshProfile();
       Logger.info('Onboarding completado', {
         scope: 'onboarding.onSubmit',

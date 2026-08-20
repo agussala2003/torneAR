@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createQueryBuilder } from './test-utils/supabase-mock';
-import { resolveAndSetReferral } from './referral-data';
+import { applyPendingAttribution, resolveAndSetReferral } from './referral-data';
 
 const { supabaseMock, loggerMock } = vi.hoisted(() => ({
   supabaseMock: {
@@ -116,5 +116,55 @@ describe('resolveAndSetReferral', () => {
       p_referred_by_username: '  CapitaN  ',
     });
     expect(lastInfoDetails()).toMatchObject({ referredByUsername: 'capitan' });
+  });
+
+  // Fase 3 de Marketing & Growth.
+  it('manda los UTM en la misma llamada a la RPC cuando vienen', async () => {
+    mockReads({ data: SELF, error: null }, { data: REFERRER, error: null });
+
+    await resolveAndSetReferral('capitan', AUTH_USER_ID, {
+      source: 'instagram',
+      medium: 'social',
+      campaign: 'mvp-card-w34',
+    });
+
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('set_referral', {
+      p_referred_by_username: 'capitan',
+      p_utm_source: 'instagram',
+      p_utm_medium: 'social',
+      p_utm_campaign: 'mvp-card-w34',
+    });
+  });
+
+  it('no agrega claves de UTM a la RPC cuando no se pasa `utm` (compatibilidad con el llamado de antes de Fase 3)', async () => {
+    mockReads({ data: SELF, error: null }, { data: REFERRER, error: null });
+
+    await resolveAndSetReferral('capitan', AUTH_USER_ID);
+
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('set_referral', {
+      p_referred_by_username: 'capitan',
+    });
+  });
+});
+
+describe('applyPendingAttribution', () => {
+  it('llama a set_referral sin username y con los UTM pendientes', async () => {
+    await applyPendingAttribution({ source: 'whatsapp', medium: 'chat', campaign: null });
+
+    expect(supabaseMock.rpc).toHaveBeenCalledWith('set_referral', {
+      p_referred_by_username: '',
+      p_utm_source: 'whatsapp',
+      p_utm_medium: 'chat',
+      p_utm_campaign: undefined,
+    });
+  });
+
+  it('no tira si la RPC falla — el onboarding nunca se bloquea por esto', async () => {
+    supabaseMock.rpc.mockResolvedValue({ error: { message: 'network' } });
+
+    await expect(
+      applyPendingAttribution({ source: 'tiktok', medium: null, campaign: null }),
+    ).resolves.toBeUndefined();
+    expect(loggerMock.warn).toHaveBeenCalledTimes(1);
   });
 });

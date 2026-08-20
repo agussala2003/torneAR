@@ -1,30 +1,29 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
+import { IS_PUSH_UNSUPPORTED_ENV as isUnsupportedEnv } from '@/lib/push-environment';
 import { registerForPushNotificationsAsync } from '@/lib/push-notifications';
 import { extractDeepLinkUrl, resolveDeepLink } from '@/lib/deep-linking';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
 import { useAuth } from '@/context/AuthContext';
 
-// Entornos donde expo-notifications no aplica y el hook queda inerte:
-//  - Expo Go (Android, SDK 53+) crashea al inicializar el módulo.
-//  - Web: varios métodos nativos (getLastNotificationResponseAsync, listeners de
-//    push token) no están implementados y lanzan UnavailabilityError.
-// Los push tokens solo tienen sentido en un dev client / build real, que es
-// donde se prueba esta fase.
-const isUnsupportedEnv = Constants.appOwnership === 'expo' || Platform.OS === 'web';
-
 /**
  * Orquesta las push notifications del lado del cliente:
  *  - configura el handler de presentación en foreground,
- *  - ataja el tap sobre la notificación (cold + warm) y lo enruta a través del
- *    mismo Auth Gating de deep links (deepLinkStore + guard de `_layout`),
+ *  - ataja el tap sobre la notificación CON LA APP VIVA y lo enruta a través
+ *    del mismo Auth Gating de deep links (deepLinkStore + guard de `_layout`),
  *  - registra/refresca el `expo_push_token` del perfil autenticado, de modo que
  *    el dispositivo más reciente siempre pise al anterior.
+ *
+ * ⚠️ El ARRANQUE EN FRÍO (app muerta, se abre tocando la push) NO se maneja
+ * acá: lo cubre `<ColdStartPushLinkGate />`, montado en `app/_layout.tsx`. La
+ * lectura one-shot de `getLastNotificationResponseAsync()` que vivía en este
+ * hook llegaba tarde en Android —el módulo nativo todavía no tenía el intent,
+ * devolvía `null` y no había segunda oportunidad— y además navegaba directo,
+ * compitiendo con los `replace` del guard de auth. El detalle completo está en
+ * el comentario de `components/push/ColdStartPushLink.tsx`.
  *
  * Se llama sin argumentos desde `app/_layout.tsx`; internamente se activa solo
  * cuando la sesión ya está hidratada y hay un usuario logueado.
@@ -53,7 +52,7 @@ export function usePushNotifications(): void {
     [router],
   );
 
-  // ─── Handler de presentación + listener de taps (una vez, si no es Expo Go) ──
+  // ─── Handler de presentación + listener de taps calientes (una vez) ─────────
   useEffect(() => {
     if (isUnsupportedEnv) return;
 
@@ -79,16 +78,13 @@ export function usePushNotifications(): void {
           }),
         });
 
-        // Cold start: la app se abrió tocando una push estando cerrada.
-        const lastResponse = await Notifications.getLastNotificationResponseAsync();
-        if (!cancelled && lastResponse) {
-          const url = extractDeepLinkUrl(lastResponse);
-          if (url) routeIncomingUrl(url);
-        }
-
         if (cancelled) return;
 
-        // Warm: taps mientras la app está viva (foreground/background).
+        // Warm: taps mientras la app está viva (foreground/background). Acá SÍ
+        // se navega directo: la navegación ya está montada y la sesión
+        // hidratada, así que no hay carrera posible contra el guard de auth.
+        // El caso frío (app muerta) lo cubre `<ColdStartPushLinkGate />` —
+        // ver el comentario de arriba.
         responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
           const url = extractDeepLinkUrl(response);
           if (url) routeIncomingUrl(url);

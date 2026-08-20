@@ -2,6 +2,21 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+/**
+ * UTM de campaña capturados junto al `ref` (Fase 3 de Marketing & Growth).
+ * Independiente de `pendingReferralUsername` a propósito: un link del
+ * Content Factory trae los dos juntos, pero conceptualmente son cosas
+ * distintas — uno es "quién te invitó" (social, puede no querer mostrarse),
+ * el otro es "qué campaña te trajo" (interno, el usuario ni lo ve). Que el
+ * usuario edite o borre el campo de código de invitación en el onboarding no
+ * tiene por qué borrar también la atribución de marketing.
+ */
+export interface PendingUtm {
+  source: string | null;
+  medium: string | null;
+  campaign: string | null;
+}
+
 interface ReferralStore {
   /**
    * Username crudo capturado de `tornear://login?ref=<username>` (ver
@@ -20,6 +35,14 @@ interface ReferralStore {
    * llamante lo consume, los siguientes reciben `null`.
    */
   consumePendingReferralUsername: () => string | null;
+
+  /** UTM pendientes — ver el comentario de `PendingUtm`. */
+  pendingUtm: PendingUtm | null;
+
+  setPendingUtm: (utm: PendingUtm | null) => void;
+
+  /** Mismo patrón atómico que `consumePendingReferralUsername`. */
+  consumePendingUtm: () => PendingUtm | null;
 }
 
 /** Clave en AsyncStorage. Cambiarla descarta los referidos ya capturados. */
@@ -62,11 +85,26 @@ export const useReferralStore = create<ReferralStore>()(
         }
         return username;
       },
+
+      pendingUtm: null,
+
+      setPendingUtm: (utm) => set({ pendingUtm: utm }),
+
+      consumePendingUtm: () => {
+        const utm = get().pendingUtm;
+        if (utm) {
+          set({ pendingUtm: null });
+        }
+        return utm;
+      },
     }),
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ pendingReferralUsername: state.pendingReferralUsername }),
+      partialize: (state) => ({
+        pendingReferralUsername: state.pendingReferralUsername,
+        pendingUtm: state.pendingUtm,
+      }),
     },
   ),
 );

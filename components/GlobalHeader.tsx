@@ -42,7 +42,7 @@ const HEADER_BREATHING_ROOM = 12;
  * literal: es el mismo wordmark que usa `MatchShareCard`, y tener el ratio
  * escrito dos veces fue lo que dejó una de las dos copias desactualizada.
  */
-const LOGO_HEIGHT = 34;
+const LOGO_HEIGHT = 45;
 const LOGO_WIDTH = wordmarkWidthFor(LOGO_HEIGHT);
 
 export function GlobalHeader({ onNotificationPress, notificationCount, isMarketTab, isRankingTab }: GlobalHeaderProps) {
@@ -193,12 +193,12 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
      * NativeWind no lo traduce a ningún efecto nativo.
      */
     <View
-      className="relative z-50 flex-row items-center justify-between border-b border-neutral-outline/15 bg-surface-container px-5 pb-4 shadow-ambient-sm"
+      className="relative z-50 flex-row items-center justify-between border-b border-neutral-outline/15 bg-surface-container px-5 pb-2 shadow-ambient-sm"
       style={{ paddingTop: insets.top + HEADER_BREATHING_ROOM }}
     >
       {/* Logo TorneAR */}
       <Image
-        source={require('@/assets/new-images/logo_nombre_derecha.png')}
+        source={require('@/assets/new-images/TorneAR_Logo_Nombre_1.png')}
         contentFit="contain"
         style={{ height: LOGO_HEIGHT, width: LOGO_WIDTH }}
       />

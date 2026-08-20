@@ -48,12 +48,15 @@ export interface MatchShareCardData {
   /**
    * Goleadores de MI equipo en este partido, para `ScorersBlock`.
    *
-   * PENDIENTE: `lib/match-share-data.ts` todavía no lo puebla — hoy siempre
-   * llega `null` desde el fetch real hasta que exista una fuente de datos de
-   * goleadores por partido (goles individuales no se registran hoy con el
-   * mismo detalle que el MVP). El componente ya sabe tratar la ausencia
-   * (`ScorersBlock` colapsa a `null`), así que sumar esa fuente más adelante
-   * no requiere tocar la UI.
+   * Se puebla desde `match_goals` (proyección normalizada de
+   * `match_results.scorers`, migración 20260819120000) vía la RPC
+   * `get_match_scorers`, con fallback al jsonb que ya devuelve
+   * `get_match_detail` — ver el bloque «Goleadores» en
+   * `lib/match-share-data.ts` para por qué son dos fuentes y no una.
+   *
+   * Sigue siendo `null` —y no `[]`— cuando el equipo no cargó goleadores:
+   * `ScorersBlock` colapsa ante la ausencia, igual que el chip de rating y el
+   * MVP. Un array vacío obligaría a cada consumidor a chequear `length`.
    */
   scorers: MatchScorer[] | null;
 }
