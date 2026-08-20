@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
+import type { PendingUtm } from '@/stores/referralStore';
 
 /**
  * Qué pasó con un código de referido. Es el campo `status` de los eventos
@@ -62,10 +63,17 @@ const LOG_EVENT = 'referral.resolve';
  * @param referredByUsername Username del referente, tal como vino del link.
  * @param authUserId `auth.users.id` del usuario que está completando el
  *   onboarding. Hace falta para leer su propio `referred_by` previo.
+ * @param utm UTM de campaña pendientes (Fase 3), si los hubo. Van en la
+ *   MISMA llamada a `set_referral` — un solo viaje a la red en el caso común
+ *   (un link del Content Factory trae username y utm juntos) — pero no
+ *   participan de la clasificación de `ReferralOutcome`: ese enum describe
+ *   qué pasó con el REFERIDO, no con la atribución, que en `set_referral` es
+ *   un bloque independiente que nunca falla por culpa del otro.
  */
 export async function resolveAndSetReferral(
   referredByUsername: string,
   authUserId: string,
+  utm?: PendingUtm | null,
 ): Promise<ReferralOutcome> {
   const username = referredByUsername.trim().toLowerCase();
   const startedAt = Date.now();
@@ -86,8 +94,18 @@ export async function resolveAndSetReferral(
   // conclusión inventada a partir de un error de red.
   const classifiable = !selfResult.error && !referrerResult.error && self !== null;
 
+  // Objeto construido condicionalmente y no con claves en `undefined`: así
+  // la llamada sin `utm` es byte a byte la misma que antes de Fase 3 — nada
+  // que un test o un log existente tenga que reinterpretar.
   const { error } = await supabase.rpc('set_referral', {
     p_referred_by_username: referredByUsername,
+    ...(utm
+      ? {
+          p_utm_source: utm.source ?? undefined,
+          p_utm_medium: utm.medium ?? undefined,
+          p_utm_campaign: utm.campaign ?? undefined,
+        }
+      : {}),
   });
 
   if (error) {
@@ -125,4 +143,39 @@ export async function resolveAndSetReferral(
   });
 
   return status;
+}
+
+/**
+ * Registra UTM de campaña cuando NO hay código de referido pendiente (Fase
+ * 3). Caso borde, no el camino común: hoy todo link etiquetado de la app
+ * pasa por `/i/<username>` (Content Factory y referidos por igual), así que
+ * casi siempre hay username y ese caso lo cubre `resolveAndSetReferral`
+ * pasándole `utm` — esta función existe para cuando el campo de código de
+ * invitación del onboarding queda vacío (el usuario lo borró a mano) pero
+ * los UTM sí se capturaron: borrar "quién me invitó" no tiene por qué borrar
+ * también "qué campaña me trajo".
+ *
+ * Sin clasificación ni log de `referral.resolve` — no hay nada que
+ * clasificar (no hay referente, no hay self/referrer que leer), y ese evento
+ * es específicamente sobre referidos. Sólo se loguea si la RPC falla, mismo
+ * criterio de "nunca bloquear el onboarding" que el resto del módulo.
+ */
+export async function applyPendingAttribution(utm: PendingUtm): Promise<void> {
+  const { error } = await supabase.rpc('set_referral', {
+    // '' y no null: la RPC trata a los dos igual ("sin código, no-op en el
+    // bloque de referido"), pero el tipo generado de este parámetro es
+    // `string` — no acepta `null` aunque Postgres sí lo haga en runtime.
+    p_referred_by_username: '',
+    p_utm_source: utm.source ?? undefined,
+    p_utm_medium: utm.medium ?? undefined,
+    p_utm_campaign: utm.campaign ?? undefined,
+  });
+
+  if (error) {
+    Logger.warn('No se pudo guardar la atribución de marketing; el onboarding sigue sin bloquearse', {
+      scope: 'referral-data.applyPendingAttribution',
+      event: 'attribution.resolve',
+      error,
+    });
+  }
 }

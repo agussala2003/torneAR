@@ -32,18 +32,34 @@ export default function LoginScreen() {
 
   const { showAlert, AlertComponent } = useCustomAlert();
 
-  // Captura del código de referido (`tornear://login?ref=<username>`).
-  // `deepLinkToHref` (lib/deep-linking.ts) ya preserva el query param sin
-  // ningún cambio ahí; acá sólo se lee y se guarda para el onboarding, porque
-  // `profiles` no tiene grant para `anon` — recién se puede resolver contra un
-  // username real una vez que haya sesión (ver stores/referralStore.ts).
-  const { ref: referralUsername } = useLocalSearchParams<{ ref?: string }>();
+  // Captura del código de referido (`tornear://login?ref=<username>`) y de
+  // los UTM de campaña que puedan venir en el mismo link (Fase 3 de
+  // Marketing & Growth — `deepLinkToHref`/`normalizeUniversalLink` en
+  // lib/deep-linking.ts ya los preservan). Acá sólo se leen y se guardan
+  // para el onboarding: `profiles` no tiene grant para `anon`, recién se
+  // puede escribir con sesión activa (ver stores/referralStore.ts).
+  const { ref: referralUsername, utm_source, utm_medium, utm_campaign } = useLocalSearchParams<{
+    ref?: string;
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  }>();
 
   useEffect(() => {
     if (referralUsername) {
       useReferralStore.getState().setPendingReferralUsername(referralUsername);
     }
   }, [referralUsername]);
+
+  useEffect(() => {
+    if (utm_source || utm_medium || utm_campaign) {
+      useReferralStore.getState().setPendingUtm({
+        source: utm_source ?? null,
+        medium: utm_medium ?? null,
+        campaign: utm_campaign ?? null,
+      });
+    }
+  }, [utm_source, utm_medium, utm_campaign]);
 
   // Flags de PRESENTACIÓN. Los guards de reentrada de abajo siguen mirando
   // `loading` / `googleLoading` reales: si usaran estos, el formulario quedaría

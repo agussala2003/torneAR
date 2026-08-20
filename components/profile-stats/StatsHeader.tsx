@@ -2,18 +2,18 @@ import { Image, Text, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { formatAge } from '@/lib/age';
-import type { ProfileRow } from './types';
+import type { PublicProfileRow } from './types';
 
 function positionLabel(pos: string): string {
   return pos.replaceAll('_', ' ');
 }
 
 type StatsHeaderProps = {
-  profile: ProfileRow;
+  profile: PublicProfileRow;
   /**
-   * Ya calculada server-side (vista `profiles_public`) — ver el comentario
-   * en `ProfileStatsViewData.age`. No se deriva de `profile.date_of_birth`
-   * porque esa columna ya no viaja en `profile` para un perfil ajeno.
+   * Ya calculada server-side (columna derivada de `profiles_public`) — ver
+   * el comentario en `ProfileStatsViewData.age`. Nunca se deriva de
+   * `date_of_birth`: esa columna no es legible por SELECT directo.
    */
   age: number | null;
   /** Ver el mismo prop en `components/profile/ProfileHeader.tsx`. */

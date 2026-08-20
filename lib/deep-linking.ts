@@ -37,6 +37,16 @@ const UNIVERSAL_LINK_HOST = 'tornear.app';
 const REFERRAL_UNIVERSAL_LINK_PREFIX = 'i/';
 
 /**
+ * UTM que `normalizeUniversalLink` reenvía del Universal Link al
+ * `tornear://login?...` (Fase 3 de Marketing & Growth: el Content Factory
+ * del dashboard etiqueta los links de las tarjetas con esto). Allowlist
+ * explícita y no un passthrough genérico de `queryParams` — esta función
+ * arma la URL interna que el resto de la app confía en resolver; no vale
+ * la pena que cualquier query param futuro se cuele ahí sin una decisión.
+ */
+const UTM_PARAM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign'] as const;
+
+/**
  * Path al que Supabase devuelve el control después del consentimiento de Google
  * (`tornear://auth/callback`). NO es una pantalla: `signInWithGoogle()`
  * (lib/auth-data.ts) ya resuelve esa URL desde `WebBrowser.openAuthSessionAsync`
@@ -107,7 +117,16 @@ function normalizeUniversalLink(url: string): string {
   }
 
   const username = decodeURIComponent(encodedUsername);
-  return `${APP_SCHEME}://login?ref=${encodeURIComponent(username)}`;
+  const parts = [`ref=${encodeURIComponent(username)}`];
+
+  for (const key of UTM_PARAM_KEYS) {
+    const value = parsed.queryParams?.[key];
+    if (typeof value === 'string' && value.length > 0) {
+      parts.push(`${key}=${encodeURIComponent(value)}`);
+    }
+  }
+
+  return `${APP_SCHEME}://login?${parts.join('&')}`;
 }
 
 /**

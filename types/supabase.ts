@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       app_feedback: {
@@ -65,6 +40,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_feedback_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "app_feedback_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_player_stats"
+            referencedColumns: ["profile_id"]
           },
         ]
       }
@@ -268,6 +257,13 @@ export type Database = {
             foreignKeyName: "challenges_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -337,6 +333,20 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "content_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "v_player_stats"
+            referencedColumns: ["profile_id"]
+          },
         ]
       }
       conversation_reads: {
@@ -368,6 +378,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_reads_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -417,6 +434,13 @@ export type Database = {
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -568,6 +592,13 @@ export type Database = {
             foreignKeyName: "market_player_post_applications_applicant_profile_id_fkey"
             columns: ["applicant_profile_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_player_post_applications_applicant_profile_id_fkey"
+            columns: ["applicant_profile_id"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -637,6 +668,13 @@ export type Database = {
             foreignKeyName: "market_player_posts_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_player_posts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -680,6 +718,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_team_post_applications_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -746,6 +791,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "market_team_posts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -826,6 +878,13 @@ export type Database = {
             foreignKeyName: "match_dispute_votes_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_dispute_votes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -845,9 +904,80 @@ export type Database = {
           },
         ]
       }
+      match_goals: {
+        Row: {
+          created_at: string
+          goals_count: number
+          id: string
+          match_id: string
+          player_id: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          goals_count: number
+          id?: string
+          match_id: string
+          player_id: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          goals_count?: number
+          id?: string
+          match_id?: string
+          player_id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_goals_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_goals_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_goals_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_goals_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "v_player_stats"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "match_goals_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_goals_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "v_team_ranking"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_participants: {
         Row: {
-          checkin_at: string | null          did_checkin: boolean
+          checkin_at: string | null
+          did_checkin: boolean
           id: string
           is_guest: boolean
           is_result_loader: boolean
@@ -857,7 +987,8 @@ export type Database = {
           team_id: string
         }
         Insert: {
-          checkin_at?: string | null          did_checkin?: boolean
+          checkin_at?: string | null
+          did_checkin?: boolean
           id?: string
           is_guest?: boolean
           is_result_loader?: boolean
@@ -867,7 +998,8 @@ export type Database = {
           team_id: string
         }
         Update: {
-          checkin_at?: string | null          did_checkin?: boolean
+          checkin_at?: string | null
+          did_checkin?: boolean
           id?: string
           is_guest?: boolean
           is_result_loader?: boolean
@@ -889,6 +1021,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_participants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -1002,6 +1141,13 @@ export type Database = {
             foreignKeyName: "match_proposals_proposed_by_fkey"
             columns: ["proposed_by"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_proposals_proposed_by_fkey"
+            columns: ["proposed_by"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -1077,6 +1223,13 @@ export type Database = {
             foreignKeyName: "match_results_mvp_id_fkey"
             columns: ["mvp_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_results_mvp_id_fkey"
+            columns: ["mvp_id"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -1085,6 +1238,13 @@ export type Database = {
             columns: ["submitted_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_results_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -1301,6 +1461,13 @@ export type Database = {
             foreignKeyName: "messages_sender_profile_id_fkey"
             columns: ["sender_profile_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_profile_id_fkey"
+            columns: ["sender_profile_id"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -1366,6 +1533,59 @@ export type Database = {
             foreignKeyName: "notifications_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "v_player_stats"
+            referencedColumns: ["profile_id"]
+          },
+        ]
+      }
+      profile_attributions: {
+        Row: {
+          created_at: string
+          profile_id: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_attributions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_attributions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_attributions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -1403,6 +1623,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_badges_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -1477,6 +1704,20 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "v_player_stats"
+            referencedColumns: ["profile_id"]
+          },
         ]
       }
       result_dispute_votes: {
@@ -1534,6 +1775,13 @@ export type Database = {
             foreignKeyName: "result_dispute_votes_voter_id_fkey"
             columns: ["voter_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "result_dispute_votes_voter_id_fkey"
+            columns: ["voter_id"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -1569,6 +1817,104 @@ export type Database = {
         }
         Relationships: []
       }
+      social_accounts: {
+        Row: {
+          access_token_secret_id: string | null
+          created_at: string
+          display_name: string
+          external_id: string | null
+          handle: string
+          id: string
+          is_active: boolean
+          last_sync_error: string | null
+          last_synced_at: string | null
+          platform: string
+          token_expires_at: string | null
+        }
+        Insert: {
+          access_token_secret_id?: string | null
+          created_at?: string
+          display_name: string
+          external_id?: string | null
+          handle: string
+          id?: string
+          is_active?: boolean
+          last_sync_error?: string | null
+          last_synced_at?: string | null
+          platform: string
+          token_expires_at?: string | null
+        }
+        Update: {
+          access_token_secret_id?: string | null
+          created_at?: string
+          display_name?: string
+          external_id?: string | null
+          handle?: string
+          id?: string
+          is_active?: boolean
+          last_sync_error?: string | null
+          last_synced_at?: string | null
+          platform?: string
+          token_expires_at?: string | null
+        }
+        Relationships: []
+      }
+      social_metrics_daily: {
+        Row: {
+          account_id: string
+          captured_at: string
+          created_at: string
+          engagements: number | null
+          followers: number | null
+          following: number | null
+          id: string
+          posts_count: number | null
+          profile_views: number | null
+          raw: Json | null
+          reach: number | null
+          source: string
+          views: number | null
+        }
+        Insert: {
+          account_id: string
+          captured_at: string
+          created_at?: string
+          engagements?: number | null
+          followers?: number | null
+          following?: number | null
+          id?: string
+          posts_count?: number | null
+          profile_views?: number | null
+          raw?: Json | null
+          reach?: number | null
+          source?: string
+          views?: number | null
+        }
+        Update: {
+          account_id?: string
+          captured_at?: string
+          created_at?: string
+          engagements?: number | null
+          followers?: number | null
+          following?: number | null
+          id?: string
+          posts_count?: number | null
+          profile_views?: number | null
+          raw?: Json | null
+          reach?: number | null
+          source?: string
+          views?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_metrics_daily_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_join_requests: {
         Row: {
           created_at: string
@@ -1600,6 +1946,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_join_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -1653,6 +2006,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_members_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -1785,6 +2145,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_stints_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -1977,6 +2344,13 @@ export type Database = {
             foreignKeyName: "wo_claims_claimed_by_fkey"
             columns: ["claimed_by"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wo_claims_claimed_by_fkey"
+            columns: ["claimed_by"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -2012,6 +2386,13 @@ export type Database = {
             foreignKeyName: "wo_claims_mvp_id_fkey"
             columns: ["mvp_id"]
             isOneToOne: false
+            referencedRelation: "profiles_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wo_claims_mvp_id_fkey"
+            columns: ["mvp_id"]
+            isOneToOne: false
             referencedRelation: "v_player_stats"
             referencedColumns: ["profile_id"]
           },
@@ -2020,6 +2401,13 @@ export type Database = {
             columns: ["resolved_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wo_claims_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_public"
             referencedColumns: ["id"]
           },
           {
@@ -2066,10 +2454,42 @@ export type Database = {
           full_name: string | null
           gender: string | null
           id: string | null
-          preferred_position: Database["public"]["Enums"]["player_position"] | null
+          preferred_position:
+            | Database["public"]["Enums"]["player_position"]
+            | null
           strong_foot: string | null
           username: string | null
           zone: string | null
+        }
+        Insert: {
+          age?: never
+          avatar_url?: string | null
+          created_at?: string | null
+          favorite_team?: string | null
+          full_name?: string | null
+          gender?: string | null
+          id?: string | null
+          preferred_position?:
+            | Database["public"]["Enums"]["player_position"]
+            | null
+          strong_foot?: string | null
+          username?: string | null
+          zone?: string | null
+        }
+        Update: {
+          age?: never
+          avatar_url?: string | null
+          created_at?: string | null
+          favorite_team?: string | null
+          full_name?: string | null
+          gender?: string | null
+          id?: string | null
+          preferred_position?:
+            | Database["public"]["Enums"]["player_position"]
+            | null
+          strong_foot?: string | null
+          username?: string | null
+          zone?: string | null
         }
         Relationships: []
       }
@@ -2127,6 +2547,28 @@ export type Database = {
     }
     Functions: {
       accept_challenge: { Args: { p_challenge_id: string }; Returns: Json }
+      admin_connect_instagram_account: {
+        Args: {
+          p_access_token: string
+          p_account_id: string
+          p_expires_in_seconds: number
+          p_ig_user_id: string
+          p_username: string
+        }
+        Returns: undefined
+      }
+      admin_disconnect_instagram_account: {
+        Args: { p_account_id: string }
+        Returns: undefined
+      }
+      admin_get_suspension_status: {
+        Args: { p_profile_ids: string[] }
+        Returns: {
+          banned_until: string
+          is_suspended: boolean
+          profile_id: string
+        }[]
+      }
       admin_resolve_dispute: {
         Args: {
           p_admin_notes?: string
@@ -2134,6 +2576,18 @@ export type Database = {
           p_resolution: string
         }
         Returns: Json
+      }
+      admin_set_admin_flag: {
+        Args: { p_is_admin: boolean; p_profile_id: string }
+        Returns: undefined
+      }
+      admin_suspend_user: {
+        Args: { p_profile_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      admin_unban_user: {
+        Args: { p_profile_id: string; p_reason?: string }
+        Returns: undefined
       }
       apply_match_outcome: {
         Args: {
@@ -2184,7 +2638,176 @@ export type Database = {
         Args: { p_match_id: string; p_proposal_id: string }
         Returns: undefined
       }
+      content_weekly_highlights: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: Json
+      }
       current_profile_id: { Args: never; Returns: string }
+      dashboard_activity_timeseries: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          day: string
+          matches_created: number
+          matches_finished: number
+          matches_scheduled: number
+        }[]
+      }
+      dashboard_attribution_stats: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          signups: number
+          utm_campaign: string
+          utm_source: string
+        }[]
+      }
+      dashboard_checkin_timeseries: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          checkins: number
+          day: string
+          participants: number
+        }[]
+      }
+      dashboard_feedback_inbox: {
+        Args: { limit_val?: number; offset_val?: number }
+        Returns: {
+          avatar_url: string
+          created_at: string
+          full_name: string
+          id: string
+          message: string
+          profile_id: string
+          username: string
+        }[]
+      }
+      dashboard_growth_summary: {
+        Args: never
+        Returns: {
+          matches_count: number
+          profiles_count: number
+          teams_count: number
+        }[]
+      }
+      dashboard_growth_timeseries: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          day: string
+          signups: number
+          teams: number
+        }[]
+      }
+      dashboard_logs_timeseries: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          day: string
+          error_count: number
+          info_count: number
+          warn_count: number
+        }[]
+      }
+      dashboard_market_timeseries: {
+        Args: { p_from?: string; p_to?: string }
+        Returns: {
+          applications: number
+          day: string
+          player_posts: number
+          team_posts: number
+        }[]
+      }
+      dashboard_matches_by_status: {
+        Args: never
+        Returns: {
+          matches_count: number
+          status: Database["public"]["Enums"]["match_status"]
+        }[]
+      }
+      dashboard_overview_kpis: {
+        Args: never
+        Returns: {
+          active_teams: number
+          checkin_rate_30d: number
+          disputes_pending: number
+          errors_24h: number
+          errors_prev_24h: number
+          matches_created_7d: number
+          matches_created_prev_7d: number
+          matches_live: number
+          matches_today: number
+          matches_upcoming_7d: number
+          reports_pending: number
+          signups_7d: number
+          signups_prev_7d: number
+          total_teams: number
+          wo_claims_pending: number
+        }[]
+      }
+      dashboard_referral_summary: {
+        Args: never
+        Returns: {
+          ambassador_count: number
+          referral_rate: number
+          referred_count: number
+          referrer_count: number
+          total_profiles: number
+        }[]
+      }
+      dashboard_retention_cohorts: {
+        Args: { p_weeks?: number }
+        Returns: {
+          cohort_size: number
+          cohort_week: string
+          mature_28d: boolean
+          mature_7d: boolean
+          played_28d: number
+          played_7d: number
+        }[]
+      }
+      dashboard_social_timeseries: {
+        Args: { p_from?: string; p_platform: string; p_to?: string }
+        Returns: {
+          day: string
+          engagements: number
+          followers: number
+          following: number
+          posts_count: number
+          profile_views: number
+          reach: number
+          views: number
+        }[]
+      }
+      dashboard_top_referrers: {
+        Args: { p_limit?: number }
+        Returns: {
+          full_name: string
+          is_ambassador: boolean
+          profile_id: string
+          referred_count: number
+          username: string
+        }[]
+      }
+      dashboard_users_list: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_status?: string
+        }
+        Returns: {
+          avatar_url: string
+          banned_until: string
+          created_at: string
+          full_name: string
+          is_admin: boolean
+          is_suspended: boolean
+          matches_count: number
+          profile_id: string
+          referred_by_username: string
+          teams_count: number
+          total_count: number
+          username: string
+          zone: string
+        }[]
+      }
       deactivate_expired_market_posts: { Args: never; Returns: undefined }
       delete_own_account: { Args: never; Returns: undefined }
       elo_delta: {
@@ -2256,6 +2879,14 @@ export type Database = {
         Args: { p_match_id: string; p_team_id: string }
         Returns: Json
       }
+      get_match_scorers: {
+        Args: { p_match_id: string; p_team_id: string }
+        Returns: {
+          full_name: string
+          goals_count: number
+          player_id: string
+        }[]
+      }
       get_my_matches: {
         Args: { p_team_id: string }
         Returns: {
@@ -2326,6 +2957,12 @@ export type Database = {
           updated_at: string
           username: string
           zone: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       get_pending_wo_claims: {
@@ -2540,7 +3177,27 @@ export type Database = {
         Returns: Json
       }
       set_referral: {
-        Args: { p_referred_by_username: string }
+        Args: {
+          p_referred_by_username: string
+          p_utm_campaign?: string
+          p_utm_medium?: string
+          p_utm_source?: string
+        }
+        Returns: undefined
+      }
+      social_snapshot_upsert: {
+        Args: {
+          p_account_id: string
+          p_captured_at: string
+          p_engagements?: number
+          p_followers?: number
+          p_following?: number
+          p_posts?: number
+          p_profile_views?: number
+          p_reach?: number
+          p_source?: string
+          p_views?: number
+        }
         Returns: undefined
       }
       submit_dispute_vote: {
@@ -2570,6 +3227,10 @@ export type Database = {
       transition_season: {
         Args: { p_ends_at: string; p_new_name: string; p_starts_at: string }
         Returns: string
+      }
+      verify_instagram_sync_secret: {
+        Args: { p_candidate: string }
+        Returns: boolean
       }
       verify_push_webhook_secret: {
         Args: { p_candidate: string }
@@ -2768,9 +3429,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       challenge_status: ["ENVIADA", "ACEPTADA", "RECHAZADA", "CANCELADA"],
