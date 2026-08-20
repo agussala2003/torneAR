@@ -107,6 +107,78 @@ describe('resolveDeepLink · Ignore (URLs inválidas / scheme desconocido)', () 
   it('ignora https (no es el scheme de la app)', () => {
     expect(resolveDeepLink('https://tornear.app/market', true)).toEqual({ kind: 'ignore' });
   });
+
+  it('ignora un Universal Link a /i/ sin username', () => {
+    expect(resolveDeepLink('https://tornear.app/i', false)).toEqual({ kind: 'ignore' });
+    expect(resolveDeepLink('https://tornear.app/i/', false)).toEqual({ kind: 'ignore' });
+  });
+});
+
+describe('resolveDeepLink · Universal Links de referido (https://tornear.app/i/<username>)', () => {
+  // Fase 6.1: el link que se comparte hoy (lib/referral-link.ts) es este
+  // formato https, no el tornear:// directo de antes. Si el SO lo
+  // intercepta, la app recibe la URL cruda tal cual.
+  it('traduce al mismo destino que el tornear://login?ref= de antes, sin sesión', () => {
+    expect(resolveDeepLink('https://tornear.app/i/agussala', false)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/login', params: { ref: 'agussala' } },
+    });
+  });
+
+  it('decodifica un username percent-encoded (Universal Link de producción)', () => {
+    expect(resolveDeepLink('https://tornear.app/i/juan%2Fperez', false)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/login', params: { ref: 'juan/perez' } },
+    });
+  });
+
+  it('navega igual con sesión activa (login es público independientemente del auth)', () => {
+    expect(resolveDeepLink('https://tornear.app/i/agussala', true)).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/login', params: { ref: 'agussala' } },
+    });
+  });
+
+  // Fase 3 de Marketing & Growth: el Content Factory etiqueta los links de
+  // las tarjetas con UTM. Tienen que sobrevivir la misma traducción que el
+  // username, no perderse en el camino a `tornear://login`.
+  it('reenvía los 3 UTM cuando vienen en el Universal Link', () => {
+    expect(
+      resolveDeepLink(
+        'https://tornear.app/i/agussala?utm_source=instagram&utm_medium=social&utm_campaign=mvp-card-w34',
+        false,
+      ),
+    ).toEqual({
+      kind: 'navigate',
+      href: {
+        pathname: '/login',
+        params: {
+          ref: 'agussala',
+          utm_source: 'instagram',
+          utm_medium: 'social',
+          utm_campaign: 'mvp-card-w34',
+        },
+      },
+    });
+  });
+
+  it('reenvía sólo los UTM presentes, sin inventar los que faltan', () => {
+    expect(
+      resolveDeepLink('https://tornear.app/i/agussala?utm_source=whatsapp', false),
+    ).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/login', params: { ref: 'agussala', utm_source: 'whatsapp' } },
+    });
+  });
+
+  it('ignora query params que no son ni ref ni UTM (allowlist, no passthrough genérico)', () => {
+    expect(
+      resolveDeepLink('https://tornear.app/i/agussala?utm_source=instagram&debug=1', false),
+    ).toEqual({
+      kind: 'navigate',
+      href: { pathname: '/login', params: { ref: 'agussala', utm_source: 'instagram' } },
+    });
+  });
 });
 
 describe('resolveDeepLink · Defer (ruta protegida sin sesión)', () => {
@@ -189,6 +261,42 @@ describe('deepLinkToHref (helpers de bajo nivel)', () => {
       params: { id: '7', tab: 'stats' },
     });
   });
+
+  it('traduce un Universal Link https://tornear.app/i/<username> al href de login con ref', () => {
+    expect(deepLinkToHref('https://tornear.app/i/agussala')).toEqual({
+      pathname: '/login',
+      params: { ref: 'agussala' },
+    });
+  });
+
+  it('decodifica el username percent-encoded del Universal Link', () => {
+    expect(deepLinkToHref('https://tornear.app/i/juan%2Fperez')).toEqual({
+      pathname: '/login',
+      params: { ref: 'juan/perez' },
+    });
+  });
+
+  it('sigue rechazando cualquier otro path bajo tornear.app', () => {
+    // Solo /i/<username> tiene traducción — el resto del dominio (la
+    // landing, /legal/*, etc.) no tiene pantalla equivalente en la app.
+    expect(deepLinkToHref('https://tornear.app/legal/tyc')).toBeNull();
+  });
+
+  it('reenvía los UTM del Universal Link junto con ref', () => {
+    expect(
+      deepLinkToHref('https://tornear.app/i/agussala?utm_source=tiktok&utm_campaign=elo-jump'),
+    ).toEqual({
+      pathname: '/login',
+      params: { ref: 'agussala', utm_source: 'tiktok', utm_campaign: 'elo-jump' },
+    });
+  });
+
+  it('no agrega claves de UTM cuando el Universal Link no trae ninguno', () => {
+    expect(deepLinkToHref('https://tornear.app/i/agussala')).toEqual({
+      pathname: '/login',
+      params: { ref: 'agussala' },
+    });
+  });
 });
 
 describe('isOAuthCallback · callback de Google', () => {
@@ -243,5 +351,14 @@ describe('isProtectedDeepLink', () => {
     expect(isProtectedDeepLink('tornear://market')).toBe(true);
     expect(isProtectedDeepLink('tornear://match-detail?id=1')).toBe(true);
     expect(isProtectedDeepLink('tornear://admin/wo-review')).toBe(true);
+  });
+
+  it('trata el Universal Link de referido como público (login), no como protegido', () => {
+    // Regresión: normalizeUniversalLink() traduce a `login`, que SÍ está en
+    // PUBLIC_DEEP_LINK_PATHS. Si esta función normalizara distinto que
+    // deepLinkToHref (o no normalizara), vería la raíz `i` — que no está en
+    // el set — y trataría un link público como protegido, diriéndolo en vez
+    // de navegar aunque el usuario no tenga sesión.
+    expect(isProtectedDeepLink('https://tornear.app/i/agussala')).toBe(false);
   });
 });

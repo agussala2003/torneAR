@@ -8,12 +8,43 @@ import type { Href } from 'expo-router';
 const PUBLIC_DEEP_LINK_PATHS = new Set<string>(['login', 'forgot-password']);
 
 /**
- * Scheme propio de la app (ver `app.json`). Solo aceptamos deep links de este
- * scheme: cualquier otro (https, un scheme ajeno, o una URL sin scheme) se
- * descarta. El SO ya filtra por scheme al entregar, pero validarlo acá blinda
- * también las URLs que llegan por el payload de una push (`data.url`).
+ * Scheme propio de la app (ver `app.json`). Todo el gating de abajo trabaja
+ * sobre este scheme — un Universal Link `https://tornear.app/...` se traduce
+ * primero a este formato (`normalizeUniversalLink`) antes de llegar a
+ * cualquiera de los chequeos. Cualquier otro scheme ajeno, o una URL sin
+ * scheme, se sigue descartando tal cual.
  */
 const APP_SCHEME = 'tornear';
+
+/**
+ * Dominio asociado a Universal Links / App Links (Fase 6.1 — ver
+ * `associatedDomains`/`intentFilters` en `app.json` y
+ * `tornear.app/.well-known/*` en torneAR/dashboard). Si el SO interceptó
+ * bien el link, la app recibe esta URL `https://` cruda en vez del
+ * `tornear://` que se comparte (`lib/referral-link.ts`).
+ */
+const UNIVERSAL_LINK_HOST = 'tornear.app';
+
+/**
+ * Prefijo de path de los links de referido en la web
+ * (`torneAR/dashboard/app/(public)/i/[username]`). Es el único patrón de
+ * Universal Link que esta función sabe traducir — mantenerlo en sync con
+ * `REFERRAL_LINK_BASE_URL` de `lib/referral-link.ts` si alguno cambia.
+ * Cualquier otro path bajo `tornear.app` (ej. la landing en `/`) no tiene
+ * pantalla equivalente dentro de la app y se sigue ignorando como
+ * cualquier https ajeno.
+ */
+const REFERRAL_UNIVERSAL_LINK_PREFIX = 'i/';
+
+/**
+ * UTM que `normalizeUniversalLink` reenvía del Universal Link al
+ * `tornear://login?...` (Fase 3 de Marketing & Growth: el Content Factory
+ * del dashboard etiqueta los links de las tarjetas con esto). Allowlist
+ * explícita y no un passthrough genérico de `queryParams` — esta función
+ * arma la URL interna que el resto de la app confía en resolver; no vale
+ * la pena que cualquier query param futuro se cuele ahí sin una decisión.
+ */
+const UTM_PARAM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign'] as const;
 
 /**
  * Path al que Supabase devuelve el control después del consentimiento de Google
@@ -44,12 +75,67 @@ function extractPath(parsed: Linking.ParsedURL): string {
 }
 
 /**
+ * Traduce un Universal Link de referido (`https://tornear.app/i/<username>`)
+ * al `tornear://login?ref=<username>` que el resto de este módulo ya sabe
+ * resolver — mismo destino final que si el link hubiera llegado con el
+ * scheme propio desde el vamos. Cualquier otra URL, incluido cualquier otro
+ * path bajo `tornear.app`, se devuelve sin tocar.
+ *
+ * Se llama al principio de `isOAuthCallback`, `deepLinkToHref` e
+ * `isProtectedDeepLink` — las tres, no solo una — para que el gating de
+ * `isProtectedDeepLink` vea `login` (público) y no `i` (que, sin traducir,
+ * no está en `PUBLIC_DEEP_LINK_PATHS` y diferiría el link como si fuera
+ * protegido).
+ *
+ * El username va percent-encoded en el path si tenía caracteres especiales
+ * (`juan%2Fperez` si el username original tenía una `/`, ver
+ * `lib/referral-link.ts`): se decodifica con `decodeURIComponent` y se
+ * vuelve a codificar como query param al armar el `tornear://`, sin asumir
+ * que el escapado de un path y el de un query string son intercambiables.
+ */
+function normalizeUniversalLink(url: string): string {
+  const parsed = Linking.parse(url);
+
+  if (parsed.scheme !== 'https' || parsed.hostname !== UNIVERSAL_LINK_HOST) {
+    return url;
+  }
+
+  // OJO: acá NO se usa `extractPath()`. Esa función combina hostname+path
+  // porque en un `tornear://...` el host ES el primer segmento de la ruta
+  // (`tornear://match-detail` → hostname: 'match-detail'). Para un
+  // `https://`, `parsed.hostname` ya es el dominio real (`tornear.app`,
+  // recién validado arriba) y NO forma parte de la ruta — combinarlo
+  // armaría `tornear.app/i/juan` en vez de `i/juan`.
+  const path = (parsed.path ?? '').replace(/^\/+/, '').replace(/\/+$/, '');
+  if (!path.startsWith(REFERRAL_UNIVERSAL_LINK_PREFIX)) {
+    return url;
+  }
+
+  const encodedUsername = path.slice(REFERRAL_UNIVERSAL_LINK_PREFIX.length);
+  if (!encodedUsername) {
+    return url;
+  }
+
+  const username = decodeURIComponent(encodedUsername);
+  const parts = [`ref=${encodeURIComponent(username)}`];
+
+  for (const key of UTM_PARAM_KEYS) {
+    const value = parsed.queryParams?.[key];
+    if (typeof value === 'string' && value.length > 0) {
+      parts.push(`${key}=${encodeURIComponent(value)}`);
+    }
+  }
+
+  return `${APP_SCHEME}://login?${parts.join('&')}`;
+}
+
+/**
  * Reconoce la URL de callback de OAuth. Compara sobre la URL sin query ni
  * fragment porque Supabase vuelve con los tokens colgados ahí
  * (`...#access_token=…` en implicit, `...?code=…` en PKCE).
  */
 export function isOAuthCallback(url: string): boolean {
-  const withoutParams = url.split('#')[0].split('?')[0];
+  const withoutParams = normalizeUniversalLink(url).split('#')[0].split('?')[0];
   const parsed = Linking.parse(withoutParams);
 
   if (parsed.scheme !== APP_SCHEME) {
@@ -62,10 +148,12 @@ export function isOAuthCallback(url: string): boolean {
 /**
  * Convierte una URL de deep link en un `Href` navegable por expo-router,
  * preservando los query params. Devuelve `null` si la URL no apunta a
- * ninguna ruta concreta (ej. `tornear://` a secas).
+ * ninguna ruta concreta (ej. `tornear://` a secas), o si el scheme/host no
+ * son ninguno de los que la app reconoce (ver `normalizeUniversalLink` para
+ * el único caso `https://` aceptado: los Universal Links de referido).
  */
 export function deepLinkToHref(url: string): Href | null {
-  const parsed = Linking.parse(url);
+  const parsed = Linking.parse(normalizeUniversalLink(url));
 
   if (parsed.scheme !== APP_SCHEME) {
     return null;
@@ -89,7 +177,7 @@ export function deepLinkToHref(url: string): Href | null {
  * pendiente cuando el usuario todavía no está autenticado.
  */
 export function isProtectedDeepLink(url: string): boolean {
-  const parsed = Linking.parse(url);
+  const parsed = Linking.parse(normalizeUniversalLink(url));
   const root = extractPath(parsed).split('/')[0] ?? '';
 
   return !PUBLIC_DEEP_LINK_PATHS.has(root);

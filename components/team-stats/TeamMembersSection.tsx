@@ -1,6 +1,6 @@
 import { Image, Text, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
-import { calculateAge, formatAge } from '@/lib/age';
+import { formatAge } from '@/lib/age';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { getTeamRoleLabel } from '@/lib/team-options';
 import type { TeamMemberStat } from './types';
@@ -46,7 +46,7 @@ export function TeamMembersSection({ members }: TeamMembersSectionProps) {
               : null;
             // `null` cuando el jugador no cargo la fecha: no se muestra nada en
             // vez de un "0 años" o un guion, que se leerian como un dato real.
-            const age = formatAge(calculateAge(member.dateOfBirth));
+            const age = formatAge(member.age);
             return (
               <View
                 key={member.profileId}

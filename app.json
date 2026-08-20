@@ -1,5 +1,6 @@
 {
   "expo": {
+    "owner": "tornear-org",
     "name": "TorneAR",
     "slug": "tornear",
     "version": "1.0.0",
@@ -12,6 +13,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.agussala2003.tornear",
+      "associatedDomains": ["applinks:tornear.app"],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "TorneAR necesita tu ubicación para verificar que estás en la cancha al hacer check-in.",
         "LSApplicationQueriesSchemes": ["instagram"]
@@ -21,6 +23,20 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "tornear.app",
+              "pathPrefix": "/i/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ],
       "adaptiveIcon": {
         "backgroundColor": "#131313",
@@ -65,7 +81,8 @@
           "color": "#53E076",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "./plugins/withInstagramQueries"
     ],
     "experiments": {
       "typedRoutes": true,

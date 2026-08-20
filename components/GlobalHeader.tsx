@@ -11,6 +11,7 @@ import { ActiveTeamSelector } from './ui/ActiveTeamSelector';
 import { fetchUnreadChatCount } from '@/lib/chat-api';
 import { fetchChallengesInbox } from '@/lib/challenge-actions'; // NUEVO
 import { Logger } from '@/lib/logger';
+import { wordmarkWidthFor } from '@/constants/brand';
 
 type GlobalHeaderProps = {
   onNotificationPress?: () => void;
@@ -30,16 +31,19 @@ type GlobalHeaderProps = {
 const HEADER_BREATHING_ROOM = 12;
 
 /**
- * Ancho/alto fijos para el logo y no `aspectRatio` con un solo lado: en un
- * `flex-row` sin stretch, Yoga (el layout nativo de iOS/Android) no siempre
- * deriva el ancho a partir de la altura + aspectRatio de forma confiable con
- * `expo-image` — anda bien en react-native-web (que usa CSS real) pero en el
- * celular el logo terminaba en 0 de ancho. Mismo criterio que el resto de las
- * imágenes locales de la app (`TeamShield`, `MarketCards`): las dos
- * dimensiones, explícitas.
+ * Altura óptica del wordmark: ahora es la altura del logo, no la de su lienzo.
+ *
+ * Con el asset sin recortar, `LOGO_HEIGHT = 40` pintaba una caja de 40 px de la
+ * que el logo ocupaba 33,4 (605/725) y el resto era aire transparente — de ahí
+ * que no alineara. 34 conserva ese tamaño visible y elimina el aire, así que el
+ * header no cambia de peso óptico: lo único que se va es el padding fantasma.
+ *
+ * El ancho sale del ratio real del asset (`constants/brand.ts`) y no de un
+ * literal: es el mismo wordmark que usa `MatchShareCard`, y tener el ratio
+ * escrito dos veces fue lo que dejó una de las dos copias desactualizada.
  */
-const LOGO_HEIGHT = 40;
-const LOGO_WIDTH = Math.round(LOGO_HEIGHT * (2169 / 725));
+const LOGO_HEIGHT = 45;
+const LOGO_WIDTH = wordmarkWidthFor(LOGO_HEIGHT);
 
 export function GlobalHeader({ onNotificationPress, notificationCount, isMarketTab, isRankingTab }: GlobalHeaderProps) {
   const insets = useSafeAreaInsets();
@@ -189,12 +193,12 @@ export function GlobalHeader({ onNotificationPress, notificationCount, isMarketT
      * NativeWind no lo traduce a ningún efecto nativo.
      */
     <View
-      className="relative z-50 flex-row items-center justify-between border-b border-neutral-outline/15 bg-surface-container px-5 pb-4 shadow-ambient-sm"
+      className="relative z-50 flex-row items-center justify-between border-b border-neutral-outline/15 bg-surface-container px-5 pb-2 shadow-ambient-sm"
       style={{ paddingTop: insets.top + HEADER_BREATHING_ROOM }}
     >
       {/* Logo TorneAR */}
       <Image
-        source={require('@/assets/new-images/logo_nombre_derecha.png')}
+        source={require('@/assets/new-images/TorneAR_Logo_Nombre_1.png')}
         contentFit="contain"
         style={{ height: LOGO_HEIGHT, width: LOGO_WIDTH }}
       />

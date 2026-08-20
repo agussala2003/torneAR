@@ -23,6 +23,8 @@ import { ProfileFormFields } from '@/components/profile/ProfileFormFields';
 import { FAVORITE_TEAM_OPTIONS } from '@/lib/favorite-teams';
 import { userProfileSchema, UserProfileFormData } from '@/lib/schemas/userSchema';
 import { saveOnboardingProfile } from '@/lib/onboarding-data';
+import { needsLegalAcceptance, recordLegalAcceptance } from '@/lib/auth-data';
+import { LegalConsentCheckbox } from '@/components/ui/LegalConsentCheckbox';
 import { useUsernameAvailability } from '@/hooks/useUsernameAvailability';
 import { useReferralStore } from '@/stores/referralStore';
 import { Logger } from '@/lib/logger';
@@ -53,6 +55,41 @@ export default function OnboardingScreen() {
   const [loading, setLoading] = useState(false);
   const [showZonePicker, setShowZonePicker] = useState(false);
   const [showFavoriteTeamPicker, setShowFavoriteTeamPicker] = useState(false);
+
+  /**
+   * ¿Hay que pedir el consentimiento acá?
+   *
+   * El alta por email ya lo trae: `signUp()` lo adjunta en `options.data` en el
+   * mismo acto que crea la cuenta. Google no puede — el proveedor da de alta al
+   * usuario en su propio consentimiento — así que esas cuentas llegan al
+   * onboarding sin ninguna constancia, y este es el último punto donde se puede
+   * pedir antes de que existan datos de perfil.
+   *
+   * Se resuelve UNA vez, al montar (initializer perezoso), y no en cada render:
+   * `recordLegalAcceptance()` dispara `USER_UPDATED`, el AuthContext reemplaza
+   * `user` con la metadata nueva y un valor derivado se daría vuelta a mitad del
+   * envío, desmontando el checkbox mientras el botón todavía está en vuelo.
+   */
+  const [mustAcceptLegal] = useState(() => needsLegalAcceptance(user));
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+
+  /**
+   * Código de invitación, editable. Respaldo manual del deep link
+   * (`tornear://login?ref=<username>`): si el usuario no tenía la app
+   * instalada al tocar el link, el `?ref=` se pierde en el salto a la store
+   * y nunca llega a `referralStore` — este campo es la única forma de
+   * recuperarlo, tipeándolo a mano.
+   *
+   * El initializer perezoso LEE el store sin consumirlo: si el deep link sí
+   * se capturó, el campo arranca completo para que el usuario no tenga que
+   * volver a escribirlo; `consumePendingReferralUsername()` recién se llama
+   * al enviar el formulario (ver `onSubmit`), y para entonces el campo ya es
+   * la única fuente de verdad — si el usuario lo edita o lo borra, eso es lo
+   * que se manda, no lo que haya quedado en el store.
+   */
+  const [referralCode, setReferralCode] = useState(
+    () => useReferralStore.getState().pendingReferralUsername ?? '',
+  );
 
   const { showAlert, AlertComponent } = useCustomAlert();
 
@@ -106,6 +143,10 @@ export default function OnboardingScreen() {
     // bloquea: decide el índice único al guardar.
     (step !== 1 || (usernameAvailability !== 'taken' && usernameAvailability !== 'checking'));
 
+  // El consentimiento gatea el envío igual que un campo incompleto: sin él no
+  // hay alta posible. Sólo aplica al paso 3 — los pasos 1 y 2 no crean nada.
+  const canSubmit = isStepValid && (!mustAcceptLegal || acceptedLegal);
+
   const handleNextStep = async () => {
     if (step === 1) {
       const valid = await trigger(['fullName', 'username', 'zone']);
@@ -120,12 +161,44 @@ export default function OnboardingScreen() {
 
   const onSubmit = async (data: UserProfileFormData) => {
     if (!user) return;
+    // Segunda barrera, además del botón deshabilitado: `handleSubmit` también se
+    // dispara desde el teclado o desde un test, y completar el perfil sin
+    // constancia de aceptación es un incumplimiento legal, no un bug de UI.
+    // Mismo criterio que `app/login.tsx`.
+    if (mustAcceptLegal && !acceptedLegal) return;
+
     setLoading(true);
     try {
-      // Se consume (no se lee) recién acá, no antes: el perfil todavía no
-      // existe en los pasos 1 y 2, y `set_referral` necesita que ya exista.
-      const referredByUsername = useReferralStore.getState().consumePendingReferralUsername();
-      await saveOnboardingProfile(user.id, data, referredByUsername);
+      // La constancia va PRIMERO, antes de que exista fila en `profiles`.
+      // Al revés quedaría un perfil completo —y por lo tanto una cuenta con
+      // acceso a la app, según el guard de `_layout`— sin prueba de qué texto
+      // aceptó su dueño. Si falla, se corta acá y no se crea nada.
+      if (mustAcceptLegal) {
+        const { error: legalError } = await recordLegalAcceptance();
+        if (legalError) throw legalError;
+
+        Logger.info('Consentimiento legal registrado en el onboarding', {
+          scope: 'onboarding.onSubmit',
+          userId: user.id,
+        });
+      }
+
+      // El campo manda, no el store: es lo que el usuario ve y pudo editar o
+      // vaciar. El store igual se consume acá —no antes: el perfil todavía
+      // no existe en los pasos 1 y 2, y `set_referral` necesita que ya
+      // exista— pero sólo para vaciarlo; su valor de retorno se descarta a
+      // propósito. Sin este consumo, un `pendingReferralUsername` viejo
+      // sobreviviría en AsyncStorage y precompletaría un onboarding futuro
+      // (otro logout/login en el mismo dispositivo) con un código que ya no
+      // corresponde.
+      useReferralStore.getState().consumePendingReferralUsername();
+      // Los UTM se consumen aparte del campo de código de invitación —
+      // adrede independientes, ver el comentario de `PendingUtm` en
+      // stores/referralStore.ts: que el usuario edite o borre "quién me
+      // invitó" no tiene por qué borrar también "qué campaña me trajo".
+      const pendingUtm = useReferralStore.getState().consumePendingUtm();
+      const referredByUsername = referralCode.trim() || null;
+      await saveOnboardingProfile(user.id, data, referredByUsername, pendingUtm);
       await refreshProfile();
       Logger.info('Onboarding completado', {
         scope: 'onboarding.onSubmit',
@@ -374,24 +447,56 @@ export default function OnboardingScreen() {
               </TouchableOpacity>
             </View>
 
-            <View className="mb-6 flex-row flex-wrap items-center justify-center px-4 mt-8">
-              <Text className="font-ui text-xs text-neutral-on-surface-variant text-center">
-                Al comenzar aceptas los{' '}
-              </Text>
-              <TouchableOpacity onPress={() => router.push('/(modals)/terms' as any)}>
-                <Text className="font-uiBold text-xs text-brand-primary">Términos</Text>
-              </TouchableOpacity>
-              <Text className="font-ui text-xs text-neutral-on-surface-variant"> y la </Text>
-              <TouchableOpacity onPress={() => router.push('/(modals)/privacy' as any)}>
-                <Text className="font-uiBold text-xs text-brand-primary">Privacidad</Text>
-              </TouchableOpacity>
-              <Text className="font-ui text-xs text-neutral-on-surface-variant">.</Text>
+            {/* Código de invitación — respaldo manual del deep link, ver el
+                comentario de `referralCode` más arriba. Sin label propio: el
+                placeholder ya pregunta y aclara "(Opcional)", y este es el
+                único campo de la pantalla sin validación — sumarle además un
+                label como los de arriba pesaría más de lo que un campo
+                opcional debería. */}
+            <View className="mb-8">
+              <TextInput
+                className="w-full rounded-xl border border-neutral-outline-variant/15 bg-surface-low px-4 py-4 text-neutral-on-surface"
+                placeholder="¿Tenés un código de invitación? (Opcional)"
+                placeholderTextColor="#3A3939"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={referralCode}
+                onChangeText={setReferralCode}
+              />
             </View>
+
+            {/* Quien ya aceptó en el alta ve el recordatorio de siempre; quien
+                entró por Google ve el consentimiento real, porque su cuenta se
+                creó sin él. Es el mismo componente que usa el registro por
+                email, así que el texto y los enlaces no pueden divergir. */}
+            {mustAcceptLegal ? (
+              <View className="mt-8">
+                <LegalConsentCheckbox
+                  checked={acceptedLegal}
+                  onToggle={setAcceptedLegal}
+                  disabled={loading}
+                />
+              </View>
+            ) : (
+              <View className="mb-6 flex-row flex-wrap items-center justify-center px-4 mt-8">
+                <Text className="font-ui text-xs text-neutral-on-surface-variant text-center">
+                  Al comenzar aceptas los{' '}
+                </Text>
+                <TouchableOpacity onPress={() => router.push('/(modals)/terms' as any)}>
+                  <Text className="font-uiBold text-xs text-brand-primary">Términos</Text>
+                </TouchableOpacity>
+                <Text className="font-ui text-xs text-neutral-on-surface-variant"> y la </Text>
+                <TouchableOpacity onPress={() => router.push('/(modals)/privacy' as any)}>
+                  <Text className="font-uiBold text-xs text-brand-primary">Privacidad</Text>
+                </TouchableOpacity>
+                <Text className="font-ui text-xs text-neutral-on-surface-variant">.</Text>
+              </View>
+            )}
 
             <HeroButton
               onPress={handleSubmit(onSubmit)}
               isLoading={loading}
-              disabled={!isStepValid}
+              disabled={!canSubmit}
               label="Comenzar"
               style={{ width: '100%' }}
             />

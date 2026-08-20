@@ -1,27 +1,33 @@
 import { Image, Text, View } from 'react-native';
 import { AppIcon } from '@/components/ui/AppIcon';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
-import { calculateAge, formatAge } from '@/lib/age';
-import type { ProfileRow } from './types';
+import { formatAge } from '@/lib/age';
+import type { PublicProfileRow } from './types';
 
 function positionLabel(pos: string): string {
   return pos.replaceAll('_', ' ');
 }
 
 type StatsHeaderProps = {
-  profile: ProfileRow;
+  profile: PublicProfileRow;
+  /**
+   * Ya calculada server-side (columna derivada de `profiles_public`) — ver
+   * el comentario en `ProfileStatsViewData.age`. Nunca se deriva de
+   * `date_of_birth`: esa columna no es legible por SELECT directo.
+   */
+  age: number | null;
   /** Ver el mismo prop en `components/profile/ProfileHeader.tsx`. */
   isEmbajador?: boolean;
 };
 
-export function StatsHeader({ profile, isEmbajador = false }: StatsHeaderProps) {
+export function StatsHeader({ profile, age, isEmbajador = false }: StatsHeaderProps) {
   const avatarUrl = profile.avatar_url
     ? getSupabaseStorageUrl('avatars', profile.avatar_url)
     : null;
 
   // `null` cuando el jugador no cargo su fecha de nacimiento: en ese caso no se
   // renderiza el badge en vez de mostrar un "0 años" que parece un dato real.
-  const age = formatAge(calculateAge(profile.date_of_birth));
+  const ageLabel = formatAge(age);
 
   return (
     <View className="items-center pb-2 pt-4">
@@ -53,10 +59,10 @@ export function StatsHeader({ profile, isEmbajador = false }: StatsHeaderProps) 
       </Text>
 
       <View className="mt-3 flex-row flex-wrap items-center justify-center gap-3">
-        {age && (
+        {ageLabel && (
           <View className="flex-row items-center gap-1 rounded-full bg-surface-high px-3 py-1">
             <AppIcon family="material-community" name="cake-variant-outline" size={12} color="#FABD32" />
-            <Text className="font-uiBold text-xs text-neutral-on-surface">{age}</Text>
+            <Text className="font-uiBold text-xs text-neutral-on-surface">{ageLabel}</Text>
           </View>
         )}
         <View className="flex-row items-center gap-1 rounded-full bg-surface-high px-3 py-1">

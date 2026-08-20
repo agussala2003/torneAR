@@ -14,9 +14,12 @@ import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { AppIntroSplash } from '@/components/AppIntroSplash';
 import { AppUpdateModal } from '@/components/AppUpdateModal';
+import { LegalVersionGate } from '@/components/LegalVersionGate';
+import { ColdStartPushLinkGate } from '@/components/push/ColdStartPushLinkGate';
 import { Colors } from '@/constants/theme';
 import { useForceUpdate } from '@/hooks/useForceUpdate';
 import { isProfileComplete } from '@/lib/auth-utils';
+import { needsLegalAcceptance } from '@/lib/auth-data';
 import { deepLinkToHref, resolveDeepLink } from '@/lib/deep-linking';
 import { initLogger } from '@/lib/logger';
 import { useDeepLinkStore } from '@/stores/deepLinkStore';
@@ -41,6 +44,22 @@ export const unstable_settings = {
 const INTRO_DURATION_MS = 2300;
 
 /**
+ * Pantallas de `(modals)` legibles en cualquier estado de sesión.
+ *
+ * Los Términos y la Política se aceptan ANTES de tener cuenta: el checkbox de
+ * registro (`LegalConsentCheckbox`) y el del onboarding enlazan acá. Como el
+ * guard de abajo sólo miraba `segments[0]`, tocar «Términos y Condiciones»
+ * llevaba a `(modals)` —que no figuraba entre las rutas públicas— y el usuario
+ * terminaba pateado de vuelta al login sin haber leído nada. El consentimiento
+ * versionado que guardamos en el alta quedaba registrado contra un texto que
+ * era imposible de abrir.
+ *
+ * Es el grupo `(modals)` completo lo que NO se abre: ahí también viven `chat` y
+ * `market-create`, que son privadas. Sólo estas dos rutas quedan exentas.
+ */
+const PUBLIC_MODAL_ROUTES = new Set(['terms', 'privacy']);
+
+/**
  * torneAR es dark-only.
  *
  * No existe un solo estilo con variantes `dark:` / `light:` en la app: todos los
@@ -62,11 +81,41 @@ const navigationTheme: Theme = {
 };
 
 function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
-  const { session, profile, loading, hydrated } = useAuth();
+  const { session, user, profile, loading, hydrated } = useAuth();
   // Suscripción reactiva (y no `getState()` como el deep link, que se consume de
   // forma atómica): soltar la retención tiene que volver a correr el guard.
   const isHoldingOnboardingRedirect = useSignupGateStore((s) => s.isHoldingOnboardingRedirect);
-  const segments = useSegments();
+  /**
+   * Suscripción REACTIVA al deep link pendiente (y no sólo el `getState()`
+   * atómico de más abajo, que es el que lo consume).
+   *
+   * El pendiente puede aparecer DESPUÉS de que el guard ya corrió su pasada de
+   * usuario autenticado: `<ColdStartPushLinkGate />` lo publica cuando el
+   * módulo nativo resuelve la notificación que abrió la app, que en Android
+   * puede ser bastante después de que la sesión terminó de hidratar. Sin
+   * tenerlo en las dependencias del efecto, ese link se quedaba en el store
+   * para siempre — el guard no tenía ningún motivo para volver a correr.
+   *
+   * Sólo el valor se usa como disparador; el consumo sigue siendo el
+   * `consumePendingDeepLink()` atómico, para que dos pasadas del efecto no
+   * naveguen dos veces al mismo lugar.
+   */
+  const pendingDeepLink = useDeepLinkStore((s) => s.pendingDeepLink);
+
+  // Anotado como `string[]` a mano y no inferido: `useSegments()` devuelve una
+  // UNIÓN de TUPLAS que expo-router genera a partir del árbol de rutas
+  // (`.expo/types/router.d.ts`). Cuando esa generación produce una tupla de
+  // largo 1, `segments[1]` deja de ser `string | undefined` y pasa a ser un
+  // error de tipos —"Tuple type '[string]' of length '1' has no element at
+  // index '1'"— que ningún `?? ''` puede tapar: lo que TS rechaza es el
+  // índice, no el valor.
+  //
+  // Por qué sólo se ve en CI: `.expo/` está en .gitignore, así que en local
+  // `tsc` compila contra los tipos ya generados de una corrida previa y el
+  // runner los regenera desde cero en cada build. Fijar el tipo acá lo vuelve
+  // independiente de esa generación, que es lo único que hace falta —el guard
+  // compara segmentos contra strings literales, no necesita la tupla.
+  const segments: string[] = useSegments();
   const router = useRouter();
   const [showIntro, setShowIntro] = useState(true);
 
@@ -149,6 +198,16 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
     // para no redirigir a /login mientras todavía leemos la sesión guardada.
     if (!hydrated || loading || showIntro) return;
 
+    // Los documentos legales se leen en cualquier estado de sesión, así que se
+    // resuelven antes que nada y con un `return`: no alcanza con sumarlos al
+    // conjunto público de abajo, porque el usuario de Google los abre DESDE el
+    // onboarding —donde `!isProfileComplete(profile)` es verdadero— y la rama
+    // de esa condición lo devolvería a `/onboarding` igual que la de `!session`
+    // lo devuelve a `/login`. Salir temprano los exime de las tres ramas.
+    if (segments[0] === '(modals)' && PUBLIC_MODAL_ROUTES.has(segments[1] ?? '')) {
+      return;
+    }
+
     // `auth` (app/auth/callback.tsx) cuenta como grupo público a propósito: al
     // volver de Google la sesión tarda unos ms en escribirse, y sin esto el
     // guard vería `session === null` y patearía a /login en el medio del canje.
@@ -172,11 +231,12 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
     } else if (session && isProfileComplete(profile)) {
       // Autenticado y con perfil completo: es el único punto donde sabemos que
       // el usuario puede acceder a rutas protegidas, así que acá consumimos el
-      // deep link pendiente (post-login o cold-start ya logueado). El consumo
-      // es atómico, por lo que solo dispara en la primera pasada.
-      const pendingDeepLink = useDeepLinkStore.getState().consumePendingDeepLink();
-      if (pendingDeepLink) {
-        const href = deepLinkToHref(pendingDeepLink);
+      // deep link pendiente (post-login, cold-start ya logueado, o el que
+      // publica `<ColdStartPushLinkGate />` al abrirse la app desde una push).
+      // El consumo es atómico, por lo que solo dispara en la primera pasada.
+      const consumedDeepLink = useDeepLinkStore.getState().consumePendingDeepLink();
+      if (consumedDeepLink) {
+        const href = deepLinkToHref(consumedDeepLink);
         if (href) {
           router.replace(href);
           return;
@@ -187,14 +247,41 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
         router.replace('/(tabs)');
       }
     }
-  }, [session, profile, loading, segments, router, showIntro, hydrated, isHoldingOnboardingRedirect]);
+  }, [
+    session,
+    profile,
+    loading,
+    segments,
+    router,
+    showIntro,
+    hydrated,
+    isHoldingOnboardingRedirect,
+    pendingDeepLink,
+  ]);
 
   // El overlay tapa la pantalla mientras corre el intro o mientras faltan las
   // fuentes. Lo que YA no hace es sustituir al navegador (ver comentario abajo).
   const showOverlay = showIntro || !fontsLoaded;
 
+  // Sólo para sesión completa (autenticado + perfil completo): un usuario
+  // recién registrado ya pasa por su propia aceptación en el onboarding, y
+  // uno sin sesión no tiene nada que re-aceptar. `!showIntro` evita que el
+  // modal aparezca detrás/encima de la animación de arranque — un `Modal`
+  // de RN se monta en su propia capa nativa por encima de todo, sin
+  // importar dónde esté en el árbol de JS.
+  const mustReacceptLegal =
+    hydrated && !showIntro && !!session && isProfileComplete(profile) && needsLegalAcceptance(user);
+
   return (
     <>
+      {/* Arranque en frío por push. Renderiza `null`: es un efecto con forma de
+          componente (ver `components/push/ColdStartPushLink.tsx`). Va como
+          hermano del <Stack> y no adentro de ninguna pantalla porque tiene que
+          estar vivo desde el primer frame — la respuesta de la notificación
+          puede resolverse antes de que se monte cualquier ruta. No navega:
+          publica el deep link en `deepLinkStore` y lo consume el guard de
+          arriba, que es el único que sabe si ya se puede navegar y a dónde. */}
+      <ColdStartPushLinkGate />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.dark.background } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
@@ -219,6 +306,7 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="(modals)" />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
+      <LegalVersionGate visible={mustReacceptLegal} />
       {/* El intro va SUPERPUESTO, no en lugar del navegador.
 
           Antes esto era un `return <AppIntroSplash />` antes del <Stack>: durante

@@ -2,8 +2,8 @@ import { supabase } from '@/lib/supabase';
 import { fetchMatchDetailViewData } from '@/lib/match-detail-data';
 import { getSupabaseStorageUrl } from '@/lib/supabase-storage';
 import { Logger } from '@/lib/logger';
-import type { MatchShareCardData } from '@/components/match-share/types';
-import type { ProfileSnippet } from '@/components/matches/types';
+import type { MatchScorer, MatchShareCardData } from '@/components/match-share/types';
+import type { ProfileSnippet, ScorerEntry } from '@/components/matches/types';
 
 function scoreForTeam(
   teamId: string,
@@ -31,18 +31,48 @@ function resolveMvpAvatar(mvp: ProfileSnippet | null): ProfileSnippet | null {
 }
 
 /**
+ * Fila de `get_match_scorers` (20260819120000_match_goals.sql). Se declara
+ * acá y no se infiere de `types/supabase.ts` porque el mapeo de abajo sólo
+ * necesita dos de las tres columnas: escribirlo explícito documenta el
+ * contrato que consume la tarjeta sin arrastrar el tipo generado entero.
+ */
+interface RawMatchScorer {
+  player_id: string;
+  full_name: string;
+  goals_count: number;
+}
+
+/**
+ * Normaliza cualquiera de las dos fuentes de goleadores al shape que pinta
+ * `ScorersBlock` (`{ name, goals }`). Devuelve `null` —y no `[]`— cuando no
+ * hay nada: es la ausencia lo que el componente sabe colapsar, un array
+ * vacío obligaría a que cada consumidor repita el chequeo de `length`.
+ */
+function toCardScorers(
+  rows: readonly { name: string; goals: number }[] | null | undefined,
+): MatchScorer[] | null {
+  if (!rows || rows.length === 0) return null;
+  return rows.map((row) => ({ name: row.name, goals: row.goals }));
+}
+
+/**
  * Arma los datos de `MatchShareCard` para `matchId` desde la perspectiva de
  * `myTeamId`. Reusa `fetchMatchDetailViewData` (mismo par matchId/myTeamId
  * que ya expone esa función) en vez de duplicar la RPC `get_match_detail`, y
- * suma UNA query incremental a `elo_history` — la única pieza que esa RPC no
- * trae. `get_match_detail` es una RPC de seguridad crítica y muy auditada; no
- * se justifica tocarla para un enriquecimiento de sólo lectura.
+ * suma DOS queries incrementales — `elo_history` y `get_match_scorers` —, las
+ * únicas piezas que esa RPC no cubre por sí sola. `get_match_detail` es una
+ * RPC de seguridad crítica y muy auditada; no se justifica tocarla para un
+ * enriquecimiento de sólo lectura.
+ *
+ * Las tres van en el MISMO `Promise.all`: son independientes entre sí y
+ * encadenarlas sólo sumaría latencia al modal de preview, que ya bloquea con
+ * un spinner hasta tener todo.
  */
 export async function fetchMatchShareViewData(
   matchId: string,
   myTeamId: string,
 ): Promise<MatchShareCardData> {
-  const [match, eloRes] = await Promise.all([
+  const [match, eloRes, scorersRes] = await Promise.all([
     fetchMatchDetailViewData(matchId, myTeamId),
     supabase
       .from('elo_history')
@@ -50,6 +80,7 @@ export async function fetchMatchShareViewData(
       .eq('match_id', matchId)
       .eq('team_id', myTeamId)
       .maybeSingle(),
+    supabase.rpc('get_match_scorers', { p_match_id: matchId, p_team_id: myTeamId }),
   ]);
 
   if (eloRes.error) {
@@ -73,6 +104,41 @@ export async function fetchMatchShareViewData(
   const eloDelta =
     rawDelta !== null && rawDelta >= 0 ? { teamId: myTeamId, delta: rawDelta } : null;
 
+  // ── Goleadores ───────────────────────────────────────────────────────────
+  // Fuente primaria: `match_goals` vía `get_match_scorers` — normalizada,
+  // ordenada en la base y con FK real contra `profiles`.
+  //
+  // Fallback: `match.myResult.scorers`, que `get_match_detail` ya resuelve
+  // desde el jsonb `match_results.scorers`. NO es redundancia por las dudas,
+  // cubre dos estados reales y transitorios:
+  //   · el binario corriendo contra una base donde la migración
+  //     20260819120000 todavía no se aplicó (la RPC no existe → error), y
+  //   · un partido cargado ANTES del backfill cuya proyección quedó vacía.
+  // Ambos degradan a "la tarjeta muestra los goleadores igual", que es el
+  // punto — no a "la tarjeta pierde el bloque". Mismo criterio que el chip de
+  // rating: nada acá bloquea la generación de la tarjeta.
+  if (scorersRes.error) {
+    Logger.warn('No se pudo leer match_goals para la tarjeta compartible', {
+      scope: 'match-share-data.fetchMatchShareViewData',
+      matchId,
+      teamId: myTeamId,
+      error: scorersRes.error,
+    });
+  }
+
+  const projectedScorers: RawMatchScorer[] = scorersRes.error ? [] : (scorersRes.data ?? []);
+
+  const scorers =
+    toCardScorers(
+      projectedScorers.map((row) => ({ name: row.full_name, goals: row.goals_count })),
+    ) ??
+    toCardScorers(
+      (match.myResult?.scorers ?? []).map((entry: ScorerEntry) => ({
+        name: entry.fullName,
+        goals: entry.goals,
+      })),
+    );
+
   return {
     teamA: match.teamA,
     teamB: match.teamB,
@@ -82,5 +148,6 @@ export async function fetchMatchShareViewData(
     finishedAt: match.finishedAt,
     eloDelta,
     mvp: resolveMvpAvatar(match.myResult?.mvp ?? null),
+    scorers,
   };
 }

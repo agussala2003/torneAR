@@ -20,10 +20,16 @@
 --     INSERT/UPDATE/DELETE de nuestros grants.
 --   team_members : los mismos MENOS DELETE — revocado por 20260723123000
 --     para que las salidas pasen por las RPCs que fijan tornear.leave_reason.
---   profiles / teams : los mismos MENOS UPDATE — el lockdown por columna de
+--   teams : los mismos MENOS UPDATE — el lockdown por columna de
 --     20260714022651 (restaurado en 20260719130000) revoca UPDATE a nivel
 --     tabla y lo re-otorga sólo sobre columnas editables. Que UPDATE NO
---     aparezca en estos arrays ES la aserción de seguridad central.
+--     aparezca en ese array ES la aserción de seguridad central.
+--   profiles : los mismos MENOS UPDATE **Y MENOS SELECT**. Al lockdown de
+--     UPDATE de arriba se le sumó el de SELECT en
+--     20260819100000_privacy_and_age_compliance, que cerró la lectura masiva
+--     de `date_of_birth` y `expo_push_token`. El bloque 4 de esta suite
+--     verifica el detalle columna por columna: sin ese bloque, el array de
+--     tabla pasaría igual si alguien revocara TODO el acceso a profiles.
 --   team_stints : sólo lectura + defaults; SIN INSERT/UPDATE/DELETE. El
 --     ledger de trayectoria lo escriben exclusivamente los triggers
 --     SECURITY DEFINER open/close_team_stint, así que el rol de la app no
@@ -36,7 +42,7 @@
 -- ============================================================
 
 begin;
-select plan(18);
+select plan(21);
 
 -- ── 1. Existencia de las 6 tablas core ──────────────────────────────────────
 select has_table('public', 'profiles',     'tabla core profiles existe');
@@ -82,11 +88,20 @@ select table_privs_are('public', 'team_members', 'authenticated',
   array['INSERT','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE'],
   'team_members: authenticated NO tiene DELETE (las salidas pasan por RPC con motivo)');
 
--- profiles / teams: SIN UPDATE a nivel tabla (lockdown de columna). Esta es
--- la aserción que se pone roja si vuelve a colarse un GRANT UPDATE tabla.
+-- profiles: SIN UPDATE **y SIN SELECT** a nivel tabla. Los dos están por
+-- columna ahora, por dos lockdowns distintos y con motivos distintos:
+--   · UPDATE  — 20260714022651 / 20260719130000, anti-escalada de is_admin.
+--   · SELECT  — 20260819100000_privacy_and_age_compliance, para que
+--     `date_of_birth` (fecha exacta) y `expo_push_token` dejen de ser
+--     legibles por cualquier autenticado sobre cualquier perfil.
+-- El REVOKE de SELECT de tabla es obligatorio, no cosmético: Postgres evalúa
+-- el acceso a una columna como "lo permite el ACL de tabla O el de columna",
+-- así que mientras el SELECT de tabla siguiera vivo, ningún REVOKE de columna
+-- podía angostar nada. Que SELECT tampoco aparezca acá es parte de la
+-- aserción.
 select table_privs_are('public', 'profiles', 'authenticated',
-  array['DELETE','INSERT','REFERENCES','SELECT','TRIGGER','TRUNCATE'],
-  'profiles: authenticated NO tiene UPDATE a nivel tabla (anti-escalada is_admin)');
+  array['DELETE','INSERT','REFERENCES','TRIGGER','TRUNCATE'],
+  'profiles: authenticated NO tiene UPDATE ni SELECT a nivel tabla (ambos por columna)');
 select table_privs_are('public', 'teams', 'authenticated',
   array['DELETE','INSERT','REFERENCES','SELECT','TRIGGER','TRUNCATE'],
   'teams: authenticated NO tiene UPDATE a nivel tabla (anti-manipulación de elo_rating)');
@@ -96,6 +111,30 @@ select table_privs_are('public', 'teams', 'authenticated',
 select table_privs_are('public', 'team_stints', 'authenticated',
   array['REFERENCES','SELECT','TRIGGER','TRUNCATE'],
   'team_stints: authenticated es sólo-lectura (el ledger lo escriben triggers)');
+
+-- ── 4. El lockdown por COLUMNA de profiles ──────────────────────────────────
+-- Sacar SELECT del array de arriba deja un agujero en el canario: pasaría
+-- igual si alguien revocara TODO el acceso a profiles, o si re-otorgara
+-- SELECT de tabla completa a mano. Estas tres aserciones fijan lo que el
+-- lockdown de verdad promete, columna por columna.
+--
+-- ⚠️ INSERT aparece en los tres arrays porque el GRANT de INSERT sí es de
+-- tabla, e information_schema lo expande a todas las columnas. Lo que estos
+-- tests vigilan es la presencia/ausencia de SELECT y UPDATE.
+select column_privs_are('public', 'profiles', 'date_of_birth', 'authenticated',
+  array['INSERT','REFERENCES','UPDATE'],
+  'profiles.date_of_birth: SIN SELECT — la fecha exacta no se lee por SELECT directo (sólo age derivada, vía profiles_public)');
+
+select column_privs_are('public', 'profiles', 'expo_push_token', 'authenticated',
+  array['INSERT','REFERENCES','UPDATE'],
+  'profiles.expo_push_token: SIN SELECT — no se pueden cosechar tokens ajenos (sólo las RPCs acotadas de 20260819100000)');
+
+-- La contracara del array de tabla: is_admin se puede LEER (lo necesita el
+-- gate del dashboard, 20260819140000) pero no ESCRIBIR. Si algún día vuelve
+-- a aparecer UPDATE acá, la escalada de privilegios del 19-jul está de vuelta.
+select column_privs_are('public', 'profiles', 'is_admin', 'authenticated',
+  array['INSERT','REFERENCES','SELECT'],
+  'profiles.is_admin: legible pero SIN UPDATE (anti-escalada de privilegios)');
 
 select * from finish();
 rollback;

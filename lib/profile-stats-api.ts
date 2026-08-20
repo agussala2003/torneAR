@@ -4,7 +4,7 @@ import { resolveShieldUrl } from '@/lib/supabase-storage';
 import { Database } from '@/types/supabase';
 import type {
   ProfileStatsViewData,
-  ProfileRow,
+  PublicProfileRow,
   RecentMatchResult,
   EarnedBadge,
   TeamEntry,
@@ -58,9 +58,26 @@ function ratio(v: number, d: number): string {
   return (v / d).toFixed(2);
 }
 
+/**
+ * Columnas que esta pantalla necesita del perfil, todas dentro de lo que
+ * `profiles_public` expone. Se listan explicitas y NUNCA `*`: el `*` de la
+ * vista traeria tambien `age`, que va separada en `ProfileStatsViewData`, y
+ * dejar el `*` invita a que la proxima columna sensible que se agregue a la
+ * vista viaje sola hasta el cliente.
+ */
+const PROFILE_PUBLIC_COLUMNS =
+  'id, username, full_name, avatar_url, zone, preferred_position, favorite_team, strong_foot, gender, created_at, age';
+
 export async function fetchProfileStatsViewData(profileId: string): Promise<ProfileStatsViewData> {
   const [profileRes, statsRes, participantsRes, badgesRpcRes, teamsRes] = await Promise.all([
-    supabase.from('profiles').select('*').eq('id', profileId).single(),
+    // `profiles_public` y no `profiles`: desde
+    // 20260819100000_privacy_and_age_compliance el SELECT sobre la tabla base
+    // es por columna, asi que el `select('*')` que habia aca respondia 42501
+    // (`permission denied for table profiles`) al expandirse a
+    // `date_of_birth`/`expo_push_token`. La vista corre con privilegio de
+    // owner y ya devuelve `age` derivada — por eso tambien desaparecio la
+    // segunda consulta que buscaba la edad por separado.
+    supabase.from('profiles_public').select(PROFILE_PUBLIC_COLUMNS).eq('id', profileId).single(),
     supabase
       .from('v_player_stats')
       .select('matches_played, total_goals, total_mvps, total_wins')
@@ -91,6 +108,11 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
   ]);
 
   if (profileRes.error) throw profileRes.error;
+
+  // La vista tipa todas sus columnas como nullable (ver `PublicProfileRow`).
+  // `age` se separa del resto acá: el contrato de `ProfileStatsViewData` la
+  // lleva en su propia clave, no adentro de `profile`.
+  const { age, ...publicProfile } = profileRes.data;
 
   const s = statsRes.data as {
     matches_played: number;
@@ -213,7 +235,8 @@ export async function fetchProfileStatsViewData(profileId: string): Promise<Prof
     }));
 
   return {
-    profile: profileRes.data as ProfileRow,
+    profile: publicProfile as PublicProfileRow,
+    age: age ?? null,
     stats: {
       matchesPlayed,
       goals,

@@ -50,6 +50,7 @@ import { CancellationRequestSection } from '@/components/matches/CancellationReq
 import { WoModal } from '@/components/matches/WoModal';
 import { DisputeSection } from '@/components/matches/DisputeSection';
 import { ShareMatchButton } from '@/components/match-share/ShareMatchButton';
+import { ReportModal } from '@/components/reports/ReportModal';
 import type { MatchDetailViewData, MatchProposalFormData } from '@/components/matches/types';
 
 export default function MatchDetailScreen() {
@@ -80,6 +81,7 @@ export default function MatchDetailScreen() {
   const [showResultModal, setShowResultModal] = useState(false);
   const [showCancellationModal, setShowCancellationModal] = useState(false);
   const [showWoModal, setShowWoModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     if (!matchId || !profile?.id) return;
@@ -609,6 +611,7 @@ export default function MatchDetailScreen() {
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
               onCancel={hasPendingCancellation || !canManageMatch ? undefined : () => setShowCancellationModal(true)}
+              onReport={() => setShowReportModal(true)}
             />
           </>
         )}
@@ -647,6 +650,7 @@ export default function MatchDetailScreen() {
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
               onWo={myCheckinAt !== null && !match.woClaim ? () => setShowWoModal(true) : undefined}
               onCancel={hasPendingCancellation || !canManageMatch ? undefined : () => setShowCancellationModal(true)}
+              onReport={() => setShowReportModal(true)}
             />
           </>
         )}
@@ -687,6 +691,7 @@ export default function MatchDetailScreen() {
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
               onWo={match.woClaim ? undefined : () => setShowWoModal(true)}
+              onReport={() => setShowReportModal(true)}
             />
           </>
         )}
@@ -702,6 +707,11 @@ export default function MatchDetailScreen() {
               </Text>
             </View>
             <ShareMatchButton matchId={match.id} myTeamId={myTeamId} />
+            {/* Sin onChat/onWo/onCancel: acá sólo queda Denunciar, que es
+                justamente lo único de esta fila que sigue teniendo sentido
+                una vez que el partido ya cerró — de hecho es el momento más
+                probable para reportar algo que pasó durante el juego. */}
+            <ActionButtons onReport={() => setShowReportModal(true)} />
           </>
         )}
 
@@ -719,6 +729,7 @@ export default function MatchDetailScreen() {
             ) : null}
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
+              onReport={() => setShowReportModal(true)}
             />
           </>
         )}
@@ -740,6 +751,7 @@ export default function MatchDetailScreen() {
             <ShareMatchButton matchId={match.id} myTeamId={myTeamId} />
             <ActionButtons
               onChat={match.conversationId ? () => router.push({ pathname: '/(modals)/chat' as never, params: { conversationId: match.conversationId!, myTeamId } }) : undefined}
+              onReport={() => setShowReportModal(true)}
             />
           </>
         )}
@@ -865,6 +877,15 @@ export default function MatchDetailScreen() {
           showAlert('Reclamo enviado', 'Tu reclamo WO fue enviado a revisión.');
         }}
       />
+      {profile?.id && (
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          entityType="MATCH"
+          entityId={match.id}
+          reporterId={profile.id}
+        />
+      )}
 
       {AlertComponent}
     </View>
@@ -909,9 +930,10 @@ interface ActionButtonsProps {
   onChat?: () => void;
   onWo?: () => void;
   onCancel?: () => void;
+  onReport?: () => void;
 }
 
-function ActionButtons({ onChat, onWo, onCancel }: ActionButtonsProps) {
+function ActionButtons({ onChat, onWo, onCancel, onReport }: ActionButtonsProps) {
   return (
     <View className="mt-4 flex-row flex-wrap gap-2">
       {onChat && (
@@ -942,6 +964,19 @@ function ActionButtons({ onChat, onWo, onCancel }: ActionButtonsProps) {
         >
           <AppIcon family="material-community" name="cancel" size={16} color="#FFB4AB" />
           <Text className="font-uiBold text-sm text-danger-error">Cancelar</Text>
+        </TouchableOpacity>
+      )}
+      {onReport && (
+        // Tono neutro, no rojo: a diferencia de Cancelar, denunciar no es una
+        // acción destructiva sobre ESTE partido — pintarla como las demás
+        // acciones "graves" confundiría "avisar de algo" con "romper algo".
+        <TouchableOpacity
+          onPress={onReport}
+          activeOpacity={0.8}
+          className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-neutral-outline/25 bg-surface-container py-3"
+        >
+          <AppIcon family="material-community" name="flag-outline" size={16} color="#869585" />
+          <Text className="font-uiBold text-sm text-neutral-on-surface-variant">Denunciar</Text>
         </TouchableOpacity>
       )}
     </View>

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Logger } from '@/lib/logger';
-import { averageAge } from '@/lib/age';
+import { averageOfAges } from '@/lib/age';
 import { resolveShieldUrl } from '@/lib/supabase-storage';
 import { Database } from '@/types/supabase';
 import type {
@@ -58,7 +58,6 @@ type MemberRaw = {
     username: string;
     avatar_url: string | null;
     preferred_position: PlayerPosition;
-    date_of_birth: string | null;
   } | null;
 };
 
@@ -134,7 +133,7 @@ export async function fetchTeamStatsViewData(
       .limit(10),
     supabase
       .from('team_members')
-      .select('profile_id, role, profiles(full_name, username, avatar_url, preferred_position, date_of_birth)')
+      .select('profile_id, role, profiles(full_name, username, avatar_url, preferred_position)')
       .eq('team_id', teamId),
     supabase
       .from('elo_history')
@@ -158,6 +157,32 @@ export async function fetchTeamStatsViewData(
   const matches = ((matchesRes.data as MatchRaw[]) ?? []);
   const memberRows = ((membersRes.data as MemberRaw[]) ?? []).filter((m) => !!m.profiles);
 
+  // Edad de cada miembro: consulta aparte a `profiles_public` (no un embed a
+  // `profiles`), porque `date_of_birth` de un perfil ajeno ya no es legible
+  // desde el cliente (20260819100000_privacy_and_age_compliance) — la vista
+  // expone `age` ya derivada. No entra en el `Promise.all` de arriba porque
+  // depende de los profile_id que recién se conocen tras resolver `membersRes`.
+  const memberProfileIds = memberRows.map((m) => m.profile_id);
+  const agesById = new Map<string, number | null>();
+  if (memberProfileIds.length > 0) {
+    const { data: agesData, error: agesError } = await supabase
+      .from('profiles_public')
+      .select('id, age')
+      .in('id', memberProfileIds);
+
+    if (agesError) {
+      Logger.warn('No se pudo leer la edad de los miembros del equipo', {
+        scope: 'teamStats.fetchTeamStatsViewData',
+        teamId,
+        error: agesError,
+      });
+    } else {
+      for (const row of agesData ?? []) {
+        if (row.id) agesById.set(row.id, row.age);
+      }
+    }
+  }
+
   // El historial es accesorio: si falla, la pantalla se muestra igual con el
   // gráfico vacío. Pero un fallo silencioso acá miente («todavía no jugó
   // ningún partido de ranking») — por eso queda registrado, no descartado.
@@ -180,7 +205,7 @@ export async function fetchTeamStatsViewData(
     shieldUrl: team.shield_url,
     prRating: team.elo_rating,
     fairPlayScore: Number(team.fair_play_score),
-    squadAge: averageAge(memberRows.map((m) => m.profiles!.date_of_birth)),
+    squadAge: averageOfAges(memberRows.map((m) => agesById.get(m.profile_id) ?? null)),
   };
 
   // Season record
@@ -325,7 +350,7 @@ export async function fetchTeamStatsViewData(
       avatarUrl: m.profiles!.avatar_url,
       position: m.profiles!.preferred_position,
       role: m.role,
-      dateOfBirth: m.profiles!.date_of_birth,
+      age: agesById.get(m.profile_id) ?? null,
       matchesPlayed: stats.matchesPlayed,
       goals: stats.goals,
       presencePercent: percent(stats.matchesPlayed, totalTeamMatches),

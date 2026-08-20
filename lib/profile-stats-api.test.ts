@@ -58,8 +58,14 @@ type Tables = {
 function mockTables({ participants = [buildParticipantRow()], elo = [], eloError = null }: Tables = {}) {
   supabaseMock.from.mockImplementation((table: string) => {
     switch (table) {
-      case 'profiles':
-        return createQueryBuilder({ data: { id: PROFILE_ID, full_name: 'Tester' }, error: null });
+      // Una sola fuente para el perfil: `profiles_public`. La tabla `profiles`
+      // no se mockea a proposito — el `default` de este switch tira si alguien
+      // la vuelve a consultar, que es exactamente el 42501 que se arreglo.
+      case 'profiles_public':
+        return createQueryBuilder({
+          data: { id: PROFILE_ID, full_name: 'Tester', username: 'tester', age: 28 },
+          error: null,
+        });
       case 'v_player_stats':
         return createQueryBuilder({
           data: { matches_played: 1, total_goals: 2, total_mvps: 1, total_wins: 1 },
@@ -211,6 +217,29 @@ describe('fetchProfileStatsViewData — historial de partidos', () => {
 
     expect(data.recentMatches).toHaveLength(0);
     expect(supabaseMock.from).not.toHaveBeenCalledWith('elo_history');
+  });
+
+  // Regresion de produccion: `"code": "42501", "message": "permission denied
+  // for table profiles"`. El `select('*')` sobre la tabla base se expandia a
+  // `date_of_birth`/`expo_push_token`, revocadas por columna en
+  // 20260819100000_privacy_and_age_compliance.
+  it('lee el perfil de profiles_public y nunca de la tabla profiles', async () => {
+    mockTables();
+
+    const data = await fetchProfileStatsViewData(PROFILE_ID);
+
+    expect(supabaseMock.from).toHaveBeenCalledWith('profiles_public');
+    expect(supabaseMock.from).not.toHaveBeenCalledWith('profiles');
+    expect(data.profile.id).toBe(PROFILE_ID);
+  });
+
+  it('separa la edad del resto del perfil', async () => {
+    mockTables();
+
+    const data = await fetchProfileStatsViewData(PROFILE_ID);
+
+    expect(data.age).toBe(28);
+    expect(data.profile).not.toHaveProperty('age');
   });
 
   it('tolera un match_results vacio (partido aun sin resultado cargado)', async () => {

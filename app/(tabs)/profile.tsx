@@ -26,7 +26,7 @@ import { useTabBarInset } from '@/hooks/useTabBarInset';
 import { Logger } from '@/lib/logger';
 
 export default function ProfileScreen() {
-  const { signOut, profile, user } = useAuth();
+  const { signOut, profile } = useAuth();
   const tabBarInset = useTabBarInset();
   const { fetchMyTeams } = useTeamStore();
   const [loading, setLoading] = useState(true);
@@ -182,10 +182,7 @@ export default function ProfileScreen() {
             </Text>
           </TouchableOpacity>
         )}
-        <ProfileFeedbackCard
-          email={user?.email}
-          onError={(message) => showAlert('No pudimos abrir el formulario', message)}
-        />
+        <ProfileFeedbackCard profileId={profile?.id} />
         <ProfileSocialSection
           onError={(message) => showAlert('No pudimos abrir la red', message)}
         />

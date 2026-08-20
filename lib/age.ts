@@ -112,15 +112,30 @@ export function averageAge(
   datesOfBirth: (string | null | undefined)[],
   now: Date = new Date(),
 ): { average: number; counted: number } | null {
-  const ages = datesOfBirth
-    .map((date) => calculateAge(date, now))
-    .filter((age): age is number => age !== null);
+  return averageOfAges(datesOfBirth.map((date) => calculateAge(date, now)));
+}
 
-  if (ages.length === 0) return null;
+/**
+ * Igual que `averageAge`, pero a partir de edades ya calculadas.
+ *
+ * Existe porque `profiles_public` (20260819100000_privacy_and_age_compliance)
+ * devuelve `age` ya derivada de `date_of_birth` — la fecha exacta de un
+ * perfil ajeno ya no es legible desde el cliente, así que no hay forma de
+ * recalcular la edad localmente para compañeros de equipo. El costo es que
+ * la edad de otros queda fija al momento del fetch, no recalculada en vivo
+ * si la pantalla sigue abierta al cruzar la medianoche del cumpleaños —
+ * aceptable frente a exponer la fecha exacta de terceros.
+ */
+export function averageOfAges(
+  ages: (number | null | undefined)[],
+): { average: number; counted: number } | null {
+  const validAges = ages.filter((age): age is number => age !== null && age !== undefined);
 
-  const total = ages.reduce((sum, age) => sum + age, 0);
+  if (validAges.length === 0) return null;
+
+  const total = validAges.reduce((sum, age) => sum + age, 0);
   return {
-    average: Math.round((total / ages.length) * 10) / 10,
-    counted: ages.length,
+    average: Math.round((total / validAges.length) * 10) / 10,
+    counted: validAges.length,
   };
 }

@@ -9,6 +9,10 @@
  *
  * Para actualizar: cambiar `TERMS_LAST_UPDATED` y el contenido de
  * `TERMS_SECTIONS`. La pantalla no se toca.
+ *
+ * ⚠️ Cláusula 2 (Responsables) tiene placeholders `[COMPLETAR_DNI]`,
+ * `[COMPLETAR_CUIT]` y `[COMPLETAR_DOMICILIO]` a propósito — no se inventan
+ * datos de identidad de terceros. Completar antes de publicar esta versión.
  */
 
 export interface LegalSection {
@@ -22,7 +26,7 @@ export interface LegalSection {
 }
 
 /** Se muestra bajo el título. Cambiarlo al publicar una versión nueva. */
-export const TERMS_LAST_UPDATED = '12 de Agosto, 2026';
+export const TERMS_LAST_UPDATED = '18 de Agosto, 2026';
 
 export const TERMS_INTRO =
   'Al utilizar torneAR, aceptás someterte a estos Términos y Condiciones. Leé detenidamente esta información antes de utilizar la plataforma.';
@@ -33,6 +37,13 @@ export const TERMS_SECTIONS: LegalSection[] = [
     paragraphs: [
       'torneAR se encuentra en etapa Beta. Las funcionalidades, los criterios de puntaje y la estructura de las temporadas pueden cambiar, suspenderse o reiniciarse mientras dure esta etapa.',
       'Durante la Beta el servicio se ofrece "tal como está", sin garantía de disponibilidad continua ni de conservación indefinida de los datos de juego. Te avisaremos dentro de la app cuando un cambio afecte partidos ya jugados o puntajes acumulados.',
+    ],
+  },
+  {
+    title: 'Responsables de la plataforma',
+    paragraphs: [
+      'torneAR es operado, en carácter de cotitulares, por Juan Ignacio Sacco Moriconi (DNI [COMPLETAR_DNI], CUIT [COMPLETAR_CUIT], domicilio [COMPLETAR_DOMICILIO]) y Agustín Saladino (DNI [COMPLETAR_DNI], CUIT [COMPLETAR_CUIT], domicilio [COMPLETAR_DOMICILIO]).',
+      'El dominio oficial de la plataforma es https://tornear.app. Para consultas o reclamos relacionados con estos Términos, escribinos a tornearcc@gmail.com.',
     ],
   },
   {
@@ -74,7 +85,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
   {
     title: 'Ranking, puntaje y temporadas',
     paragraphs: [
-      'El puntaje de Ranking se calcula de forma automática a partir de los partidos finalizados y se lleva por separado para cada formato de juego (F5, F7, F11): un mismo equipo puede tener puntajes distintos en cada uno.',
+      'El puntaje de Ranking se calcula de forma automática a partir de los partidos finalizados y se lleva por separado para cada formato de juego (F5, F6, F7, F8, F9 y F11): un mismo equipo puede tener puntajes distintos en cada uno.',
       'Al cerrarse una temporada, los puntajes y las estadísticas de temporada pueden reiniciarse o recalcularse. torneAR puede ajustar el cálculo para corregir errores, sanciones o resultados auditados.',
     ],
   },
@@ -95,7 +106,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
   {
     title: 'Contenido que subís',
     paragraphs: [
-      'Sos responsable del contenido que cargues: foto de perfil, escudo del equipo, nombres y mensajes. No subas material que infrinja derechos de terceros ni contenido ofensivo, discriminatorio o engañoso.',
+      'Sos responsable del contenido que cargues: foto de perfil, escudo del equipo, nombres, mensajes y evidencias de Walkover. No subas material que infrinja derechos de terceros ni contenido ofensivo, discriminatorio o engañoso.',
       'torneAR puede eliminar contenido que incumpla estas reglas y suspender las cuentas o equipos responsables.',
     ],
   },
@@ -110,6 +121,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
     title: 'Cambios en estos Términos',
     paragraphs: [
       'Podemos actualizar estos Términos para reflejar cambios en la plataforma. La fecha de la última actualización figura al comienzo de esta pantalla, y el uso de la app después de una actualización implica su aceptación.',
+      'La versión vigente de este documento siempre está disponible en https://tornear.app/legal/tyc.',
     ],
   },
 ];

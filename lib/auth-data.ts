@@ -3,14 +3,104 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
 import { OAUTH_CALLBACK_PATH } from '@/lib/deep-linking';
-import { AuthError } from '@supabase/supabase-js';
+import { LEGAL_VERSIONS } from '@/constants/legal';
+import { AuthError, User } from '@supabase/supabase-js';
 
 export async function signIn(email: string, password: string): Promise<{ error: AuthError | null }> {
   return supabase.auth.signInWithPassword({ email, password });
 }
 
-export async function signUp(email: string, password: string): Promise<{ error: AuthError | null }> {
-  return supabase.auth.signUp({ email, password });
+/**
+ * Prueba de aceptación legal que viaja con el alta de cuenta.
+ *
+ * Va en `options.data` (→ `auth.users.raw_user_meta_data`) y no en una tabla
+ * propia porque tiene que quedar registrado en el MISMO acto que crea el
+ * usuario: si fuese un INSERT posterior, un fallo de red entre ambos dejaría
+ * una cuenta creada sin constancia de consentimiento — exactamente el agujero
+ * que el requerimiento legal viene a cerrar.
+ *
+ * Las versiones se guardan además del booleano: "aceptó los TyC" no prueba
+ * nada si no consta QUÉ texto estaba vigente cuando aceptó.
+ */
+export interface LegalAcceptance {
+  accepted_tyc: true;
+  accepted_privacy: true;
+  legal_acceptance_date: string;
+  tyc_version: string;
+  privacy_version: string;
+}
+
+/**
+ * Arma la constancia con la fecha del momento y las versiones VIGENTES.
+ *
+ * Existe para que los dos puntos de entrada —el alta por email (`app/login.tsx`)
+ * y el onboarding de Google (`app/onboarding.tsx`)— no repitan el literal. Si
+ * cada uno armara su propio objeto, alcanzaría con que a uno se le olvidara
+ * `tyc_version` para que esas cuentas quedaran con una constancia que no prueba
+ * contra qué texto se aceptó.
+ */
+export function buildLegalAcceptance(): LegalAcceptance {
+  return {
+    accepted_tyc: true,
+    accepted_privacy: true,
+    legal_acceptance_date: new Date().toISOString(),
+    tyc_version: LEGAL_VERSIONS.terms,
+    privacy_version: LEGAL_VERSIONS.privacy,
+  };
+}
+
+/**
+ * Escribe la constancia sobre una cuenta que YA existe.
+ *
+ * Es el caso de Google: el proveedor da de alta al usuario en el primer
+ * consentimiento, y `signInWithGoogle()` no puede adjuntar `options.data` como
+ * hace `signUp()` — el alta no pasa por nosotros. Sin esto, ninguna cuenta
+ * creada por Google tenía `accepted_tyc`, fecha ni versión.
+ *
+ * El momento para llamarla es el onboarding: es el único punto por el que pasan
+ * todas las altas de Google (el guard de `app/_layout.tsx` no deja entrar a la
+ * app con el perfil incompleto), y ocurre antes de que exista fila en
+ * `profiles`.
+ *
+ * `updateUser` dispara `USER_UPDATED`, así que el `AuthContext` recoge la
+ * metadata nueva solo.
+ */
+export async function recordLegalAcceptance(): Promise<{ error: AuthError | null }> {
+  const { error } = await supabase.auth.updateUser({ data: buildLegalAcceptance() });
+  return { error };
+}
+
+/**
+ * `true` si la cuenta todavía no tiene constancia de aceptación VIGENTE.
+ *
+ * Lee `user_metadata` (espejo de `auth.users.raw_user_meta_data`). Compara
+ * `accepted_tyc` contra `true` estricto y no por truthiness: la metadata es
+ * JSON libre y un `"false"` o un `1` no deben pasar por una aceptación.
+ *
+ * Además de la aceptación en sí, compara `tyc_version` contra
+ * `LEGAL_VERSIONS.terms`: aceptar unos Términos viejos no cubre una versión
+ * publicada después — sin esto, actualizar el documento no volvía a pedir
+ * consentimiento a nadie que ya lo hubiera aceptado alguna vez (gap cerrado
+ * en LegalVersionGate.tsx).
+ *
+ * Sin usuario devuelve `true` —hay que pedir el consentimiento— porque el error
+ * barato es pedirlo de más y el caro es dar de alta sin él.
+ */
+export function needsLegalAcceptance(user: User | null): boolean {
+  if (user?.user_metadata?.accepted_tyc !== true) return true;
+  return user.user_metadata.tyc_version !== LEGAL_VERSIONS.terms;
+}
+
+export async function signUp(
+  email: string,
+  password: string,
+  legalAcceptance: LegalAcceptance,
+): Promise<{ error: AuthError | null }> {
+  return supabase.auth.signUp({
+    email,
+    password,
+    options: { data: legalAcceptance },
+  });
 }
 
 export async function sendPasswordReset(email: string): Promise<{ error: AuthError | null }> {

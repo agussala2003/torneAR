@@ -4,8 +4,11 @@ import { AppIcon } from '@/components/ui/AppIcon';
 import { fetchMatchShareViewData } from '@/lib/match-share-data';
 import { captureViewToUri, shareGeneric, NativeCaptureUnavailableError } from '@/lib/share-image';
 import { shareToInstagramStories } from '@/lib/instagram-stories';
+import { trackShareIntent } from '@/lib/share-analytics';
+import { useAuth } from '@/context/AuthContext';
 import { useCustomAlert } from '@/hooks/useCustomAlert';
 import { Logger } from '@/lib/logger';
+import { deriveMatchOutcome } from '@/lib/match-share-outcome';
 import { MatchShareCard, SHARE_CARD_HEIGHT, SHARE_CARD_WIDTH } from './MatchShareCard';
 import type { MatchShareCardData } from './types';
 
@@ -33,6 +36,10 @@ export function ShareMatchButton({ matchId, myTeamId }: Props) {
   // un solo booleano que no distinguiría cuál se tocó.
   const [sharing, setSharing] = useState<ShareTarget | null>(null);
   const { showAlert, AlertComponent } = useCustomAlert();
+  // Sólo para la instrumentación (Fase 6.2): `app_logs.user_id` lo llena el
+  // Logger con el id de AUTH, así que el id de PERFIL hay que pasarlo a mano
+  // — es el que cruza contra el resto del dominio. Ver `lib/share-analytics.ts`.
+  const { profile } = useAuth();
 
   // Ref sobre el wrapper de tamaño REAL (SHARE_CARD_WIDTH x SHARE_CARD_HEIGHT),
   // no sobre el contenedor visualmente achicado: `captureViewToUri` necesita
@@ -69,6 +76,19 @@ export function ShareMatchButton({ matchId, myTeamId }: Props) {
     async (target: ShareTarget) => {
       if (sharing) return;
       setSharing(target);
+
+      // Se registra ACÁ y no después del share: lo único medible de nuestro
+      // lado es la intención (Meta no devuelve nada sobre la Story), y una
+      // captura que falla también cuenta como intención — es justo la que más
+      // urge ver en el panel. `trackShareIntent` devuelve `void` y nunca tira,
+      // así que no puede demorar ni romper el flujo del usuario.
+      trackShareIntent({
+        target,
+        profileId: profile?.id ?? null,
+        matchId,
+        teamId: myTeamId,
+      });
+
       try {
         const uri = await captureViewToUri(cardRef);
         if (target === 'instagram') {
@@ -105,7 +125,7 @@ export function ShareMatchButton({ matchId, myTeamId }: Props) {
         setSharing(null);
       }
     },
-    [sharing, matchId, showAlert],
+    [sharing, matchId, myTeamId, profile?.id, showAlert],
   );
 
   return (
@@ -145,7 +165,11 @@ export function ShareMatchButton({ matchId, myTeamId }: Props) {
                   }}
                   collapsable={false}
                 >
-                  <MatchShareCard data={data} />
+                  {/* `outcome` se deriva acá y no en `MatchShareCard`: es el
+                      único punto que conoce `myTeamId`, el dato que hace
+                      falta para saber cuál de los dos equipos es "el mío"
+                      (ver `deriveMatchOutcome` en `types.ts`). */}
+                  <MatchShareCard data={data} outcome={deriveMatchOutcome(data, myTeamId)} />
                 </View>
               </View>
 

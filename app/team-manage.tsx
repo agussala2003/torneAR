@@ -379,7 +379,6 @@ export default function TeamManageScreen() {
           memberForRoleUpdate.profile_id,
           selectedRoleToAssign,
           { id: team.id, name: team.name },
-          memberForRoleUpdate.profiles?.expo_push_token
         );
         await loadTeamData();
         setShowRoleModal(false);
@@ -425,7 +424,6 @@ export default function TeamManageScreen() {
         teamId,
         memberForRemove.profile_id,
         { id: team.id, name: team.name },
-        memberForRemove.profiles?.expo_push_token
       );
 
       await loadTeamData();
