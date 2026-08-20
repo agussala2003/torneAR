@@ -101,7 +101,21 @@ function RootNavigation({ fontsLoaded }: { fontsLoaded: boolean }) {
    * naveguen dos veces al mismo lugar.
    */
   const pendingDeepLink = useDeepLinkStore((s) => s.pendingDeepLink);
-  const segments = useSegments();
+
+  // Anotado como `string[]` a mano y no inferido: `useSegments()` devuelve una
+  // UNIÓN de TUPLAS que expo-router genera a partir del árbol de rutas
+  // (`.expo/types/router.d.ts`). Cuando esa generación produce una tupla de
+  // largo 1, `segments[1]` deja de ser `string | undefined` y pasa a ser un
+  // error de tipos —"Tuple type '[string]' of length '1' has no element at
+  // index '1'"— que ningún `?? ''` puede tapar: lo que TS rechaza es el
+  // índice, no el valor.
+  //
+  // Por qué sólo se ve en CI: `.expo/` está en .gitignore, así que en local
+  // `tsc` compila contra los tipos ya generados de una corrida previa y el
+  // runner los regenera desde cero en cada build. Fijar el tipo acá lo vuelve
+  // independiente de esa generación, que es lo único que hace falta —el guard
+  // compara segmentos contra strings literales, no necesita la tupla.
+  const segments: string[] = useSegments();
   const router = useRouter();
   const [showIntro, setShowIntro] = useState(true);
 

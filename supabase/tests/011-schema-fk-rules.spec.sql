@@ -52,6 +52,12 @@ select set_eq(
       ('market_player_post_applications_team_id_fkey => CASCADE'),
       ('market_team_posts_team_id_fkey => CASCADE'),
       ('match_dispute_votes_voted_team_id_fkey => CASCADE'),
+      -- match_goals es una PROYECCIÓN de match_results.scorers
+      -- (20260819120000), no una fuente de verdad: si el equipo se borra, sus
+      -- filas de goles no le sirven a nadie. La fuente (match_results) es la
+      -- que conserva NO ACTION más abajo, porque esa fila le pertenece
+      -- también al rival.
+      ('match_goals_team_id_fkey => CASCADE'),
       ('team_join_requests_team_id_fkey => CASCADE'),
       ('team_members_team_id_fkey => CASCADE'),
       -- El ELO por formato es un dato accesorio del equipo: si el equipo se
