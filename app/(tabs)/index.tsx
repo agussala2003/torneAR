@@ -60,7 +60,7 @@ export default function HomeScreen() {
   const [viewData, setViewData] = useState<HomeViewData | null>(null);
   const { showAlert, AlertComponent } = useCustomAlert();
 
-  // ─── Mini-ranking (top 3 del formato que juega mi equipo) ──────────────────
+  // ─── Mini-ranking (top 3 global de la categoría que juega mi equipo) ───────
   const [miniRanking, setMiniRanking] = useState<MiniRankingEntry[]>([]);
   const [miniRankingContext, setMiniRankingContext] = useState<MiniRankingContext | null>(null);
   const [miniRankingLoading, setMiniRankingLoading] = useState(true);
@@ -74,14 +74,44 @@ export default function HomeScreen() {
   const [nowTs, setNowTs] = useState(() => Date.now());
 
   const loadData = useCallback(async () => {
-    if (!profile) {
+    /*
+     * `profile` puede ser un objeto VERDADERO y aun así no tener `id`.
+     *
+     * `get_own_profile()` (20260819100000) es `RETURNS public.profiles`, no
+     * `RETURNS SETOF`: para un usuario sin fila la función no devuelve "cero
+     * filas" sino UNA fila de NULLs, y PostgREST la serializa como
+     * `{ id: null, auth_user_id: null, ... }`. `AuthContext.fetchProfile`
+     * chequea `if (!data)`, que ese objeto pasa, así que el estado
+     * pending/onboarding llega acá con `profile.id === null`.
+     *
+     * De ahí el 22P02: `fetchHomeViewData(null)` termina en
+     * `.eq('profile_id', null)`, supabase-js lo manda como `profile_id=eq.null`
+     * y Postgres castea el TEXTO 'null' a uuid → "invalid input syntax for
+     * type uuid: \"null\"".
+     *
+     * Esta pantalla igual se monta en ese estado aunque el guard de
+     * `app/_layout.tsx` mande a /onboarding: `unstable_settings.anchor` es
+     * `(tabs)`, así que la Home monta —y dispara su `useFocusEffect`— durante
+     * los ~2,3 s de intro, antes de que el guard llegue a redirigir.
+     *
+     * El fix de raíz está en `AuthContext.fetchProfile` (normaliza esa fila a
+     * `null`); este guard es la red de seguridad de la pantalla, que no tiene
+     * por qué confiar en la forma que le llega el perfil.
+     */
+    const profileId = profile?.id ?? null;
+
+    if (!profileId) {
+      setViewData(null);
+      setMiniRanking([]);
+      setMiniRankingContext(null);
       setLoading(false);
       setMiniRankingLoading(false);
       return;
     }
+
     try {
       setLoading(true);
-      const data = await fetchHomeViewData(profile.id);
+      const data = await fetchHomeViewData(profileId);
       setViewData(data);
       // El reloj se resincroniza con cada carga: si la pantalla estuvo horas en
       // segundo plano, `nowTs` quedó viejo y la cuenta arrancaría atrasada.
@@ -103,55 +133,91 @@ export default function HomeScreen() {
       } else {
         setMiniRankingLoading(true);
         try {
-          // Paso 1: zona + categoría + formato del equipo.
+          // Paso 1: el contexto del widget.
           //
           // Se usa `fetchActiveTeamRankingInfo`, que es EXACTAMENTE la misma
-          // fuente que el bootstrap de la tab Ranking. Antes acá se leía sólo
-          // `preferred_format` y se consultaba el top 3 global de ese formato,
-          // mientras que la tab arrancaba filtrada también por zona y categoría:
-          // el "Ver la tabla completa" llevaba a una lista distinta de la del
-          // widget y parecía que el botón no funcionaba.
+          // fuente que el bootstrap de la tab Ranking. Es una invariante, no
+          // una coincidencia: cada vez que las dos pantallas derivaron su
+          // contexto por caminos distintos, el "Ver la tabla completa" terminó
+          // abriendo una lista que no era la del widget y el botón pareció roto.
           const teamInfo = await fetchActiveTeamRankingInfo(rankedTeamId);
 
+          /*
+           * Del equipo se hereda SÓLO la categoría; `zone` y `format` arrancan
+           * en null = Global. Es la misma decisión que toma el bootstrap de la
+           * tab Ranking, y tiene que ser la misma o el widget vuelve a mostrar
+           * una tabla distinta de la que se abre al tocarlo.
+           *
+           * El motivo, acá, pesa todavía más que en la tab: con el volumen del
+           * MVP la intersección "mi zona × mi formato × mi categoría" suele
+           * tener uno o dos equipos —o ninguno—, y el resultado era la tarjeta
+           * en su estado vacío ocupando el centro de la pantalla PRINCIPAL. La
+           * primera impresión de la app terminaba siendo "acá no hay nada" en
+           * vez de "así está el ranking".
+           *
+           * La categoría se retiene porque no es recorte de volumen sino de
+           * pertinencia: a un equipo de MUJERES no le sirve un podio de equipos
+           * de HOMBRES, por más lleno que esté.
+           *
+           * `MiniRankingCard` ya contempla estos nulls sin tocarla: el título
+           * cae a "Top 3 del ranking" y el chip de zona simplemente no se
+           * pinta. Y `handleSeeRanking` manda '' por cada null, que
+           * `paramToNullable` de la tab lee como "sin filtro" — el pasaje del
+           * widget a la tabla completa sigue siendo exacto.
+           */
           const context: MiniRankingContext = {
-            zone: teamInfo?.zone ?? null,
+            zone: null,
             category: teamInfo?.category ?? null,
-            format: teamInfo?.format ?? null,
+            format: null,
           };
           setMiniRankingContext(context);
 
+          /*
+           * Ya no hay corte por `!teamInfo`.
+           *
+           * Cuando el contexto se armaba con los tres campos del equipo, no
+           * poder resolverlo dejaba la consulta sin sentido y la salida era la
+           * tarjeta vacía. Ahora lo único que aporta `teamInfo` es la
+           * categoría, y su ausencia es un filtro menos: el widget cae al top 3
+           * global, que es información válida y es justo lo que el estado vacío
+           * NO era. El warn de abajo mantiene la traza de que no se resolvió.
+           */
           if (!teamInfo) {
-            setMiniRanking([]);
-          } else {
-            // Paso 2: la misma consulta que alimenta la tab Ranking, recortada
-            // al podio. `activeTeamElo` va en null a propósito: "rivales
-            // ideales" es un filtro de la tab, no del widget.
-            const myTeamIds = data.myTeams.map((team) => team.id);
-            const ranking = await fetchRankingWithFilters(
-              { ...context, rivalesIdeales: false },
-              myTeamIds,
-              null,
-            );
-
-            const top3 = [...ranking]
-              .sort((a, b) => a.rankPosition - b.rankPosition)
-              .slice(0, 3)
-              .map<MiniRankingEntry>((row) => ({
-                rankPosition: row.rankPosition,
-                teamId: row.teamId,
-                teamName: row.teamName,
-                shieldUrl: row.shieldUrl,
-                eloRating: row.eloRating,
-                isMyTeam: row.isMyTeam,
-              }));
-
-            setMiniRanking(top3);
+            Logger.warn('No se pudo resolver la categoría del equipo para el mini-ranking', {
+              scope: 'tabs.index.loadMiniRanking',
+              profileId,
+              teamId: rankedTeamId,
+            });
           }
+
+          // Paso 2: la misma consulta que alimenta la tab Ranking, recortada
+          // al podio. `activeTeamElo` va en null a propósito: "rivales
+          // ideales" es un filtro de la tab, no del widget.
+          const myTeamIds = data.myTeams.map((team) => team.id);
+          const ranking = await fetchRankingWithFilters(
+            { ...context, rivalesIdeales: false },
+            myTeamIds,
+            null,
+          );
+
+          const top3 = [...ranking]
+            .sort((a, b) => a.rankPosition - b.rankPosition)
+            .slice(0, 3)
+            .map<MiniRankingEntry>((row) => ({
+              rankPosition: row.rankPosition,
+              teamId: row.teamId,
+              teamName: row.teamName,
+              shieldUrl: row.shieldUrl,
+              eloRating: row.eloRating,
+              isMyTeam: row.isMyTeam,
+            }));
+
+          setMiniRanking(top3);
         } catch (rankingError) {
           // La tarjeta se degrada a su estado vacío; el resto del inicio queda intacto.
           Logger.error('No se pudo cargar el mini-ranking del inicio', {
             scope: 'tabs.index.loadMiniRanking',
-            profileId: profile.id,
+            profileId,
             teamId: rankedTeamId,
             error: rankingError,
           });
@@ -163,7 +229,7 @@ export default function HomeScreen() {
     } catch (error) {
       Logger.error('No se pudo cargar la pantalla de inicio', {
         scope: 'tabs.index.loadData',
-        profileId: profile.id,
+        profileId,
         error,
       });
       showAlert(
@@ -526,7 +592,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
 
-          {/* ── TAREA 2 — Mini-ranking del formato de mi equipo ───────────── */}
+          {/* ── TAREA 2 — Mini-ranking de la categoría de mi equipo ───────── */}
           <MiniRankingCard
             entries={miniRanking}
             context={miniRankingContext}

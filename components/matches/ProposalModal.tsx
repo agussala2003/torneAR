@@ -218,8 +218,7 @@ export function ProposalModal({ visible, matchType = 'RANKING', onClose, onSubmi
     <SafeAreaBottomSheet
       visible={visible}
       onClose={handleClose}
-      maxHeight="90%"
-      avoidKeyboard
+      maxHeight="80%"
       /* Dentro del <Modal>: si se montara en la pantalla padre quedaría detrás
          de esa ventana nativa y el error sería invisible. */
       overlay={AlertComponent}

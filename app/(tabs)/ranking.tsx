@@ -187,7 +187,28 @@ export default function RankingScreen() {
           if (cancelled) return;
           if (team) {
             elo = team.eloRating;
-            defaults = { zone: team.zone, category: team.category, format: team.format, rivalesIdeales: false };
+            /*
+             * Sólo la CATEGORÍA se hereda del equipo activo. `zone` y `format`
+             * arrancan en null = Global.
+             *
+             * Antes se precargaban los tres y el resultado era una tabla vacía
+             * para casi todo el mundo: con el volumen del MVP, la intersección
+             * "mi zona × mi formato × mi categoría" suele tener uno o dos
+             * equipos —o ninguno—, y el usuario leía eso como "el ranking no
+             * funciona", no como "todavía no hay equipos acá". Un ranking
+             * global con equipos adentro comunica mucho mejor que uno perfecto
+             * y vacío, y el usuario puede angostar solo desde el modal.
+             *
+             * La categoría SÍ se retiene porque no es un recorte de volumen
+             * sino de pertinencia: a un equipo de MUJERES no le sirve un
+             * ranking encabezado por equipos de HOMBRES, por más lleno que
+             * esté. Es el único filtro donde ver de más es peor que ver de
+             * menos.
+             *
+             * `elo` se sigue resolviendo igual (arriba): "rivales ideales" lo
+             * necesita y ese filtro no cambia.
+             */
+            defaults = { zone: null, category: team.category, format: null, rivalesIdeales: false };
           } else {
             // Hay equipo activo seleccionado pero no se resolvió su info: el
             // ranking arranca con filtros vacíos y parece "mal ordenado".

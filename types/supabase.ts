@@ -2853,6 +2853,14 @@ export type Database = {
           team_name: string
         }[]
       }
+      get_instagram_token: {
+        Args: { p_account_id: string }
+        Returns: {
+          access_token: string
+          ig_user_id: string
+          token_expires_at: string
+        }[]
+      }
       get_join_request_applicant_push_token: {
         Args: { p_request_id: string }
         Returns: string
@@ -3107,6 +3115,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_instagram_sync: {
+        Args: { p_account_id: string; p_error?: string }
+        Returns: undefined
+      }
       match_guest_code_expires_at: {
         Args: { p_created_at: string; p_scheduled_at: string }
         Returns: string
@@ -3143,6 +3155,20 @@ export type Database = {
         Args: { p_accept: boolean; p_request_id: string }
         Returns: string
       }
+      save_own_profile: {
+        Args: {
+          p_date_of_birth: string
+          p_expo_push_token?: string
+          p_favorite_team?: string
+          p_full_name: string
+          p_gender: string
+          p_preferred_position: Database["public"]["Enums"]["player_position"]
+          p_strong_foot: string
+          p_username: string
+          p_zone: string
+        }
+        Returns: string
+      }
       search_teams: {
         Args: {
           p_category?: Database["public"]["Enums"]["team_category"]
@@ -3175,6 +3201,21 @@ export type Database = {
           p_to_team_id: string
         }
         Returns: Json
+      }
+      service_snapshot_upsert: {
+        Args: {
+          p_account_id: string
+          p_captured_at: string
+          p_engagements?: number
+          p_followers?: number
+          p_following?: number
+          p_posts?: number
+          p_profile_views?: number
+          p_raw?: Json
+          p_reach?: number
+          p_views?: number
+        }
+        Returns: undefined
       }
       set_referral: {
         Args: {
@@ -3227,6 +3268,14 @@ export type Database = {
       transition_season: {
         Args: { p_ends_at: string; p_new_name: string; p_starts_at: string }
         Returns: string
+      }
+      update_instagram_token: {
+        Args: {
+          p_access_token: string
+          p_account_id: string
+          p_expires_in_seconds: number
+        }
+        Returns: undefined
       }
       verify_instagram_sync_secret: {
         Args: { p_candidate: string }
