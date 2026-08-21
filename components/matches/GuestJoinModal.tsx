@@ -164,8 +164,8 @@ export function GuestJoinModal({ visible, onClose, onJoined }: Props) {
     <SafeAreaBottomSheet
       visible={visible}
       onClose={handleClose}
-      avoidKeyboard
       overlay={AlertComponent}
+      maxHeight="80%"
     >
       {/* Header fijo: queda fuera del ScrollView para que no se vaya con el
           contenido al scrollear. */}

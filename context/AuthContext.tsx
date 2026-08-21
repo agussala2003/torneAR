@@ -55,9 +55,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // que el resto de la app (profile.date_of_birth, profile.expo_push_token,
       // etc.) no cambia.
       //
-      // Sin fila para este usuario, la función devuelve NULL (no un error;
-      // es el mismo caso "recién registrado, sin perfil todavía" que antes
-      // cubría `maybeSingle`).
+      // Sin fila para este usuario NO devuelve un error: devuelve una fila de
+      // NULLs (ver el bloque de abajo). Es el mismo caso "recién registrado,
+      // sin perfil todavía" que antes cubría `maybeSingle`.
       const { data, error } = await supabase.rpc('get_own_profile');
 
       // Devolver null acá manda al usuario a /onboarding (ver app/_layout.tsx).
@@ -73,7 +73,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
 
-      if (!data) {
+      /*
+       * `!data` NO alcanza: `get_own_profile()` es `RETURNS public.profiles`
+       * (un compuesto), no `RETURNS SETOF public.profiles`. Una función SQL
+       * que devuelve un compuesto SIEMPRE produce exactamente una fila: sin
+       * fila en `profiles`, esa fila es un registro de NULLs, y PostgREST lo
+       * serializa como un OBJETO `{ id: null, auth_user_id: null, ... }`, no
+       * como `null`. Verificado contra la base:
+       * `select count(*) from get_own_profile()` = 1 para un usuario sin perfil.
+       *
+       * Ese objeto es truthy, así que el chequeo anterior lo dejaba pasar y
+       * medio app quedaba con un `profile` fantasma cuyo `.id` es `null` —
+       * el origen del 22P02 de `tabs.index.loadData` ('null'::uuid).
+       *
+       * `id` es la clave primaria y es NOT NULL en la tabla: si viene en null,
+       * la fila no existe. Es la única discriminación posible y no puede dar
+       * falsos positivos sobre un perfil real.
+       */
+      if (!data || !data.id) {
         // Caso esperado, no un fallo: sesión válida sin fila en `profiles`.
         // Se loguea en `info` para poder separarlo del error de arriba cuando
         // alguien reporte "me tira siempre el onboarding".
