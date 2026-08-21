@@ -48,6 +48,25 @@ const SHARE_CARD_BASE_URL =
 
 const SHARE_CARD_ENDPOINT = `${SHARE_CARD_BASE_URL}/api/og/share-match`;
 
+/**
+ * Traza de diagnóstico de la descarga, etiquetada `[ShareCard]`.
+ *
+ * `console.*` directo y no `Logger`: el Logger imprime en consola PERO además
+ * persiste cada línea en `app_logs` (lib/logger.ts), y una traza paso a paso
+ * de cada intento de compartir llenaría esa tabla de ruido operativo. Para
+ * telemetría de verdad siguen estando los `Logger.warn`/`Logger.error` de más
+ * abajo; esto es sólo para mirar la terminal de Metro.
+ *
+ * Guardado detrás de `__DEV__` a propósito: en un build de release estas
+ * líneas no aportan nada (nadie mira esa consola) y sí imprimirían la URL
+ * completa y el prefijo del token en los logs del dispositivo. En Expo Go y
+ * en el Dev Client `__DEV__` es `true`, así que para probar en el celular
+ * no hay que tocar nada.
+ */
+const debug = (...args: unknown[]) => {
+  if (__DEV__) console.log('[ShareCard]', ...args);
+};
+
 /** Errores que la UI puede explicarle al usuario sin decir "error 409". */
 export type ShareCardFailureReason =
   | 'unauthenticated'
@@ -96,9 +115,35 @@ function httpStatusFrom(error: unknown): number | null {
  * dónde compartirlo, y el sistema puede borrarlo cuando necesite espacio.
  */
 export async function downloadShareCard(matchId: string): Promise<string> {
-  const { data, error } = await supabase.auth.getSession();
+  const startedAt = Date.now();
+  const requestUrl = `${SHARE_CARD_ENDPOINT}?match=${encodeURIComponent(matchId)}`;
 
-  if (error || !data.session?.access_token) {
+  debug('─────────── inicio ───────────');
+  debug('matchId:', matchId);
+  debug('base URL:', SHARE_CARD_BASE_URL);
+  // Cuál de los dos caminos está activo. Si acá dice `false` y estabas
+  // esperando pegarle a tu máquina, el `.env.local` no se releyó: Expo lee
+  // las `EXPO_PUBLIC_*` al arrancar el bundler, hay que reiniciarlo.
+  debug('override EXPO_PUBLIC_SHARE_CARD_BASE_URL activo:', !!process.env.EXPO_PUBLIC_SHARE_CARD_BASE_URL);
+  debug('URL completa:', requestUrl);
+
+  const { data, error } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token ?? null;
+
+  debug('sesión — hay session:', !!data.session);
+  debug('sesión — hay access_token:', !!accessToken);
+  debug('sesión — error de getSession:', error ? error.message : 'ninguno');
+  if (accessToken) {
+    // Sólo el prefijo y el largo: alcanza para ver que es un JWT plausible
+    // (`eyJ...`) sin dejar una credencial usable en la consola.
+    debug('sesión — token:', `${accessToken.slice(0, 12)}… (${accessToken.length} chars)`);
+    debug('sesión — expira:', data.session?.expires_at
+      ? new Date(data.session.expires_at * 1000).toISOString()
+      : 'desconocido');
+  }
+
+  if (error || !accessToken) {
+    debug('ABORTA: sin token, no se intenta la descarga.');
     Logger.warn('No hay sesión para descargar la tarjeta compartible', {
       scope: 'share-card-remote.downloadShareCard',
       matchId,
@@ -107,30 +152,85 @@ export async function downloadShareCard(matchId: string): Promise<string> {
     throw new ShareCardError('unauthenticated', 'Necesitás iniciar sesión para compartir.');
   }
 
+  const headers = { Authorization: `Bearer ${accessToken}` };
+  // Se imprime el header ARMADO, no el token suelto: así se ve si el prefijo
+  // "Bearer " y el espacio quedaron bien, que es el error clásico y el que el
+  // servidor rechaza con 401 sin decir por qué.
+  debug('headers — Authorization:', `${headers.Authorization.slice(0, 19)}…`);
+  debug('headers — largo total del valor:', headers.Authorization.length);
+
   // Un subdirectorio propio para no mezclarse con lo que cachean otras
   // librerías, y `create({ idempotent: true })` porque a partir de la segunda
   // vez ya existe.
   const directory = new Directory(Paths.cache, 'share-cards');
   directory.create({ idempotent: true });
 
-  // Nombre por partido y no aleatorio: dos toques seguidos sobre el mismo
-  // partido pisan el mismo archivo en vez de ir llenando la caché.
-  const destination = new File(directory, `match-${matchId}.png`);
+  /**
+   * Nombre ÚNICO por descarga, y se borra lo anterior.
+   *
+   * Antes esto reusaba `match-<id>.png` para no llenar la caché, y funcionaba
+   * mientras el archivo sólo se compartía. Ahora que además se dibuja con
+   * `<Image source={{ uri }}>` en el preview, ese nombre fijo es un bug: el
+   * caché de imágenes de React Native se indexa POR URI, así que si el
+   * marcador cambia en el servidor y se vuelve a abrir el modal, el archivo
+   * nuevo se escribe en la misma ruta y `<Image>` sigue mostrando el PNG
+   * viejo desde memoria. Con un nombre distinto por descarga, esa colisión no
+   * puede pasar.
+   *
+   * El barrido previo mantiene la cota: siempre queda un solo archivo, no uno
+   * por toque. `try/catch` individual porque un archivo que no se puede
+   * borrar (bloqueado por el visor de otra app, por ejemplo) no es motivo
+   * para no entregar la tarjeta.
+   */
+  for (const stale of directory.list()) {
+    try {
+      stale.delete();
+    } catch (cleanupError) {
+      debug('no se pudo borrar un archivo viejo (se sigue igual):', cleanupError);
+    }
+  }
+
+  const destination = new File(directory, `match-${matchId}-${Date.now()}.png`);
+  debug('destino:', destination.uri);
 
   try {
-    const downloaded = await File.downloadFileAsync(
-      `${SHARE_CARD_ENDPOINT}?match=${encodeURIComponent(matchId)}`,
-      destination,
-      {
-        headers: { Authorization: `Bearer ${data.session.access_token}` },
-        // Sin esto, la segunda descarga tira porque el archivo ya existe.
-        idempotent: true,
-      },
-    );
+    debug('descargando…');
+    const downloaded = await File.downloadFileAsync(requestUrl, destination, {
+      headers,
+      // Sin esto, la segunda descarga tira porque el archivo ya existe.
+      idempotent: true,
+    });
 
+    debug('OK — uri:', downloaded.uri);
+    debug('OK — bytes:', downloaded.size);
+    debug(`OK — tardó ${Date.now() - startedAt}ms`);
+
+    // Un PNG de 1080×1920 nunca pesa 0. Si esto salta, la descarga "tuvo
+    // éxito" con un cuerpo vacío — típico de un proxy o portal cautivo en el
+    // medio, y conviene verlo acá y no cuando Instagram muestre un cuadro
+    // negro.
+    if (downloaded.size === 0) {
+      debug('⚠️  el archivo bajó VACÍO (0 bytes).');
+    }
+
+    debug('─────────── fin ───────────');
     return downloaded.uri;
   } catch (downloadError) {
     const status = httpStatusFrom(downloadError);
+
+    debug('FALLÓ la descarga.');
+    debug('error — status detectado por el regex:', status ?? 'ninguno (no hubo respuesta HTTP)');
+    debug('error — name:', downloadError instanceof Error ? downloadError.name : typeof downloadError);
+    debug('error — message:', downloadError instanceof Error ? downloadError.message : String(downloadError));
+    debug('error — crudo:', downloadError);
+    debug(`error — tardó ${Date.now() - startedAt}ms`);
+    if (status === null) {
+      // Sin status no hubo respuesta: DNS, TLS, cleartext bloqueado en
+      // Android, o el host simplemente no existe.
+      debug('⚠️  sin status HTTP: el servidor no respondió. Probá abrir esta URL en el navegador del celular:');
+      debug('   ', requestUrl);
+    }
+    debug('─────────── fin ───────────');
 
     Logger.error('No se pudo descargar la tarjeta compartible', {
       scope: 'share-card-remote.downloadShareCard',
